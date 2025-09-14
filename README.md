@@ -1,5 +1,5 @@
 # Yhchat_MD3
-用cursor制作的云湖第三方客户端，由cursor IDE强力驱动。
+用Cursor IDE制作的云湖第三方客户端，由AI强力驱动。
 
 
 # 声明
