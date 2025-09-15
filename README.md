@@ -7,5 +7,5 @@
 
 # 特别感谢
 ### [yhchatAPI](https://github.com/yh-Tpdev/yhchatAPI)
-### [yh_user_sdk](https://github.com/yyyytawa-org/yh_user_sdk_node)
-## 以及我
+### [yh_user_sdk](https://github.com/yyyytawa-org/yh_user_sdk)
+- 以及我
