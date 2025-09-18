@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package yh_ws_go;
+
+// 信息
+message INFO {
+    string seq = 1;
+    string cmd = 2;
+}
+
+// 标签
+message Tag {
+    int64 id = 1;
+    string text = 3;
+    string color = 4;
+}
+
+message Msg {
+    string msg_id = 1;
+    Sender sender = 2;
+    string recv_id = 3;
+    string chat_id = 4;
+    int32 chat_type = 5;
+    Content content = 6;
+    int32 content_type = 7;
+    int64 timestamp = 8;
+    Cmd cmd = 9;
+    int64 delete_time = 10;
+    string quote_msg_id = 11;
+    int64 msg_seq = 12;
+    int64 edit_time = 14;
+            
+    message Cmd {
+        int64 id = 1;
+        string name = 2;
+    }
+        
+    message Sender {
+        string chat_id = 1;
+        int32 chat_type = 2;
+        string name = 3;
+        string avatar_url = 4;
+        repeated string tag_old = 6;
+        repeated Tag tag = 7;
+    }
+            
+    message Content {
+        string text = 1;
+        string buttons = 2;
+        string image_url = 3;
+        string file_name = 4;
+        string file_url = 5;
+        string form = 7;
+        string quote_msg_text = 8;
+        string sticker_url = 9;
+        string post_id = 10;
+        string post_title = 11;
+        string post_content = 12;
+        string post_content_type = 13;
+        string html = 14;
+        string audio_url = 15;
+        int64 audio_duration = 16;
+        string video_url = 17;
+        int64 video_duration = 18;
+        string expression_id = 19;
+        string file_key = 20;
+        string file_size = 21;
+        string file_md5 = 22;
+        string file_etag = 23;
+    }
+}
+
+// 心跳响应
+message heartbeat_ack {
+    INFO info = 1;
+}
+
+// 推送消息
+message push_message {
+    INFO info = 1;
+    Msg data = 2;
+}
+
+// 编辑消息
+message edit_message {
+    INFO info = 1;
+    Msg data = 2;
+}
+
+// 草稿输入
+message draft_input {
+    INFO info = 1;
+    string chat_id = 2;
+    int32 chat_type = 3;
+    string text = 4;
+}
+
+// 机器人面板消息
+message bot_board_message {
+    INFO info = 1;
+    Msg data = 2;
+}
