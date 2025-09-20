@@ -1,258 +1,272 @@
 package com.yhchat.canary.ui.chat
 
+import android.util.Log
+import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.yhchat.canary.data.model.*
+import com.yhchat.canary.data.model.ChatMessage
 import com.yhchat.canary.data.repository.MessageRepository
 import com.yhchat.canary.data.repository.TokenRepository
-import com.yhchat.canary.data.websocket.WebSocketManager
-import kotlinx.coroutines.flow.*
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-/**
- * 聊天ViewModel
- */
-class ChatViewModel : ViewModel() {
-    
-    private val messageRepository = MessageRepository()
-    private val webSocketManager = WebSocketManager.getInstance()
-    
-    fun setTokenRepository(tokenRepository: TokenRepository) {
-        messageRepository.setTokenRepository(tokenRepository)
-    }
-    
-    // UI状态
+data class ChatUiState(
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val isConnected: Boolean = false,
+    val isRefreshing: Boolean = false
+)
+
+@HiltViewModel
+class ChatViewModel @Inject constructor(
+    private val messageRepository: MessageRepository,
+    private val tokenRepository: TokenRepository
+) : ViewModel() {
+
+    private var currentChatId: String = ""
+    private var currentChatType: Int = 1
+    private var currentUserId: String = ""
+    private var hasMoreMessages: Boolean = true
+    private var oldestMsgSeq: Long = 0
+
+    private val tag = "ChatViewModel"
+
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
-    
-    // 消息列表
-    private val _messages = MutableStateFlow<List<Message>>(emptyList())
-    val messages: StateFlow<List<Message>> = _messages.asStateFlow()
-    
-    // 当前聊天信息
-    private val _chatInfo = MutableStateFlow<ChatInfo?>(null)
-    val chatInfo: StateFlow<ChatInfo?> = _chatInfo.asStateFlow()
-    
-    init {
-        observeWebSocketMessages()
-    }
-    
+
+    private val _messages = mutableStateListOf<ChatMessage>()
+    val messages: List<ChatMessage> = _messages
+
     /**
      * 初始化聊天
      */
-    fun initChat(token: String, chatId: String, chatType: Int, chatName: String) {
-        _chatInfo.value = ChatInfo(chatId, chatType, chatName)
-        loadMessages(token, chatId, chatType)
+    fun initChat(chatId: String, chatType: Int, userId: String) {
+        currentChatId = chatId
+        currentChatType = chatType
+        currentUserId = userId
+        
+        Log.d(tag, "Initializing chat: chatId=$chatId, chatType=$chatType, userId=$userId")
+        
+        // 清空之前的消息
+        _messages.clear()
+        hasMoreMessages = true
+        oldestMsgSeq = 0
+        
+        // 加载初始消息
+        loadMessages()
     }
-    
+
     /**
-     * 加载消息
+     * 加载消息列表
      */
-    fun loadMessages(token: String, chatId: String, chatType: Int) {
+    fun loadMessages(refresh: Boolean = false) {
+        if (currentChatId.isEmpty()) {
+            Log.w(tag, "Chat not initialized")
+            return
+        }
+
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            
-            messageRepository.getMessages(token, chatId, chatType, 20)
-                .onSuccess { messageList ->
-                    _messages.value = messageList.reversed() // 反转以显示最新消息在底部
-                    _uiState.value = _uiState.value.copy(isLoading = false)
+            try {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = !refresh,
+                    isRefreshing = refresh,
+                    error = null
+                )
+
+                val result = if (oldestMsgSeq > 0 && !refresh) {
+                    // 加载更多历史消息
+                    messageRepository.getMessagesBySeq(
+                        chatId = currentChatId,
+                        chatType = currentChatType,
+                        msgSeq = oldestMsgSeq
+                    )
+                } else {
+                    // 加载最新消息
+                    messageRepository.getMessages(
+                        chatId = currentChatId,
+                        chatType = currentChatType,
+                        msgCount = 20
+                    )
                 }
-                .onFailure { error ->
+
+                result.fold(
+                    onSuccess = { newMessages ->
+                        Log.d(tag, "Loaded ${newMessages.size} messages")
+                        
+                        if (refresh) {
+                            // 刷新时替换所有消息
+                            _messages.clear()
+                            _messages.addAll(newMessages.sortedBy { it.sendTime })
+                        } else {
+                            // 加载更多时添加到现有消息前面
+                            val sortedNewMessages = newMessages.sortedBy { it.sendTime }
+                            _messages.addAll(0, sortedNewMessages)
+                        }
+
+                        // 更新最旧消息的序列号
+                        if (newMessages.isNotEmpty()) {
+                            oldestMsgSeq = newMessages.minOfOrNull { it.msgSeq ?: 0L } ?: oldestMsgSeq
+                        }
+
+                        // 检查是否还有更多消息
+                        hasMoreMessages = newMessages.size >= 20
+
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isRefreshing = false,
+                            error = null
+                        )
+                    },
+                    onFailure = { exception ->
+                        Log.e(tag, "Failed to load messages", exception)
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isRefreshing = false,
+                            error = exception.message ?: "加载消息失败"
+                        )
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(tag, "Error loading messages", e)
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = error.message
+                    isRefreshing = false,
+                    error = e.message ?: "加载消息失败"
                     )
                 }
         }
     }
     
     /**
+     * 加载更多历史消息
+     */
+    fun loadMoreMessages() {
+        if (!hasMoreMessages || _uiState.value.isLoading) {
+            Log.d(tag, "No more messages to load or already loading")
+            return
+        }
+        
+        Log.d(tag, "Loading more messages from seq: $oldestMsgSeq")
+        loadMessages(refresh = false)
+    }
+
+    /**
      * 发送文本消息
      */
-    fun sendTextMessage(token: String, text: String, quoteMsgId: String? = null) {
-        val chatInfo = _chatInfo.value ?: return
-        if (text.isBlank()) return
+    fun sendTextMessage(text: String, quoteMsgId: String? = null) {
+        if (text.isBlank() || currentChatId.isEmpty()) {
+            Log.w(tag, "Cannot send empty message or chat not initialized")
+            return
+        }
         
         viewModelScope.launch {
-            messageRepository.sendTextMessage(
-                token = token,
-                chatId = chatInfo.chatId,
-                chatType = chatInfo.chatType,
-                text = text,
-                quoteMsgId = quoteMsgId
-            ).onSuccess {
-                // 发送成功，刷新消息列表
-                loadMessages(token, chatInfo.chatId, chatInfo.chatType)
-            }.onFailure { error ->
-                _uiState.value = _uiState.value.copy(error = error.message)
-            }
-        }
-    }
-    
-    /**
-     * 发送图片消息
-     */
-    fun sendImageMessage(token: String, imageKey: String, width: Long? = null, height: Long? = null) {
-        val chatInfo = _chatInfo.value ?: return
-        
-        viewModelScope.launch {
-            messageRepository.sendImageMessage(
-                token = token,
-                chatId = chatInfo.chatId,
-                chatType = chatInfo.chatType,
-                imageKey = imageKey,
-                width = width,
-                height = height
-            ).onSuccess {
-                // 发送成功，刷新消息列表
-                loadMessages(token, chatInfo.chatId, chatInfo.chatType)
-            }.onFailure { error ->
-                _uiState.value = _uiState.value.copy(error = error.message)
-            }
-        }
-    }
-    
-    /**
-     * 发送语音消息
-     */
-    fun sendAudioMessage(token: String, audioKey: String, audioTime: Long) {
-        val chatInfo = _chatInfo.value ?: return
-        
-        viewModelScope.launch {
-            messageRepository.sendAudioMessage(
-                token = token,
-                chatId = chatInfo.chatId,
-                chatType = chatInfo.chatType,
-                audioKey = audioKey,
-                audioTime = audioTime
-            ).onSuccess {
-                // 发送成功，刷新消息列表
-                loadMessages(token, chatInfo.chatId, chatInfo.chatType)
-            }.onFailure { error ->
-                _uiState.value = _uiState.value.copy(error = error.message)
-            }
-        }
-    }
-    
-    /**
-     * 编辑消息
-     */
-    fun editMessage(token: String, msgId: String, newContent: MessageContent) {
-        val chatInfo = _chatInfo.value ?: return
-        
-        viewModelScope.launch {
-            messageRepository.editMessage(
-                token = token,
-                msgId = msgId,
-                chatId = chatInfo.chatId,
-                chatType = chatInfo.chatType,
-                contentType = MessageType.TEXT.value,
-                content = newContent
-            ).onSuccess {
-                // 编辑成功，刷新消息列表
-                loadMessages(token, chatInfo.chatId, chatInfo.chatType)
-            }.onFailure { error ->
-                _uiState.value = _uiState.value.copy(error = error.message)
-            }
-        }
-    }
-    
-    /**
-     * 撤回消息
-     */
-    fun recallMessage(token: String, msgId: String) {
-        val chatInfo = _chatInfo.value ?: return
-        
-        viewModelScope.launch {
-            messageRepository.recallMessage(
-                token = token,
-                msgId = msgId,
-                chatId = chatInfo.chatId,
-                chatType = chatInfo.chatType
-            ).onSuccess {
-                // 撤回成功，刷新消息列表
-                loadMessages(token, chatInfo.chatId, chatInfo.chatType)
-            }.onFailure { error ->
-                _uiState.value = _uiState.value.copy(error = error.message)
-            }
-        }
-    }
-    
-    /**
-     * 观察WebSocket消息
-     */
-    private fun observeWebSocketMessages() {
-        viewModelScope.launch {
-            webSocketManager.messages.collect { message ->
-                // 检查是否是当前聊天的消息
-                val chatInfo = _chatInfo.value
-                if (chatInfo != null && isMessageForCurrentChat(message, chatInfo)) {
-                    // 添加到消息列表
-                    val msg = message.data?.get("message") as? com.yhchat.canary.data.model.Message
-                    if (msg != null) {
-                        _messages.value = _messages.value + msg
+            try {
+                Log.d(tag, "Sending message: $text")
+                
+                val result = messageRepository.sendMessage(
+                    chatId = currentChatId,
+                    chatType = currentChatType,
+                    text = text,
+                    contentType = 1, // 文本消息
+                    quoteMsgId = quoteMsgId
+                )
+
+                result.fold(
+                    onSuccess = { success ->
+                        if (success) {
+                            Log.d(tag, "Message sent successfully")
+                            // 发送成功后刷新消息列表以获取最新消息
+                            loadMessages(refresh = true)
+                        }
+                    },
+                    onFailure = { exception ->
+                        Log.e(tag, "Failed to send message", exception)
+                        _uiState.value = _uiState.value.copy(
+                            error = exception.message ?: "发送消息失败"
+                        )
                     }
-                }
+                )
+            } catch (e: Exception) {
+                Log.e(tag, "Error sending message", e)
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "发送消息失败"
+                )
             }
         }
     }
     
     /**
-     * 检查消息是否属于当前聊天
+     * 添加新收到的消息（通过WebSocket）
      */
-    private fun isMessageForCurrentChat(message: com.yhchat.canary.data.model.WebSocketMessage, chatInfo: ChatInfo): Boolean {
-        // 这里需要根据消息的发送者或聊天ID来判断
-        // 简化处理，实际项目中需要更复杂的逻辑
-        return true
+    fun addNewMessage(message: ChatMessage) {
+        Log.d(tag, "Adding new message: ${message.msgId}")
+        
+        // 检查消息是否已存在
+        val existingIndex = _messages.indexOfFirst { it.msgId == message.msgId }
+        if (existingIndex != -1) {
+            // 消息已存在，更新它
+            _messages[existingIndex] = message
+            Log.d(tag, "Updated existing message: ${message.msgId}")
+        } else {
+            // 新消息，按时间排序插入
+            val insertIndex = _messages.indexOfLast { it.sendTime <= message.sendTime } + 1
+            _messages.add(insertIndex, message)
+            Log.d(tag, "Inserted new message at index: $insertIndex")
+        }
     }
     
     /**
-     * 清除错误信息
+     * 更新消息（编辑后）
+     */
+    fun updateMessage(message: ChatMessage) {
+        val index = _messages.indexOfFirst { it.msgId == message.msgId }
+        if (index != -1) {
+            _messages[index] = message
+            Log.d(tag, "Updated message: ${message.msgId}")
+        }
+    }
+    
+    /**
+     * 删除消息（撤回）
+     */
+    fun removeMessage(msgId: String) {
+        val index = _messages.indexOfFirst { it.msgId == msgId }
+        if (index != -1) {
+            _messages.removeAt(index)
+            Log.d(tag, "Removed message: $msgId")
+        }
+    }
+    
+    /**
+     * 清除错误状态
      */
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
     
     /**
-     * 加载更多消息
+     * 刷新消息
      */
-    fun loadMoreMessages(token: String) {
-        val chatInfo = _chatInfo.value ?: return
-        val messages = _messages.value
-        if (messages.isEmpty()) return
-        
-        val oldestMessage = messages.first()
-        
-        viewModelScope.launch {
-            messageRepository.getMessages(
-                token = token,
-                chatId = chatInfo.chatId,
-                chatType = chatInfo.chatType,
-                msgCount = 20,
-                msgId = oldestMessage.msgId
-            ).onSuccess { newMessages ->
-                _messages.value = (newMessages.reversed() + messages).distinctBy { it.msgId }
-            }.onFailure { error ->
-                _uiState.value = _uiState.value.copy(error = error.message)
-            }
-        }
+    fun refreshMessages() {
+        Log.d(tag, "Refreshing messages")
+        oldestMsgSeq = 0
+        hasMoreMessages = true
+        loadMessages(refresh = true)
+    }
+
+    /**
+     * 获取当前用户ID
+     */
+    fun getCurrentUserId(): String = currentUserId
+
+    /**
+     * 检查消息是否来自当前用户
+     */
+    fun isMyMessage(message: ChatMessage): Boolean {
+        return message.sender.chatId == currentUserId
     }
 }
-
-/**
- * 聊天UI状态
- */
-data class ChatUiState(
-    val isLoading: Boolean = false,
-    val error: String? = null,
-    val isSending: Boolean = false
-)
-
-/**
- * 聊天信息
- */
-data class ChatInfo(
-    val chatId: String,
-    val chatType: Int,
-    val chatName: String
-)

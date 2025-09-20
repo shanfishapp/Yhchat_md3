@@ -2,8 +2,9 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    id("kotlin-kapt")
-    id("com.google.protobuf") version "0.9.4"
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
+    id("com.google.protobuf") version "0.9.1"
 }
 
 android {
@@ -70,6 +71,10 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.material:material:1.6.8")
+
+    // 下拉刷新
+    implementation("com.google.accompanist:accompanist-swiperefresh:0.32.0")
     
     // 网络请求
     implementation(libs.retrofit)
@@ -81,6 +86,17 @@ dependencies {
     // 图片加载
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
+    
+    // Markwon Markdown 解析和渲染
+    implementation("io.noties.markwon:core:4.6.2")
+    implementation("io.noties.markwon:html:4.6.2")
+    implementation("io.noties.markwon:image-coil:4.6.2")
+    implementation("io.noties.markwon:linkify:4.6.2")
+    implementation("io.noties.markwon:ext-strikethrough:4.6.2")
+    implementation("io.noties.markwon:ext-tables:4.6.2")
+    
+    // HTML 文本渲染支持
+    implementation("androidx.compose.ui:ui-text-google-fonts")
     
     // WebSocket - 暂时注释掉，使用OkHttp WebSocket
     // implementation(libs.websocket)
@@ -94,7 +110,11 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
-    kapt(libs.room.compiler)
+    ksp(libs.room.compiler)
+    
+    // Hilt
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

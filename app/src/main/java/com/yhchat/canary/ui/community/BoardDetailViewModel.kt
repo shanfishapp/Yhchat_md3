@@ -5,15 +5,18 @@ import androidx.lifecycle.viewModelScope
 import com.yhchat.canary.data.model.*
 import com.yhchat.canary.data.repository.CommunityRepository
 import com.yhchat.canary.data.repository.TokenRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * 分区详情ViewModel
  */
-class BoardDetailViewModel(
+@HiltViewModel
+class BoardDetailViewModel @Inject constructor(
     private val communityRepository: CommunityRepository,
     private val tokenRepository: TokenRepository
 ) : ViewModel() {

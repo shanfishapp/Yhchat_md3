@@ -2,19 +2,24 @@ package com.yhchat.canary
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import dagger.hilt.android.AndroidEntryPoint
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.yhchat.canary.ui.login.LoginScreen
 import com.yhchat.canary.ui.conversation.ConversationScreen
 import com.yhchat.canary.ui.chat.ChatScreen
 import com.yhchat.canary.ui.community.CommunityScreen
+import com.yhchat.canary.ui.contacts.ContactsScreen
+import com.yhchat.canary.ui.discover.DiscoverScreen
+import com.yhchat.canary.ui.profile.ProfileScreen
+import com.yhchat.canary.ui.search.SearchScreen
+import com.yhchat.canary.data.model.SearchItem
 import com.yhchat.canary.ui.components.BottomNavigationBar
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import com.yhchat.canary.data.local.AppDatabase
@@ -26,7 +31,10 @@ import coil.ImageLoader
 import coil.Coil
 import coil.request.CachePolicy
 import okhttp3.OkHttpClient
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,50 +67,42 @@ class MainActivity : ComponentActivity() {
         Coil.setImageLoader(imageLoader)
         setContent {
             YhchatCanaryTheme {
-                var isLoggedIn by remember { mutableStateOf(false) }
-                var token by remember { mutableStateOf("") }
-                var userId by remember { mutableStateOf("") }
+                // 使用MainViewModel
+                val mainViewModel: MainViewModel = viewModel()
+                val isInitialized by mainViewModel.isInitialized.collectAsStateWithLifecycle()
+                val isLoggedIn by mainViewModel.isLoggedIn.collectAsStateWithLifecycle()
+                val savedToken by mainViewModel.savedToken.collectAsStateWithLifecycle()
+                val savedUserId by mainViewModel.userId.collectAsStateWithLifecycle()
+                val tokenRepository by mainViewModel.tokenRepository.collectAsStateWithLifecycle()
+                val userRepository by mainViewModel.userRepository.collectAsStateWithLifecycle()
+
+                // 本地状态
+                var token by remember { mutableStateOf(savedToken ?: "") }
+                var userId by remember { mutableStateOf(savedUserId ?: "") }
                 var currentScreen by remember { mutableStateOf("conversation") }
                 var currentChatId by remember { mutableStateOf("") }
                 var currentChatType by remember { mutableStateOf(0) }
                 var currentChatName by remember { mutableStateOf("") }
-                var tokenRepository by remember { mutableStateOf<TokenRepository?>(null) }
-                var userRepository by remember { mutableStateOf<UserRepository?>(null) }
                 var pendingLoginToken by remember { mutableStateOf<String?>(null) }
-                
-                // 获取上下文
-                val context = LocalContext.current
-                
-                // 初始化数据库
-                LaunchedEffect(Unit) {
-                    val database = AppDatabase.getDatabase(context)
-                    tokenRepository = TokenRepository(database.userTokenDao())
-                    userRepository = UserRepository().apply { 
-                        setTokenRepository(tokenRepository!!) 
-                    }
-                    
-                    // 检查是否已登录
-                    val savedToken = tokenRepository?.getTokenSync()
-                    if (savedToken != null) {
-                        token = savedToken
-                        // 获取用户信息
-                        userRepository?.getUserInfo()?.onSuccess { user ->
-                            userId = user.id
-                        }?.onFailure {
-                            // 如果获取用户信息失败，使用token的后8位作为userId
-                            userId = "user_${savedToken.takeLast(8)}"
-                        }
-                        isLoggedIn = true
-                    }
+
+                // 同步ViewModel状态到本地状态
+                LaunchedEffect(savedToken) {
+                    savedToken?.let { token = it }
                 }
-                
+                LaunchedEffect(savedUserId) {
+                    savedUserId?.let { userId = it }
+                }
+
                 // 处理登录后的用户信息获取
                 LaunchedEffect(pendingLoginToken) {
                     pendingLoginToken?.let { loginToken ->
                         userRepository?.getUserInfo()?.onSuccess { user ->
                             userId = user.id
+                            mainViewModel.onLoginSuccess(loginToken, user.id)
                         }?.onFailure {
-                            // 如果获取用户信息失败，保持当前的userId
+                            // 如果获取用户信息失败，使用token的后8位作为userId
+                            userId = "user_${loginToken.takeLast(8)}"
+                            mainViewModel.onLoginSuccess(loginToken, userId)
                         }
                         pendingLoginToken = null
                     }
@@ -116,26 +116,25 @@ class MainActivity : ComponentActivity() {
                                 token = loginToken
                                 pendingLoginToken = loginToken
                                 userId = loginUserId
-                                isLoggedIn = true
+                                mainViewModel.onLoginSuccess(loginToken, loginUserId)
                             },
                             tokenRepository = tokenRepository
                         )
                     }
                     currentScreen == "chat" -> {
                         // 显示聊天界面
-                        ChatScreen(
-                            token = token,
-                            chatId = currentChatId,
-                            chatType = currentChatType,
-                            chatName = currentChatName,
-                            onBackClick = {
-                                currentScreen = "conversation"
-                            },
-                            onMenuClick = {
-                                // 显示聊天菜单
-                            },
-                            tokenRepository = tokenRepository
-                        )
+                        if (currentChatId.isNotEmpty()) {
+                            ChatScreen(
+                                chatId = currentChatId,
+                                chatType = currentChatType,
+                                chatName = currentChatName,
+                                userId = userId,
+                                onBackClick = {
+                                    currentScreen = "conversation"
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
                     else -> {
                         // 主界面，包含底部导航栏
@@ -154,14 +153,16 @@ class MainActivity : ComponentActivity() {
                                     ConversationScreen(
                                         token = token,
                                         userId = userId,
-                                        onConversationClick = { chatId, chatType ->
+                                        onConversationClick = { chatId, chatType, chatName ->
                                             currentChatId = chatId
                                             currentChatType = chatType
-                                            currentChatName = "聊天" // 这里应该从会话数据中获取名称
+                                            currentChatName = chatName
                                             currentScreen = "chat"
                                         },
                                         onSearchClick = {
-                                            // 跳转到搜索界面
+                                            if (isInitialized) {
+                                                currentScreen = "search"
+                                            }
                                         },
                                         onMenuClick = {
                                             // 显示菜单
@@ -175,6 +176,60 @@ class MainActivity : ComponentActivity() {
                                         token = token,
                                         modifier = Modifier.padding(paddingValues)
                                     )
+                                }
+                                "contacts" -> {
+                                    ContactsScreen(
+                                        modifier = Modifier.padding(paddingValues)
+                                    )
+                                }
+                                "discover" -> {
+                                    DiscoverScreen(
+                                        modifier = Modifier.padding(paddingValues)
+                                    )
+                                }
+                                "profile" -> {
+                                    ProfileScreen(
+                                        modifier = Modifier.padding(paddingValues)
+                                    )
+                                }
+                                "search" -> {
+                                    if (isInitialized && tokenRepository != null) {
+                                        SearchScreen(
+                                            onBackClick = {
+                                                currentScreen = "conversation"
+                                            },
+                                            onItemClick = { searchItem ->
+                                                // 处理搜索项点击，可以跳转到聊天界面
+                                                currentChatId = searchItem.friendId
+                                                currentChatType = searchItem.friendType
+                                                currentChatName = searchItem.nickname
+                                                currentScreen = "chat"
+                                            },
+                                            modifier = Modifier.padding(paddingValues)
+                                        )
+                                    } else {
+                                        // 数据库还未初始化，显示加载状态
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            CircularProgressIndicator()
+                                        }
+                                    }
+                                }
+                                "chat" -> {
+                                    if (currentChatId.isNotEmpty()) {
+                                        ChatScreen(
+                                            chatId = currentChatId,
+                                            chatType = currentChatType,
+                                            chatName = currentChatName,
+                                            userId = userId,
+                                            onBackClick = {
+                                                currentScreen = "conversation"
+                                            },
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
                                 }
                             }
                         }

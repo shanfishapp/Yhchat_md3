@@ -5,15 +5,18 @@ import androidx.lifecycle.viewModelScope
 import com.yhchat.canary.data.model.*
 import com.yhchat.canary.data.repository.CommunityRepository
 import com.yhchat.canary.data.repository.TokenRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * 文章详情ViewModel
  */
-class PostDetailViewModel(
+@HiltViewModel
+class PostDetailViewModel @Inject constructor(
     private val communityRepository: CommunityRepository,
     private val tokenRepository: TokenRepository
 ) : ViewModel() {
@@ -160,6 +163,22 @@ class PostDetailViewModel(
         val currentPage = _commentListState.value.currentPage
         if (_commentListState.value.hasMore && !_commentListState.value.isLoading) {
             loadCommentList(token, postId, currentPage + 1)
+        }
+    }
+    
+    /**
+     * 点赞评论
+     */
+    fun likeComment(token: String, postId: Int, commentId: Int) {
+        viewModelScope.launch {
+            communityRepository.likeComment(token, commentId)
+                .onSuccess {
+                    // 重新加载评论列表以获取最新状态
+                    loadCommentList(token, postId, 1)
+                }
+                .onFailure { error ->
+                    _commentListState.value = _commentListState.value.copy(error = error.message)
+                }
         }
     }
     

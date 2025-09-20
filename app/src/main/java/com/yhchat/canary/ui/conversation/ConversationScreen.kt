@@ -5,13 +5,22 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import com.google.accompanist.swiperefresh.SwipeRefresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.animation.*
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -27,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import com.yhchat.canary.data.model.Conversation
 import com.yhchat.canary.data.model.ChatType
+import com.yhchat.canary.ui.sticky.StickyConversations
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -38,7 +48,7 @@ import java.util.*
 fun ConversationScreen(
     token: String,
     userId: String,
-    onConversationClick: (String, Int) -> Unit, // chatId, chatType
+    onConversationClick: (String, Int, String) -> Unit, // chatId, chatType, chatName
     onSearchClick: () -> Unit,
     onMenuClick: () -> Unit,
     tokenRepository: com.yhchat.canary.data.repository.TokenRepository? = null,
@@ -47,7 +57,25 @@ fun ConversationScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val conversations by viewModel.conversations.collectAsState()
-    
+
+    // 列表状态
+    val listState = rememberLazyListState()
+
+    // 置顶栏显示状态
+    var showStickyBar by remember { mutableStateOf(false) }
+
+    // 刷新状态
+    var refreshing by remember { mutableStateOf(false) }
+
+    // 下拉刷新状态
+    val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = refreshing)
+
+    // 监听列表滚动位置，控制置顶栏显示
+    LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) {
+        // 只有当滚动到顶部附近（前几个项目且滚动偏移较小）时才显示置顶栏
+        showStickyBar = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 100
+    }
+
     // 设置tokenRepository
     LaunchedEffect(tokenRepository) {
         tokenRepository?.let { viewModel.setTokenRepository(it) }
@@ -69,6 +97,9 @@ fun ConversationScreen(
         modifier = modifier.fillMaxSize()
     ) {
         // 顶部应用栏
+
+
+
         TopAppBar(
             title = {
                 Text(
@@ -109,44 +140,66 @@ fun ConversationScreen(
             }
         }
         
-        // 会话列表
-        if (uiState.isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
+        // 置顶会话（根据滚动状态显示/隐藏，带动画效果）
+        AnimatedVisibility(
+            visible = showStickyBar,
+            enter = slideInVertically() + fadeIn(),
+            exit = slideOutVertically() + fadeOut()
+        ) {
+            StickyConversations(
+                onConversationClick = onConversationClick,
+                tokenRepository = tokenRepository
+            )
+        }
+
+        // 会话列表（支持下拉刷新）
+        SwipeRefresh(
+            state = swipeRefreshState,
+            onRefresh = {
+                refreshing = true
+                viewModel.loadConversations(token)
+                refreshing = false
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(vertical = 8.dp)
-            ) {
-                items(conversations) { conversation ->
-                    ConversationItem(
-                        conversation = conversation,
-                        onClick = {
-                            onConversationClick(conversation.chatId, conversation.chatType)
-                        },
-                        onLongClick = {
-                            // 长按处理
-                        }
-                    )
+        ) {
+            if (uiState.isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
                 }
-                
-                if (conversations.isEmpty()) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "暂无会话",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    items(conversations) { conversation ->
+                        ConversationItem(
+                            conversation = conversation,
+                            onClick = {
+                                onConversationClick(conversation.chatId, conversation.chatType, conversation.name)
+                            },
+                            onLongClick = {
+                                // 长按处理
+                            }
+                        )
+                    }
+
+                    if (conversations.isEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "暂无会话",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }

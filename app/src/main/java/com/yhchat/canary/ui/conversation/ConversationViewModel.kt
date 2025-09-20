@@ -6,33 +6,38 @@ import com.yhchat.canary.data.model.Conversation
 import com.yhchat.canary.data.repository.ConversationRepository
 import com.yhchat.canary.data.repository.TokenRepository
 import com.yhchat.canary.data.websocket.WebSocketManager
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * 会话列表ViewModel
  */
-class ConversationViewModel : ViewModel() {
-    
-    private val conversationRepository = ConversationRepository()
+@HiltViewModel
+class ConversationViewModel @Inject constructor(
+    private val conversationRepository: ConversationRepository
+) : ViewModel() {
+
     private val webSocketManager = WebSocketManager.getInstance()
-    
-    fun setTokenRepository(tokenRepository: TokenRepository) {
-        conversationRepository.setTokenRepository(tokenRepository)
-    }
-    
-    // UI状态
-    private val _uiState = MutableStateFlow(ConversationUiState())
-    val uiState: StateFlow<ConversationUiState> = _uiState.asStateFlow()
-    
-    // 会话列表
-    private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
-    val conversations: StateFlow<List<Conversation>> = _conversations.asStateFlow()
-    
+
     init {
+        // 启动WebSocket观察
         observeWebSocketConversations()
         observeWebSocketMessages()
     }
+
+    fun setTokenRepository(tokenRepository: TokenRepository) {
+        conversationRepository.setTokenRepository(tokenRepository)
+    }
+
+    // UI状态
+    private val _uiState = MutableStateFlow(ConversationUiState())
+    val uiState: StateFlow<ConversationUiState> = _uiState.asStateFlow()
+
+    // 会话列表
+    private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
+    val conversations: StateFlow<List<Conversation>> = _conversations.asStateFlow()
     
     /**
      * 加载会话列表
@@ -99,14 +104,14 @@ class ConversationViewModel : ViewModel() {
                 when (message.cmd) {
                     "push_message" -> {
                         // 新消息到达，更新会话列表
-                        val msg = message.data?.get("message") as? com.yhchat.canary.data.model.Message
+                        val msg = message.data?.get("message") as? com.yhchat.canary.data.model.ChatMessage
                         if (msg != null) {
                             updateConversationWithNewMessage(msg)
                         }
                     }
                     "edit_message" -> {
                         // 消息被编辑，更新会话列表
-                        val msg = message.data?.get("message") as? com.yhchat.canary.data.model.Message
+                        val msg = message.data?.get("message") as? com.yhchat.canary.data.model.ChatMessage
                         if (msg != null) {
                             updateConversationWithEditedMessage(msg)
                         }
@@ -119,7 +124,7 @@ class ConversationViewModel : ViewModel() {
     /**
      * 用新消息更新会话列表
      */
-    private fun updateConversationWithNewMessage(message: com.yhchat.canary.data.model.Message) {
+    private fun updateConversationWithNewMessage(message: com.yhchat.canary.data.model.ChatMessage) {
         val currentConversations = _conversations.value.toMutableList()
         val conversationIndex = currentConversations.indexOfFirst { it.chatId == message.sender.chatId }
         
@@ -156,7 +161,7 @@ class ConversationViewModel : ViewModel() {
     /**
      * 用编辑的消息更新会话列表
      */
-    private fun updateConversationWithEditedMessage(message: com.yhchat.canary.data.model.Message) {
+    private fun updateConversationWithEditedMessage(message: com.yhchat.canary.data.model.ChatMessage) {
         val currentConversations = _conversations.value.toMutableList()
         val conversationIndex = currentConversations.indexOfFirst { it.chatId == message.sender.chatId }
         

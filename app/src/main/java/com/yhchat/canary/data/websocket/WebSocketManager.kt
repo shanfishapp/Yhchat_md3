@@ -3,6 +3,8 @@ package com.yhchat.canary.data.websocket
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import com.yhchat.canary.data.model.Conversation
+import com.yhchat.canary.data.model.WebSocketMessage
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import okhttp3.*
@@ -38,12 +40,12 @@ class WebSocketManager private constructor() {
     private var heartbeatJob: Job? = null
     
     // 消息流
-        private val _messages = MutableSharedFlow<com.yhchat.canary.data.model.WebSocketMessage>()
-        val messages: SharedFlow<com.yhchat.canary.data.model.WebSocketMessage> = _messages.asSharedFlow()
+    private val _messages = MutableSharedFlow<WebSocketMessage>()
+    val messages: SharedFlow<WebSocketMessage> = _messages.asSharedFlow()
     
     // 会话更新流
-    private val _conversations = MutableSharedFlow<List<com.yhchat.canary.data.model.Conversation>>()
-    val conversations: SharedFlow<List<com.yhchat.canary.data.model.Conversation>> = _conversations.asSharedFlow()
+    private val _conversations = MutableSharedFlow<List<Conversation>>()
+    val conversations: SharedFlow<List<Conversation>> = _conversations.asSharedFlow()
     
     /**
      * 连接WebSocket
@@ -191,14 +193,14 @@ class WebSocketManager private constructor() {
                 Log.d(TAG, "Parsed WebSocket message: ${message.cmd}")
                 _messages.tryEmit(message)
                 
-                    // 如果是推送消息，更新会话列表
-                    if (message.cmd == "push_message" && message.data != null) {
-                        val msg = message.data["message"] as? com.yhchat.canary.data.model.Message
-                        if (msg != null) {
-                            // 这里可以更新会话列表的最后一条消息
-                            Log.d(TAG, "New message in chat ${msg.sender.chatId}: ${msg.content.text}")
-                        }
+                // 如果是推送消息，更新会话列表
+                if (message.cmd == "push_message" && message.data != null) {
+                    val msg = message.data["message"] as? com.yhchat.canary.data.model.ChatMessage
+                    if (msg != null) {
+                        // 这里可以更新会话列表的最后一条消息
+                        Log.d(TAG, "New message in chat ${msg.sender.chatId}: ${msg.content.text}")
                     }
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse binary message", e)
@@ -220,12 +222,3 @@ class WebSocketManager private constructor() {
      */
     fun isConnected(): Boolean = isConnected
 }
-
-/**
- * WebSocket消息数据类
- */
-data class WebSocketMessage(
-    val cmd: String,
-    val data: Any? = null,
-    val timestamp: Long = System.currentTimeMillis()
-)

@@ -4,11 +4,12 @@ import com.yhchat.canary.data.api.ApiService
 import com.yhchat.canary.data.api.*
 import com.yhchat.canary.data.model.*
 import retrofit2.Response
+import javax.inject.Inject
 
 /**
  * 社区数据仓库
  */
-class CommunityRepository(
+class CommunityRepository @Inject constructor(
     private val apiService: ApiService
 ) {
     
@@ -159,6 +160,32 @@ class CommunityRepository(
         return try {
             val request = LikePostRequest(id = postId)
             val response = apiService.likePost(token, request)
+            
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null && body.code == 1) {
+                    Result.success(body)
+                } else {
+                    Result.failure(Exception("API返回错误: ${body?.message ?: "未知错误"}"))
+                }
+            } else {
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 点赞评论
+     */
+    suspend fun likeComment(
+        token: String,
+        commentId: Int
+    ): Result<ApiStatus> {
+        return try {
+            val request = LikeCommentRequest(id = commentId)
+            val response = apiService.likeComment(token, request)
             
             if (response.isSuccessful) {
                 val body = response.body()

@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -20,6 +21,10 @@ import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.MonetizationOn
+import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,6 +40,16 @@ import com.yhchat.canary.data.di.RepositoryFactory
 import com.yhchat.canary.data.model.CommunityPost
 import com.yhchat.canary.data.model.CommunityComment
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.platform.LocalContext
+import android.widget.TextView
+import android.content.Context
+import io.noties.markwon.Markwon
+import io.noties.markwon.html.HtmlPlugin
+import io.noties.markwon.image.coil.CoilImagesPlugin
+import io.noties.markwon.linkify.LinkifyPlugin
+import io.noties.markwon.ext.strikethrough.StrikethroughPlugin
+import io.noties.markwon.ext.tables.TablePlugin
 
 /**
  * 文章详情Activity
@@ -53,8 +68,7 @@ class PostDetailActivity : ComponentActivity() {
                 val viewModel: PostDetailViewModel = viewModel {
                     PostDetailViewModel(
                         communityRepository = RepositoryFactory.getCommunityRepository(this@PostDetailActivity),
-                        tokenRepository = RepositoryFactory.
-                        getTokenRepository(this@PostDetailActivity)
+                        tokenRepository = RepositoryFactory.getTokenRepository(this@PostDetailActivity)
                     )
                 }
                 
@@ -213,7 +227,16 @@ fun PostDetailScreen(
                     
                     // 评论列表
                     items(commentListState.comments) { comment ->
-                        CommentItem(comment = comment)
+                        CommentItem(
+                            comment = comment,
+                            onLikeClick = { commentId ->
+                                viewModel.likeComment(token, postId, commentId)
+                            },
+                            onReplyClick = { commentId ->
+                                // TODO: 实现回复功能
+                                showCommentInput = true
+                            }
+                        )
                     }
                     
                     // 加载更多评论
@@ -314,83 +337,99 @@ fun PostContentCard(
     onRewardClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+        // 作者信息
+        Row(
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // 作者信息
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                AsyncImage(
-                    model = post.senderAvatar,
-                    contentDescription = post.senderNickname,
-                    modifier = Modifier.size(48.dp),
-                    contentScale = ContentScale.Crop
-                )
-                
-                Spacer(modifier = Modifier.width(12.dp))
-                
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = post.senderNickname,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                        if (post.isVip == 1) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                color = MaterialTheme.colorScheme.primary,
-                                shape = MaterialTheme.shapes.small
-                            ) {
-                                Text(
-                                    text = "VIP",
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                            }
+            AsyncImage(
+                model = post.senderAvatar,
+                contentDescription = post.senderNickname,
+                modifier = Modifier.size(48.dp),
+                contentScale = ContentScale.Crop
+            )
+            
+            Spacer(modifier = Modifier.width(12.dp))
+            
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = post.senderNickname,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    if (post.isVip == 1) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Text(
+                                text = "VIP",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
                         }
                     }
-                    Text(
-                        text = post.createTimeText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
+                Text(
+                    text = post.createTimeText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // 文章标题
-            Text(
-                text = post.title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // 文章标题
+        Text(
+            text = post.title,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        // 文章内容 - 支持Markdown和HTML
+        if (post.contentType == 2) {
+            // Markdown 内容 - 使用Markwon渲染
+            MarkdownContent(
+                markdown = post.content,
+                modifier = Modifier.fillMaxWidth()
             )
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // 文章内容
+        } else {
+            // 普通文本内容
             Text(
                 text = post.content,
-                style = MaterialTheme.typography.bodyLarge,
-                lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.5
+                style = MaterialTheme.typography.bodyMedium,
+                lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.3
             )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // 操作按钮
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // 操作按钮 - 使用MD3图标
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            )
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 ActionButton(
-                    icon = if (post.isLiked == "1") Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    icon = if (post.isLiked == "1") Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp,
                     text = "点赞",
                     count = post.likeNum,
                     isActive = post.isLiked == "1",
@@ -406,7 +445,7 @@ fun PostContentCard(
                 )
                 
                 ActionButton(
-                    icon = if (post.isCollected == 1) Icons.Default.Star else Icons.Default.StarBorder,
+                    icon = if (post.isCollected == 1) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
                     text = "收藏",
                     count = post.collectNum,
                     isActive = post.isCollected == 1,
@@ -414,7 +453,7 @@ fun PostContentCard(
                 )
                 
                 ActionButton(
-                    icon = Icons.Default.MonetizationOn,
+                    icon = if (post.isReward == 1) Icons.Filled.MonetizationOn else Icons.Outlined.MonetizationOn,
                     text = "打赏",
                     count = post.amountNum.toInt(),
                     isActive = post.isReward == 1,
@@ -475,72 +514,249 @@ private fun ActionButton(
 @Composable
 fun CommentItem(
     comment: CommunityComment,
+    onLikeClick: (Int) -> Unit = {},
+    onReplyClick: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.Top
+        Column(
+            modifier = Modifier.padding(12.dp)
         ) {
-            AsyncImage(
-                model = comment.senderAvatar,
-                contentDescription = comment.senderNickname,
-                modifier = Modifier.size(32.dp),
-                contentScale = ContentScale.Crop
-            )
-            
-            Spacer(modifier = Modifier.width(8.dp))
-            
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
+            ) {
+                AsyncImage(
+                    model = comment.senderAvatar,
+                    contentDescription = comment.senderNickname,
+                    modifier = Modifier.size(32.dp),
+                    contentScale = ContentScale.Crop
+                )
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = comment.senderNickname,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        if (comment.isVip == 1) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Surface(
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = MaterialTheme.shapes.small
+                            ) {
+                                Text(
+                                    text = "VIP",
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                        }
+                    }
+                    
                     Text(
-                        text = comment.senderNickname,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
+                        text = comment.createTimeText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    if (comment.isVip == 1) {
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Surface(
-                            color = MaterialTheme.colorScheme.primary,
-                            shape = MaterialTheme.shapes.small
-                        ) {
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    Text(
+                        text = comment.content,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // 评论操作按钮
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // 点赞按钮
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { onLikeClick(comment.id) }
+                    ) {
+                        Icon(
+                            imageVector = if (comment.isLiked == "1") Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp,
+                            contentDescription = "点赞",
+                            tint = if (comment.isLiked == "1") 
+                                MaterialTheme.colorScheme.primary 
+                            else 
+                                MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        if (comment.likeNum > 0) {
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "VIP",
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                text = comment.likeNum.toString(),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimary
+                                color = if (comment.isLiked == "1") 
+                                    MaterialTheme.colorScheme.primary 
+                                else 
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    
+                    // 回复按钮
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { onReplyClick(comment.id) }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Comment,
+                            contentDescription = "回复",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        if (comment.repliesNum > 0) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = comment.repliesNum.toString(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 }
-                
-                Text(
-                    text = comment.createTimeText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                Text(
-                    text = comment.content,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                
-                if (comment.likeNum > 0) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "👍 ${comment.likeNum}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            }
+            
+            // 显示回复
+            if (!comment.replies.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Column(
+                    modifier = Modifier.padding(start = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    comment.replies.forEach { reply ->
+                        CommentReplyItem(reply = reply)
+                    }
                 }
             }
         }
     }
+}
+
+/**
+ * 评论回复项
+ */
+@Composable
+fun CommentReplyItem(
+    reply: CommunityComment,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        AsyncImage(
+            model = reply.senderAvatar,
+            contentDescription = reply.senderNickname,
+            modifier = Modifier.size(24.dp),
+            contentScale = ContentScale.Crop
+        )
+        
+        Spacer(modifier = Modifier.width(8.dp))
+        
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = reply.senderNickname,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium
+                )
+                if (reply.isVip == 1) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            text = "VIP",
+                            modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = reply.createTimeText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            Text(
+                text = reply.content,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+/**
+ * Markwon Markdown渲染组件
+ */
+@Composable
+fun MarkdownContent(
+    markdown: String,
+    modifier: Modifier = Modifier
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    
+    AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            TextView(ctx).apply {
+                // 创建Markwon实例
+                val markwon = Markwon.builder(ctx)
+                    .usePlugin(HtmlPlugin.create()) // HTML支持
+                    .usePlugin(CoilImagesPlugin.create(ctx)) // 图片支持
+                    .usePlugin(LinkifyPlugin.create()) // 链接支持
+                    .usePlugin(StrikethroughPlugin.create()) // 删除线支持
+                    .usePlugin(TablePlugin.create(ctx)) // 表格支持
+                    .build()
+                
+                // 设置文本样式
+                textSize = 16f
+                setPadding(0, 0, 0, 0)
+                
+                // 渲染Markdown
+                markwon.setMarkdown(this, markdown)
+            }
+        },
+        update = { textView ->
+            val markwon = Markwon.builder(context)
+                .usePlugin(HtmlPlugin.create())
+                .usePlugin(CoilImagesPlugin.create(context))
+                .usePlugin(LinkifyPlugin.create())
+                .usePlugin(StrikethroughPlugin.create())
+                .usePlugin(TablePlugin.create(context))
+                .build()
+            
+            markwon.setMarkdown(textView, markdown)
+        }
+    )
 }
 
 /**

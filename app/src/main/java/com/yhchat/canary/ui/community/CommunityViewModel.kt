@@ -4,18 +4,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yhchat.canary.data.model.*
 import com.yhchat.canary.data.repository.CommunityRepository
-import com.yhchat.canary.data.di.RepositoryFactory
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * 社区ViewModel
  */
-class CommunityViewModel : ViewModel() {
-    
-    private val communityRepository: CommunityRepository = RepositoryFactory.communityRepository
+@HiltViewModel
+class CommunityViewModel @Inject constructor(
+    private val communityRepository: CommunityRepository
+) : ViewModel() {
     
     // 分区列表状态
     private val _boardListState = MutableStateFlow(BoardListState())

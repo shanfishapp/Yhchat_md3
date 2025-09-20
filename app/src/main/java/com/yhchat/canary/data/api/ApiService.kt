@@ -19,7 +19,41 @@ interface ApiService {
     
     @POST("v1/user/captcha")
     suspend fun getCaptcha(): Response<CaptchaResponse>
-    
+
+    @POST("v1/verification/get-verification-code")
+    suspend fun getSmsCaptcha(
+        @Body request: SmsCaptchaRequest
+    ): Response<Map<String, Any>>
+
+    @POST("v1/search/home-search")
+    suspend fun homeSearch(
+        @Header("token") token: String,
+        @Body request: SearchRequest
+    ): Response<SearchResponse>
+
+    @POST("v1/sticky/list")
+    suspend fun getStickyList(
+        @Header("token") token: String
+    ): Response<StickyResponse>
+
+    @POST("v1/sticky/add")
+    suspend fun addSticky(
+        @Header("token") token: String,
+        @Body request: StickyOperationRequest
+    ): Response<Map<String, Any>>
+
+    @POST("v1/sticky/delete")
+    suspend fun deleteSticky(
+        @Header("token") token: String,
+        @Body request: StickyOperationRequest
+    ): Response<Map<String, Any>>
+
+    @POST("v1/sticky/topping")
+    suspend fun topSticky(
+        @Header("token") token: String,
+        @Body request: StickyTopRequest
+    ): Response<Map<String, Any>>
+
     @POST("v1/user/verification-login")
     suspend fun verificationLogin(
         @Body request: LoginRequest
@@ -36,36 +70,34 @@ interface ApiService {
         @Body request: Map<String, String>
     ): Response<Map<String, Any>>
     
-    // 消息相关API
+    // ========== 消息相关API（使用protobuf） ==========
+    
+    /**
+     * 获取消息列表（按序列）- 使用protobuf
+     */
+    @POST("v1/msg/list-message-by-seq")
+    suspend fun listMessageBySeq(
+        @Header("token") token: String,
+        @Body request: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
+    
+    /**
+     * 获取消息列表 - 使用protobuf
+     */
+    @POST("v1/msg/list-message")
+    suspend fun listMessage(
+        @Header("token") token: String,
+        @Body request: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
+    
+    /**
+     * 发送消息 - 使用protobuf
+     */
     @POST("v1/msg/send-message")
     suspend fun sendMessage(
         @Header("token") token: String,
-        @Body request: SendMessageRequest
-    ): Response<ApiStatus>
-    
-    @POST("v1/msg/list-message")
-    suspend fun listMessages(
-        @Header("token") token: String,
-        @Body request: ListMessageRequest
-    ): Response<MessageListResponse>
-    
-    @POST("v1/msg/list-message-by-seq")
-    suspend fun listMessagesBySeq(
-        @Header("token") token: String,
-        @Body request: ListMessageBySeqRequest
-    ): Response<MessageListResponse>
-    
-    @POST("v1/msg/list-message-by-mid-seq")
-    suspend fun listMessagesByMidSeq(
-        @Header("token") token: String,
-        @Body request: ListMessageByMidSeqRequest
-    ): Response<MessageListResponse>
-    
-    @POST("v1/msg/edit-message")
-    suspend fun editMessage(
-        @Header("token") token: String,
-        @Body request: EditMessageRequest
-    ): Response<ApiStatus>
+        @Body request: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
     
     @POST("v1/msg/recall-msg")
     suspend fun recallMessage(
@@ -144,6 +176,12 @@ interface ApiService {
     suspend fun likePost(
         @Header("token") token: String,
         @Body request: LikePostRequest
+    ): Response<ApiStatus>
+    
+    @POST("v1/community/comment/comment-like")
+    suspend fun likeComment(
+        @Header("token") token: String,
+        @Body request: LikeCommentRequest
     ): Response<ApiStatus>
     
     @POST("v1/community/posts/post-collect")
@@ -388,6 +426,14 @@ data class CommentListRequest(
 data class LikePostRequest(
     @SerializedName("id")
     val id: Int
+)
+
+/**
+ * 点赞评论请求
+ */
+data class LikeCommentRequest(
+    @SerializedName("id")
+    val id: Int // 评论ID
 )
 
 /**

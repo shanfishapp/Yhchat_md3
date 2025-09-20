@@ -1,17 +1,19 @@
 package com.yhchat.canary.data.repository
 
-import com.yhchat.canary.data.api.ApiClient
+import com.yhchat.canary.data.api.ApiService
 import com.yhchat.canary.data.model.*
 import com.yhchat.canary.data.protobuf.ConversationProtoParser
+import javax.inject.Inject
 
 /**
  * 会话数据仓库
  */
-class ConversationRepository {
-    
-    private val apiService = ApiClient.apiService
+class ConversationRepository @Inject constructor(
+    private val apiService: ApiService
+) {
+
     private var tokenRepository: TokenRepository? = null
-    
+
     fun setTokenRepository(tokenRepository: TokenRepository) {
         this.tokenRepository = tokenRepository
     }

@@ -3,13 +3,14 @@ package com.yhchat.canary.data.repository
 import com.yhchat.canary.data.local.AppDatabase
 import com.yhchat.canary.data.local.UserToken
 import com.yhchat.canary.data.local.UserTokenDao
+import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 
 /**
  * Token存储仓库
  */
-class TokenRepository(private val userTokenDao: UserTokenDao) {
+class TokenRepository @Inject constructor(private val userTokenDao: UserTokenDao) {
     
     /**
      * 保存Token

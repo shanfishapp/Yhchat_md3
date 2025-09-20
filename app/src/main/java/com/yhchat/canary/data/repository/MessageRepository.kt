@@ -1,296 +1,268 @@
 package com.yhchat.canary.data.repository
 
-import com.yhchat.canary.data.api.*
+import android.util.Log
+import com.yhchat.canary.data.api.ApiService
 import com.yhchat.canary.data.model.*
+import com.yhchat.canary.proto.*
+import kotlinx.coroutines.flow.first
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.UUID
+import javax.inject.Inject
+import javax.inject.Singleton
 
-/**
- * 消息数据仓库
- */
-class MessageRepository {
+@Singleton
+class MessageRepository @Inject constructor(
+    private val apiService: ApiService,
+    private val tokenRepository: TokenRepository
+) {
+    private val tag = "MessageRepository"
     
-    private val apiService = ApiClient.apiService
-    private var tokenRepository: TokenRepository? = null
-    
-    fun setTokenRepository(tokenRepository: TokenRepository) {
-        this.tokenRepository = tokenRepository
+    /**
+     * 获取消息列表
+     */
+    suspend fun getMessages(
+        chatId: String,
+        chatType: Int,
+        msgCount: Int = 20,
+        msgId: String? = null
+    ): Result<List<ChatMessage>> {
+        return try {
+            val tokenFlow = tokenRepository.getToken()
+            val token = tokenFlow.first()?.token
+            if (token.isNullOrEmpty()) {
+                Log.e(tag, "Token is null or empty")
+                return Result.failure(Exception("用户未登录"))
+            }
+
+            // 构建protobuf请求
+            val requestBuilder = list_message_send.newBuilder()
+                .setChatId(chatId)
+                .setChatType(chatType.toLong())
+                .setMsgCount(msgCount.toLong())
+            
+            if (!msgId.isNullOrEmpty()) {
+                requestBuilder.setMsgId(msgId)
+            }
+            
+            val request = requestBuilder.build()
+            val requestBody = request.toByteArray().toRequestBody("application/x-protobuf".toMediaType())
+
+            Log.d(tag, "Getting messages for chat: $chatId, type: $chatType, count: $msgCount")
+            
+            val response = apiService.listMessage(token, requestBody)
+            
+            if (response.isSuccessful) {
+                response.body()?.let { responseBody ->
+                    val bytes = responseBody.bytes()
+                    val messageResponse = list_message.parseFrom(bytes)
+                    
+                    if (messageResponse.status.code == 1) {
+                        val messages = messageResponse.msgList.map { protoMsg ->
+                            convertProtoToMessage(protoMsg)
+                        }
+                        Log.d(tag, "Successfully got ${messages.size} messages")
+                        Result.success(messages)
+                } else {
+                        Log.e(tag, "API error: ${messageResponse.status.msg}")
+                        Result.failure(Exception(messageResponse.status.msg))
+                }
+                } ?: Result.failure(Exception("响应体为空"))
+            } else {
+                Log.e(tag, "HTTP error: ${response.code()}")
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error getting messages", e)
+            Result.failure(e)
+        }
     }
     
-    private suspend fun getToken(): String? {
-        return tokenRepository?.getTokenSync()
+    /**
+     * 通过序列获取消息列表
+     */
+    suspend fun getMessagesBySeq(
+        chatId: String,
+        chatType: Int,
+        msgSeq: Long = 0
+    ): Result<List<ChatMessage>> {
+        return try {
+            val tokenFlow = tokenRepository.getToken()
+            val token = tokenFlow.first()?.token
+            if (token.isNullOrEmpty()) {
+                Log.e(tag, "Token is null or empty")
+                return Result.failure(Exception("用户未登录"))
+            }
+
+            // 构建protobuf请求
+            val request = list_message_by_seq_send.newBuilder()
+                .setChatId(chatId)
+                .setChatType(chatType.toLong())
+                .setMsgSeq(msgSeq)
+                .build()
+            
+            val requestBody = request.toByteArray().toRequestBody("application/x-protobuf".toMediaType())
+
+            Log.d(tag, "Getting messages by seq for chat: $chatId, type: $chatType, seq: $msgSeq")
+            
+            val response = apiService.listMessageBySeq(token, requestBody)
+            
+            if (response.isSuccessful) {
+                response.body()?.let { responseBody ->
+                    val bytes = responseBody.bytes()
+                    val messageResponse = list_message_by_seq.parseFrom(bytes)
+                    
+                    if (messageResponse.status.code == 1) {
+                        val messages = messageResponse.msgList.map { protoMsg ->
+                            convertProtoToMessage(protoMsg)
+                        }
+                        Log.d(tag, "Successfully got ${messages.size} messages by seq")
+                        Result.success(messages)
+                } else {
+                        Log.e(tag, "API error: ${messageResponse.status.msg}")
+                        Result.failure(Exception(messageResponse.status.msg))
+                }
+                } ?: Result.failure(Exception("响应体为空"))
+            } else {
+                Log.e(tag, "HTTP error: ${response.code()}")
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error getting messages by seq", e)
+            Result.failure(e)
+        }
     }
     
     /**
      * 发送消息
      */
     suspend fun sendMessage(
-        token: String,
-        chatId: String,
-        chatType: Int,
-        contentType: Int,
-        content: SendMessageData,
-        quoteMsgId: String? = null
-    ): Result<Boolean> {
-        return try {
-            val request = SendMessageRequest(
-                msgId = java.util.UUID.randomUUID().toString().replace("-", ""),
-                chatId = chatId,
-                chatType = chatType,
-                contentType = contentType,
-                data = content,
-                quoteMsgId = quoteMsgId
-            )
-            val response = apiService.sendMessage(token, request)
-            if (response.isSuccessful) {
-                val status = response.body()
-                if (status?.code == 1) {
-                    Result.success(true)
-                } else {
-                    Result.failure(Exception(status?.message ?: "发送消息失败"))
-                }
-            } else {
-                Result.failure(Exception("发送消息失败: ${response.code()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-    
-    /**
-     * 发送文本消息
-     */
-    suspend fun sendTextMessage(
-        token: String,
         chatId: String,
         chatType: Int,
         text: String,
+        contentType: Int = 1, // 1-文本
         quoteMsgId: String? = null
     ): Result<Boolean> {
-        val content = SendMessageData(text = text)
-        return sendMessage(token, chatId, chatType, MessageType.TEXT.value, content, quoteMsgId)
+        return try {
+            val tokenFlow = tokenRepository.getToken()
+            val token = tokenFlow.first()?.token
+            if (token.isNullOrEmpty()) {
+                Log.e(tag, "Token is null or empty")
+                return Result.failure(Exception("用户未登录"))
+            }
+
+            val msgId = UUID.randomUUID().toString().replace("-", "")
+            
+            // 构建protobuf请求
+            val contentBuilder = send_message_send.Content.newBuilder()
+                .setText(text)
+            
+            val requestBuilder = send_message_send.newBuilder()
+                .setMsgId(msgId)
+                .setChatId(chatId)
+                .setChatType(chatType.toLong())
+                .setContent(contentBuilder.build())
+                .setContentType(contentType.toLong())
+            
+            if (!quoteMsgId.isNullOrEmpty()) {
+                requestBuilder.setQuoteMsgId(quoteMsgId)
+            }
+            
+            val request = requestBuilder.build()
+            val requestBody = request.toByteArray().toRequestBody("application/x-protobuf".toMediaType())
+
+            Log.d(tag, "Sending message to chat: $chatId, type: $chatType, text: $text")
+            
+            val response = apiService.sendMessage(token, requestBody)
+            
+            if (response.isSuccessful) {
+                response.body()?.let { responseBody ->
+                    val bytes = responseBody.bytes()
+                    val sendResponse = send_message.parseFrom(bytes)
+                    
+                    if (sendResponse.status.code == 1) {
+                        Log.d(tag, "Message sent successfully")
+                    Result.success(true)
+                } else {
+                        Log.e(tag, "Send message error: ${sendResponse.status.msg}")
+                        Result.failure(Exception(sendResponse.status.msg))
+                }
+                } ?: Result.failure(Exception("响应体为空"))
+            } else {
+                Log.e(tag, "HTTP error: ${response.code()}")
+                Result.failure(Exception("发送失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error sending message", e)
+            Result.failure(e)
+        }
     }
     
     /**
-     * 发送图片消息
+     * 将Proto消息转换为应用内消息模型
      */
-    suspend fun sendImageMessage(
-        token: String,
-        chatId: String,
-        chatType: Int,
-        imageKey: String,
-        width: Long? = null,
-        height: Long? = null,
-        quoteMsgId: String? = null
-    ): Result<Boolean> {
-        val content = SendMessageData(
-            image = imageKey,
-            fileSize = 0L
+    private fun convertProtoToMessage(protoMsg: Msg): ChatMessage {
+        val sender = MessageSender(
+            chatId = protoMsg.sender.chatId,
+            chatType = protoMsg.sender.chatType,
+            name = protoMsg.sender.name,
+            avatarUrl = protoMsg.sender.avatarUrl,
+            tagOld = protoMsg.sender.tagOldList,
+            tag = protoMsg.sender.tagList.map { tag ->
+                MessageTag(
+                    id = tag.id,
+                    text = tag.text,
+                    color = tag.color
+                )
+            }
         )
-        return sendMessage(token, chatId, chatType, MessageType.IMAGE.value, content, quoteMsgId)
-    }
-    
-    /**
-     * 发送文件消息
-     */
-    suspend fun sendFileMessage(
-        token: String,
-        chatId: String,
-        chatType: Int,
-        fileKey: String,
-        fileName: String,
-        fileSize: Long,
-        quoteMsgId: String? = null
-    ): Result<Boolean> {
-        val content = SendMessageData(
-            fileKey = fileKey,
-            fileName = fileName,
-            fileSize = fileSize
+
+        val content = MessageContent(
+            text = if (protoMsg.content.text.isNotEmpty()) protoMsg.content.text else null,
+            buttons = if (protoMsg.content.buttons.isNotEmpty()) protoMsg.content.buttons else null,
+            imageUrl = if (protoMsg.content.imageUrl.isNotEmpty()) protoMsg.content.imageUrl else null,
+            fileName = if (protoMsg.content.fileName.isNotEmpty()) protoMsg.content.fileName else null,
+            fileUrl = if (protoMsg.content.fileUrl.isNotEmpty()) protoMsg.content.fileUrl else null,
+            form = if (protoMsg.content.form.isNotEmpty()) protoMsg.content.form else null,
+            quoteMsgText = if (protoMsg.content.quoteMsgText.isNotEmpty()) protoMsg.content.quoteMsgText else null,
+            stickerUrl = if (protoMsg.content.stickerUrl.isNotEmpty()) protoMsg.content.stickerUrl else null,
+            postId = if (protoMsg.content.postId.isNotEmpty()) protoMsg.content.postId else null,
+            postTitle = if (protoMsg.content.postTitle.isNotEmpty()) protoMsg.content.postTitle else null,
+            postContent = if (protoMsg.content.postContent.isNotEmpty()) protoMsg.content.postContent else null,
+            postContentType = if (protoMsg.content.postContentType.isNotEmpty()) protoMsg.content.postContentType else null,
+            expressionId = if (protoMsg.content.expressionId.isNotEmpty()) protoMsg.content.expressionId else null,
+            fileSize = if (protoMsg.content.fileSize > 0) protoMsg.content.fileSize else null,
+            videoUrl = if (protoMsg.content.videoUrl.isNotEmpty()) protoMsg.content.videoUrl else null,
+            audioUrl = if (protoMsg.content.audioUrl.isNotEmpty()) protoMsg.content.audioUrl else null,
+            audioTime = if (protoMsg.content.audioTime > 0) protoMsg.content.audioTime else null,
+            stickerItemId = if (protoMsg.content.stickerItemId > 0) protoMsg.content.stickerItemId else null,
+            stickerPackId = if (protoMsg.content.stickerPackId > 0) protoMsg.content.stickerPackId else null,
+            callText = if (protoMsg.content.callText.isNotEmpty()) protoMsg.content.callText else null,
+            callStatusText = if (protoMsg.content.callStatusText.isNotEmpty()) protoMsg.content.callStatusText else null,
+            width = if (protoMsg.content.width > 0) protoMsg.content.width else null,
+            height = if (protoMsg.content.height > 0) protoMsg.content.height else null
         )
-        return sendMessage(token, chatId, chatType, MessageType.FILE.value, content, quoteMsgId)
-    }
-    
-    /**
-     * 发送语音消息
-     */
-    suspend fun sendAudioMessage(
-        token: String,
-        chatId: String,
-        chatType: Int,
-        audioKey: String,
-        audioTime: Long,
-        quoteMsgId: String? = null
-    ): Result<Boolean> {
-        val content = SendMessageData(
-            audio = audioKey,
-            audioTime = audioTime
+
+        val cmd = if (protoMsg.hasCmd()) {
+            MessageCmd(
+                name = protoMsg.cmd.name,
+                type = protoMsg.cmd.type
+            )
+        } else null
+
+        return ChatMessage(
+            msgId = protoMsg.msgId,
+            sender = sender,
+            direction = protoMsg.direction,
+            contentType = protoMsg.contentType,
+            content = content,
+            sendTime = protoMsg.sendTime,
+            cmd = cmd,
+            msgDeleteTime = if (protoMsg.msgDeleteTime > 0) protoMsg.msgDeleteTime else null,
+            quoteMsgId = if (protoMsg.quoteMsgId.isNotEmpty()) protoMsg.quoteMsgId else null,
+            msgSeq = protoMsg.msgSeq,
+            editTime = if (protoMsg.editTime > 0) protoMsg.editTime else null
         )
-        return sendMessage(token, chatId, chatType, MessageType.AUDIO.value, content, quoteMsgId)
-    }
-    
-    /**
-     * 获取消息列表
-     */
-    suspend fun getMessages(
-        token: String,
-        chatId: String,
-        chatType: Int,
-        msgCount: Int = 20,
-        msgId: String = ""
-    ): Result<List<Message>> {
-        return try {
-            val request = ListMessageRequest(
-                msgCount = msgCount,
-                msgId = msgId,
-                chatType = chatType,
-                chatId = chatId
-            )
-            val response = apiService.listMessages(token, request)
-            if (response.isSuccessful) {
-                val messageResponse = response.body()
-                if (messageResponse?.status?.code == 1) {
-                    Result.success(messageResponse.messages ?: emptyList())
-                } else {
-                    Result.failure(Exception(messageResponse?.status?.message ?: "获取消息失败"))
-                }
-            } else {
-                Result.failure(Exception("获取消息失败: ${response.code()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-    
-    /**
-     * 编辑消息
-     */
-    suspend fun editMessage(
-        token: String,
-        msgId: String,
-        chatId: String,
-        chatType: Int,
-        contentType: Int,
-        content: MessageContent,
-        quoteMsgId: String? = null
-    ): Result<Boolean> {
-        return try {
-            val request = EditMessageRequest(
-                msgId = msgId,
-                chatId = chatId,
-                chatType = chatType,
-                contentType = contentType,
-                content = content,
-                quoteMsgId = quoteMsgId
-            )
-            val response = apiService.editMessage(token, request)
-            if (response.isSuccessful) {
-                val status = response.body()
-                if (status?.code == 1) {
-                    Result.success(true)
-                } else {
-                    Result.failure(Exception(status?.message ?: "编辑消息失败"))
-                }
-            } else {
-                Result.failure(Exception("编辑消息失败: ${response.code()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-    
-    /**
-     * 撤回消息
-     */
-    suspend fun recallMessage(
-        token: String,
-        msgId: String,
-        chatId: String,
-        chatType: Int
-    ): Result<Boolean> {
-        return try {
-            val request = RecallMessageRequest(
-                msgId = msgId,
-                chatId = chatId,
-                chatType = chatType
-            )
-            val response = apiService.recallMessage(token, request)
-            if (response.isSuccessful) {
-                val status = response.body()
-                if (status?.code == 1) {
-                    Result.success(true)
-                } else {
-                    Result.failure(Exception(status?.message ?: "撤回消息失败"))
-                }
-            } else {
-                Result.failure(Exception("撤回消息失败: ${response.code()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-    
-    /**
-     * 批量撤回消息
-     */
-    suspend fun recallMessagesBatch(
-        token: String,
-        msgIds: List<String>,
-        chatId: String,
-        chatType: Int
-    ): Result<Boolean> {
-        return try {
-            val request = RecallMessagesBatchRequest(
-                msgIds = msgIds,
-                chatId = chatId,
-                chatType = chatType
-            )
-            val response = apiService.recallMessagesBatch(token, request)
-            if (response.isSuccessful) {
-                val status = response.body()
-                if (status?.code == 1) {
-                    Result.success(true)
-                } else {
-                    Result.failure(Exception(status?.message ?: "批量撤回消息失败"))
-                }
-            } else {
-                Result.failure(Exception("批量撤回消息失败: ${response.code()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-    
-    /**
-     * 举报消息
-     */
-    suspend fun reportMessage(
-        token: String,
-        msgId: String,
-        chatId: String,
-        chatType: Int,
-        userId: String,
-        buttonValue: String
-    ): Result<Boolean> {
-        return try {
-            val request = ButtonReportRequest(
-                msgId = msgId,
-                chatId = chatId,
-                chatType = chatType,
-                userId = userId,
-                buttonValue = buttonValue
-            )
-            val response = apiService.buttonReport(token, request)
-            if (response.isSuccessful) {
-                val status = response.body()
-                if (status?.code == 1) {
-                    Result.success(true)
-                } else {
-                    Result.failure(Exception(status?.message ?: "举报消息失败"))
-                }
-            } else {
-                Result.failure(Exception("举报消息失败: ${response.code()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
     }
 }

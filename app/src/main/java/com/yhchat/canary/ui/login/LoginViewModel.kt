@@ -2,23 +2,29 @@ package com.yhchat.canary.ui.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.yhchat.canary.data.api.ApiService
 import com.yhchat.canary.data.model.CaptchaData
 import com.yhchat.canary.data.model.LoginData
 import com.yhchat.canary.data.repository.UserRepository
 import com.yhchat.canary.data.repository.TokenRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * 登录ViewModel
  */
-class LoginViewModel : ViewModel() {
-    
-    private val userRepository = UserRepository()
+@HiltViewModel
+class LoginViewModel @Inject constructor(
+    private val apiService: ApiService
+) : ViewModel() {
+
+    private val userRepository = UserRepository(apiService)
     private var tokenRepository: TokenRepository? = null
-    
+
     fun setTokenRepository(tokenRepository: TokenRepository) {
         this.tokenRepository = tokenRepository
     }
@@ -37,7 +43,7 @@ class LoginViewModel : ViewModel() {
     fun getCaptcha() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            
+
             userRepository.getCaptcha()
                 .onSuccess { captcha ->
                     _captchaData.value = captcha
@@ -47,6 +53,41 @@ class LoginViewModel : ViewModel() {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         error = error.message
+                    )
+                }
+        }
+    }
+
+    /**
+     * 获取短信验证码
+     */
+    fun getSmsCaptcha(mobile: String, captchaCode: String) {
+        if (mobile.isBlank() || captchaCode.isBlank()) {
+            _uiState.value = _uiState.value.copy(error = "请输入手机号和图片验证码")
+            return
+        }
+
+        val captchaData = _captchaData.value
+        if (captchaData == null) {
+            _uiState.value = _uiState.value.copy(error = "请先获取图片验证码")
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+
+            userRepository.getSmsCaptcha(mobile, captchaCode, captchaData.id)
+                .onSuccess { success ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = null
+                    )
+                    println("短信验证码发送成功")
+                }
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = "获取短信验证码失败: ${error.message}"
                     )
                 }
         }

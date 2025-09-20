@@ -10,6 +10,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -18,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.rememberAsyncImagePainter
 import com.yhchat.canary.R
 
 /**
@@ -40,7 +43,8 @@ fun LoginScreen(
     
     var selectedTab by remember { mutableIntStateOf(0) }
     var mobile by remember { mutableStateOf("") }
-    var captcha by remember { mutableStateOf("") }
+    var imageCaptcha by remember { mutableStateOf("") }
+    var smsCaptcha by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -137,29 +141,52 @@ fun LoginScreen(
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
-                        
+
+                        // 图片验证码
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             OutlinedTextField(
-                                value = captcha,
-                                onValueChange = { captcha = it },
-                                label = { Text("验证码") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                value = imageCaptcha,
+                                onValueChange = { imageCaptcha = it },
+                                label = { Text("图片验证码") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                                 modifier = Modifier.weight(1f),
                                 singleLine = true
                             )
-                            
+
                             Button(
                                 onClick = { viewModel.getCaptcha() },
                                 enabled = !uiState.isLoading
                             ) {
-                                Text("获取验证码")
+                                Text("获取图片")
+                            }
+                        }
+
+                        // 短信验证码
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = smsCaptcha,
+                                onValueChange = { smsCaptcha = it },
+                                label = { Text("短信验证码") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+
+                            Button(
+                                onClick = { viewModel.getSmsCaptcha(mobile, imageCaptcha) },
+                                enabled = !uiState.isLoading && mobile.isNotBlank() && imageCaptcha.isNotBlank()
+                            ) {
+                                Text("获取短信")
                             }
                         }
                         
-                        // 验证码图片
+                        // 验证码图片显示
                         captchaData?.let { captcha ->
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
@@ -175,8 +202,29 @@ fun LoginScreen(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
+
+                                    // 使用Coil显示base64图片
+                                    androidx.compose.foundation.Image(
+                                        painter = rememberAsyncImagePainter(
+                                            model = android.util.Base64.decode(
+                                                captcha.b64s.substringAfter(","),
+                                                android.util.Base64.DEFAULT
+                                            ).let { bytes ->
+                                                coil.request.ImageRequest.Builder(LocalContext.current)
+                                                    .data(bytes)
+                                                    .build()
+                                            }
+                                        ),
+                                        contentDescription = "验证码图片",
+                                        modifier = Modifier
+                                            .height(80.dp)
+                                            .fillMaxWidth(),
+                                        contentScale = ContentScale.Fit
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     Text(
-                                        text = "请在上方输入验证码",
+                                        text = "请输入上图中的验证码",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -230,11 +278,14 @@ fun LoginScreen(
                 Button(
                     onClick = {
                         when (selectedTab) {
-                            0 -> viewModel.loginWithCaptcha(mobile, captcha)
+                            0 -> viewModel.loginWithCaptcha(mobile, smsCaptcha)
                             1 -> viewModel.loginWithEmail(email, password)
                         }
                     },
-                    enabled = !uiState.isLoading,
+                    enabled = !uiState.isLoading && (
+                        (selectedTab == 0 && mobile.isNotBlank() && smsCaptcha.isNotBlank()) ||
+                        (selectedTab == 1 && email.isNotBlank() && password.isNotBlank())
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
