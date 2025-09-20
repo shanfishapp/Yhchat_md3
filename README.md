@@ -10,8 +10,9 @@
 
 # 开发工具
 ```text
-[x]Android Studio Narwhal 3 Feature Drop | 2025.1.3
-[x]Cursor IDE Version 1.5∽1.6
-[x]Gradle 8.13-all
-[x]Java 11
+[x] Android Studio Narwhal 3 Feature Drop | 2025.1.3 (251.26094)
+[x] Cursor IDE Version 1.5∽1.6
+[x] Gradle 8.13-all
+[x] OpenJDK 64-bit Server VM 21.0.7
+[x] Windows 10 22H2 Pro
 ```
