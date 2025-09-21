@@ -67,14 +67,18 @@ class UserRepository @Inject constructor(
                 if (userInfoProto.status.code == 1) {
                     val userData = userInfoProto.data
                     val userProfile = UserProfile(
-                        id = userData.id,
-                        name = userData.name,
+                        userId = userData.id,
+                        nickname = userData.name,
                         avatarUrl = if (userData.avatarUrl.isNotEmpty()) userData.avatarUrl else null,
-                        avatarId = if (userData.avatarId != 0L) userData.avatarId else null,
+                        registerTime = 0L, // Proto中没有这个字段，设置默认值
+                        registerTimeText = "", // Proto中没有这个字段，设置默认值
+                        onLineDay = 0, // Proto中没有这个字段，设置默认值
+                        continuousOnLineDay = 0, // Proto中没有这个字段，设置默认值
+                        medals = emptyList(), // Proto中没有这个字段，设置默认值
+                        isVip = if (userData.isVip != 0) userData.isVip else 0,
                         phone = if (userData.phone.isNotEmpty()) userData.phone else null,
                         email = if (userData.email.isNotEmpty()) userData.email else null,
                         coin = if (userData.coin != 0.0) userData.coin else null,
-                        isVip = if (userData.isVip != 0) userData.isVip else null,
                         vipExpiredTime = if (userData.vipExpiredTime != 0L) userData.vipExpiredTime else null,
                         invitationCode = if (userData.invitationCode.isNotEmpty()) userData.invitationCode else null
                     )
@@ -148,7 +152,7 @@ class UserRepository @Inject constructor(
     /**
      * 首页搜索
      */
-    suspend fun homeSearch(word: String): Result<SearchData> {
+    suspend fun homeSearch(word: String): Result<com.yhchat.canary.data.api.SearchData> {
         return try {
             val token = getToken()
             println("搜索前获取到的token: $token")
@@ -157,7 +161,7 @@ class UserRepository @Inject constructor(
                 return Result.failure(Exception("未登录"))
             }
             println("使用token进行搜索: $token")
-            val request = SearchRequest(word = word)
+            val request = com.yhchat.canary.data.api.SearchRequest(keyword = word)
             val response = apiService.homeSearch(token, request)
             println("搜索API响应状态: ${response.code()}")
             println("搜索API响应体: ${response.body()}")
@@ -166,7 +170,7 @@ class UserRepository @Inject constructor(
                 if (searchResponse?.code == 1 && searchResponse.data != null) {
                     Result.success(searchResponse.data)
                 } else {
-                    Result.failure(Exception(searchResponse?.message ?: "搜索失败"))
+                    Result.failure(Exception(searchResponse?.msg ?: "搜索失败"))
                 }
             } else {
                 Result.failure(Exception("搜索失败: ${response.code()} - ${response.message()}"))
@@ -401,27 +405,28 @@ class UserRepository @Inject constructor(
                             direction = protoMsg.direction,
                             contentType = protoMsg.contentType,
                             content = MessageContent(
-                                text = protoMsg.content.text.takeIf { (it as? String)?.isNotEmpty() == true },
-                                buttons = protoMsg.content.buttons.takeIf { (it as? String)?.isNotEmpty() == true },
-                                imageUrl = protoMsg.content.imageUrl.takeIf { (it as? String)?.isNotEmpty() == true },
-                                fileName = protoMsg.content.fileName.takeIf { (it as? String)?.isNotEmpty() == true },
-                                fileUrl = protoMsg.content.fileUrl.takeIf { (it as? String)?.isNotEmpty() == true },
-                                form = protoMsg.content.form.takeIf { (it as? String)?.isNotEmpty() == true },
-                                quoteMsgText = protoMsg.content.quoteMsgText.takeIf { (it as? String)?.isNotEmpty() == true },
-                                stickerUrl = protoMsg.content.stickerUrl.takeIf { (it as? String)?.isNotEmpty() == true },
-                                postId = protoMsg.content.postId.takeIf { (it as? String)?.isNotEmpty() == true },
-                                postTitle = protoMsg.content.postTitle.takeIf { (it as? String)?.isNotEmpty() == true },
-                                postContent = protoMsg.content.postContent.takeIf { (it as? String)?.isNotEmpty() == true },
-                                postContentType = protoMsg.content.postContentType.takeIf { (it as? String)?.isNotEmpty() == true },
-                                expressionId = protoMsg.content.expressionId.takeIf { (it as? String)?.isNotEmpty() == true },
+                                text = protoMsg.content.text.takeIf { it.isNotEmpty() },
+                                buttons = protoMsg.content.buttons.takeIf { it.isNotEmpty() },
+                                imageUrl = protoMsg.content.imageUrl.takeIf { it.isNotEmpty() },
+                                fileName = protoMsg.content.fileName.takeIf { it.isNotEmpty() },
+                                fileUrl = protoMsg.content.fileUrl.takeIf { it.isNotEmpty() },
+                                form = protoMsg.content.form.takeIf { it.isNotEmpty() },
+                                quoteMsgText = protoMsg.content.quoteMsgText.takeIf { it.isNotEmpty() },
+                                quoteImageUrl = null, // Proto中可能没有这个字段
+                                stickerUrl = protoMsg.content.stickerUrl.takeIf { it.isNotEmpty() },
+                                postId = protoMsg.content.postId.takeIf { it.isNotEmpty() },
+                                postTitle = protoMsg.content.postTitle.takeIf { it.isNotEmpty() },
+                                postContent = protoMsg.content.postContent.takeIf { it.isNotEmpty() },
+                                postContentType = protoMsg.content.postContentType.takeIf { it.isNotEmpty() },
+                                expressionId = protoMsg.content.expressionId.takeIf { it.isNotEmpty() },
                                 fileSize = if (protoMsg.content.fileSize > 0) protoMsg.content.fileSize.toLong() else null,
-                                videoUrl = protoMsg.content.videoUrl.takeIf { (it as? String)?.isNotEmpty() == true },
-                                audioUrl = protoMsg.content.audioUrl.takeIf { (it as? String)?.isNotEmpty() == true },
+                                videoUrl = protoMsg.content.videoUrl.takeIf { it.isNotEmpty() },
+                                audioUrl = protoMsg.content.audioUrl.takeIf { it.isNotEmpty() },
                                 audioTime = if (protoMsg.content.audioTime > 0) protoMsg.content.audioTime.toLong() else null,
                                 stickerItemId = if (protoMsg.content.stickerItemId > 0) protoMsg.content.stickerItemId.toLong() else null,
                                 stickerPackId = if (protoMsg.content.stickerPackId > 0) protoMsg.content.stickerPackId.toLong() else null,
-                                callText = protoMsg.content.callText.takeIf { (it as? String)?.isNotEmpty() == true },
-                                callStatusText = protoMsg.content.callStatusText.takeIf { (it as? String)?.isNotEmpty() == true },
+                                callText = protoMsg.content.callText.takeIf { it.isNotEmpty() },
+                                callStatusText = protoMsg.content.callStatusText.takeIf { it.isNotEmpty() },
                                 width = if (protoMsg.content.width > 0) protoMsg.content.width.toLong() else null,
                                 height = if (protoMsg.content.height > 0) protoMsg.content.height.toLong() else null
                             ),

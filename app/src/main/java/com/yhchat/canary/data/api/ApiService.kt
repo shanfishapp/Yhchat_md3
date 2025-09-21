@@ -21,6 +21,7 @@ interface ApiService {
     suspend fun getUserProfile(
         @Header("token") token: String
     ): Response<ResponseBody>
+
     
     @POST("v1/user/captcha")
     suspend fun getCaptcha(): Response<CaptchaResponse>
@@ -153,6 +154,18 @@ interface ApiService {
         @Body request: BoardListRequest
     ): Response<com.yhchat.canary.data.model.BoardListResponse>
     
+    @POST("v1/community/ba/following-ba-list")
+    suspend fun getFollowingBoardList(
+        @Header("token") token: String,
+        @Body request: BoardListRequest
+    ): Response<com.yhchat.canary.data.model.FollowingBoardListResponse>
+    
+    @POST("v1/community/posts/my-post-list")
+    suspend fun getMyPostList(
+        @Header("token") token: String,
+        @Body request: MyPostListRequest
+    ): Response<com.yhchat.canary.data.model.MyPostListResponse>
+    
     @POST("v1/community/ba/info")
     suspend fun getBoardInfo(
         @Header("token") token: String,
@@ -212,6 +225,29 @@ interface ApiService {
         @Header("token") token: String,
         @Body request: CreatePostRequest
     ): Response<com.yhchat.canary.data.model.CreatePostResponse>
+    
+    @POST("v1/community/search")
+    suspend fun searchCommunity(
+        @Header("token") token: String,
+        @Body request: SearchRequest
+    ): SearchResponse
+    
+    @POST("v1/community/ba/group-list")
+    suspend fun getBoardGroupList(
+        @Header("token") token: String,
+        @Body request: GroupListRequest
+    ): GroupListResponse
+
+    // ========== 好友相关API ==========
+
+    /**
+     * 添加好友/加入群聊
+     */
+    @POST("v1/friend/apply")
+    suspend fun addFriend(
+        @Header("token") token: String,
+        @Body request: AddFriendRequest
+    ): Response<ApiStatus>
 }
 
 /**
@@ -480,16 +516,122 @@ data class CommentPostRequest(
 data class CreatePostRequest(
     @SerializedName("baId")
     val baId: Int,
-    
+
     @SerializedName("groupId")
     val groupId: String = "",
-    
+
     @SerializedName("title")
     val title: String,
-    
+
     @SerializedName("content")
     val content: String,
-    
+
     @SerializedName("contentType")
     val contentType: Int  // 1-文本，2-markdown
+)
+
+/**
+ * 添加好友/加入群聊请求
+ */
+data class AddFriendRequest(
+    @SerializedName("chatId")
+    val chatId: String,
+    
+    @SerializedName("chatType")
+    val chatType: Int, // 1-用户，2-群聊，3-机器人
+    
+    @SerializedName("remark")
+    val remark: String
+)
+
+/**
+ * 搜索社区请求
+ */
+data class SearchRequest(
+    @SerializedName("typ")
+    val typ: Int = 3,
+    
+    @SerializedName("keyword")
+    val keyword: String,
+    
+    @SerializedName("size")
+    val size: Int = 50,
+    
+    @SerializedName("page")
+    val page: Int = 1
+)
+
+/**
+ * 搜索社区响应
+ */
+data class SearchResponse(
+    @SerializedName("code")
+    val code: Int,
+    
+    @SerializedName("data")
+    val data: SearchData,
+    
+    @SerializedName("msg")
+    val msg: String
+)
+
+/**
+ * 搜索数据
+ */
+data class SearchData(
+    @SerializedName("ba")
+    val boards: List<com.yhchat.canary.data.model.CommunityBoard>? = emptyList(),
+    
+    @SerializedName("posts") 
+    val posts: List<com.yhchat.canary.data.model.CommunityPost>? = emptyList()
+)
+
+/**
+ * 群聊列表请求
+ */
+data class GroupListRequest(
+    @SerializedName("baId")
+    val baId: Int,
+    
+    @SerializedName("size")
+    val size: Int = 20,
+    
+    @SerializedName("page")
+    val page: Int = 1
+)
+
+/**
+ * 群聊列表响应
+ */
+data class GroupListResponse(
+    @SerializedName("code")
+    val code: Int,
+    
+    @SerializedName("data")
+    val data: GroupListData,
+    
+    @SerializedName("msg")
+    val msg: String
+)
+
+/**
+ * 我的文章列表请求
+ */
+data class MyPostListRequest(
+    @SerializedName("size")
+    val size: Int = 20,
+    
+    @SerializedName("page")
+    val page: Int = 1
+)
+
+/**
+ * 群聊列表数据
+ */
+data class GroupListData(
+    @SerializedName("groups")
+    val groups: List<com.yhchat.canary.data.model.CommunityGroup>,
+    
+    @SerializedName("total")
+    val total: Int
 )

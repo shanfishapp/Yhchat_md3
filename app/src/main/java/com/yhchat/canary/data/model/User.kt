@@ -137,27 +137,8 @@ data class SearchRequest(
     val word: String
 )
 
-/**
- * 搜索响应
- */
-data class SearchResponse(
-    @SerializedName("code")
-    val code: Int,
 
-    @SerializedName("msg")
-    val message: String,
 
-    @SerializedName("data")
-    val data: SearchData? = null
-)
-
-/**
- * 搜索数据
- */
-data class SearchData(
-    @SerializedName("list")
-    val list: List<SearchCategory>
-)
 
 /**
  * 搜索类别
@@ -383,6 +364,8 @@ data class MessageContent(
     val form: String? = null,
     @SerializedName("quote_msg_text")
     val quoteMsgText: String? = null,
+    @SerializedName("quote_image_url")
+    val quoteImageUrl: String? = null,
     @SerializedName("sticker_url")
     val stickerUrl: String? = null,
     @SerializedName("post_id")
@@ -585,9 +568,9 @@ enum class ChatType(val value: Int) {
 }
 
 /**
- * 用户个人信息
+ * 当前用户个人信息
  */
-data class UserProfile(
+data class CurrentUserProfile(
     @SerializedName("id")
     val id: String,
     

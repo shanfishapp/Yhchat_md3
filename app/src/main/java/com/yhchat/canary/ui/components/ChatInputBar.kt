@@ -49,8 +49,12 @@ fun ChatInputBar(
     val keyboardController = LocalSoftwareKeyboardController.current
     
     Surface(
-        modifier = modifier.fillMaxWidth(),
-        shadowElevation = 8.dp,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        shadowElevation = 12.dp,
+        tonalElevation = 4.dp,
+        shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surface
     ) {
         Column {
@@ -93,6 +97,10 @@ fun ChatInputBar(
                         showAttachMenu = !showAttachMenu
                         if (showAttachMenu) {
                             keyboardController?.hide()
+           
+           
+           
+           
                         }
                     },
                     modifier = Modifier

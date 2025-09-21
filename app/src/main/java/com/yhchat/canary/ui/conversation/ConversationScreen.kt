@@ -12,8 +12,10 @@ import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.animation.*
 import androidx.compose.ui.Modifier
@@ -57,14 +59,17 @@ fun ConversationScreen(
     // 列表状态
     val listState = rememberLazyListState()
 
-    // 置顶栏显示状态
-    var showStickyBar by remember { mutableStateOf(false) }
+    // 置顶栏显示状态 - 使用key保持状态
+    var showStickyBar by remember(key1 = "sticky_bar") { mutableStateOf(false) }
 
-    // 刷新状态
-    var refreshing by remember { mutableStateOf(false) }
+    // 刷新状态 - 使用key保持状态
+    var refreshing by remember(key1 = "refreshing") { mutableStateOf(false) }
 
     // 下拉刷新状态
     val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = refreshing)
+    
+    // 协程作用域
+    val coroutineScope = rememberCoroutineScope()
 
     // 监听列表滚动位置，控制置顶栏显示
     LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) {
@@ -72,21 +77,25 @@ fun ConversationScreen(
         showStickyBar = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 100
     }
 
-    // 设置tokenRepository
+    // 允许返回后重新刷新（移除禁止刷新逻辑）
+    
+    // 设置tokenRepository（只在第一次或tokenRepository变化时执行）
     LaunchedEffect(tokenRepository) {
         tokenRepository?.let { viewModel.setTokenRepository(it) }
     }
     
-    // 启动WebSocket连接
+    // 启动WebSocket连接（只在第一次或token/userId变化时执行）
     LaunchedEffect(token, userId) {
         if (token.isNotEmpty() && userId.isNotEmpty()) {
             viewModel.startWebSocket(token, userId)
         }
     }
     
-    // 加载会话列表
+    // 每次进入页面都拉取一次
     LaunchedEffect(token) {
-        viewModel.loadConversations(token)
+        if (token.isNotEmpty()) {
+            viewModel.loadConversations(token)
+        }
     }
     
     Column(
@@ -152,9 +161,14 @@ fun ConversationScreen(
         SwipeRefresh(
             state = swipeRefreshState,
             onRefresh = {
+                // 只有用户主动下拉刷新时才重新加载数据
                 refreshing = true
-                viewModel.loadConversations(token)
-                refreshing = false
+                viewModel.refreshConversations(token)
+                // 延迟一下再关闭刷新状态，让用户感知到刷新动作
+                coroutineScope.launch {
+                    kotlinx.coroutines.delay(500)
+                    refreshing = false
+                }
             }
         ) {
             if (uiState.isLoading) {
@@ -259,8 +273,8 @@ fun ConversationItem(
                     error = painterResource(id = com.yhchat.canary.R.drawable.ic_person)
                 )
                 
-                // 未读消息标识
-                if (conversation.unreadMessage > 0) {
+                // 未读消息标识 - 开启免打扰时不显示红点
+                if (conversation.unreadMessage > 0 && conversation.doNotDisturb != 1) {
                     Box(
                         modifier = Modifier
                             .size(20.dp)
@@ -330,6 +344,17 @@ fun ConversationItem(
                                     fontSize = 10.sp
                                 )
                             }
+                        }
+                        
+                        // 免打扰图标
+                        if (conversation.doNotDisturb == 1) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.VolumeOff,
+                                contentDescription = "免打扰",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                     

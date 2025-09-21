@@ -42,6 +42,61 @@ class CommunityRepository @Inject constructor(
     }
     
     /**
+     * 获取关注的分区列表
+     */
+    suspend fun getFollowingBoardList(
+        token: String,
+        typ: Int = 1,
+        size: Int = 20,
+        page: Int = 1
+    ): Result<FollowingBoardListResponse> {
+        return try {
+            val request = BoardListRequest(typ = typ, size = size, page = page)
+            val response = apiService.getFollowingBoardList(token, request)
+            
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null && body.code == 1) {
+                    Result.success(body)
+                } else {
+                    Result.failure(Exception("API返回错误: ${body?.msg ?: "未知错误"}"))
+                }
+            } else {
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 获取我的文章列表
+     */
+    suspend fun getMyPostList(
+        token: String,
+        size: Int = 20,
+        page: Int = 1
+    ): Result<MyPostListResponse> {
+        return try {
+            val request = MyPostListRequest(size = size, page = page)
+            val response = apiService.getMyPostList(token, request)
+            
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null && body.code == 1) {
+                    Result.success(body)
+                } else {
+                    Result.failure(Exception("API返回错误: ${body?.msg ?: "未知错误"}"))
+                }
+            } else {
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
      * 获取分区信息
      */
     suspend fun getBoardInfo(
@@ -317,5 +372,32 @@ class CommunityRepository @Inject constructor(
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+    
+    /**
+     * 搜索社区内容
+     */
+    suspend fun searchCommunity(
+        token: String,
+        keyword: String,
+        typ: Int = 3,
+        size: Int = 50,
+        page: Int = 1
+    ): com.yhchat.canary.data.api.SearchResponse {
+        val request = com.yhchat.canary.data.api.SearchRequest(typ = typ, keyword = keyword, size = size, page = page)
+        return apiService.searchCommunity(token, request)
+    }
+    
+    /**
+     * 获取分区群聊列表
+     */
+    suspend fun getBoardGroupList(
+        token: String,
+        boardId: Int,
+        size: Int = 20,
+        page: Int = 1
+    ): GroupListResponse {
+        val request = GroupListRequest(baId = boardId, size = size, page = page)
+        return apiService.getBoardGroupList(token, request)
     }
 }

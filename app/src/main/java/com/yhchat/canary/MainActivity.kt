@@ -27,6 +27,8 @@ import coil.request.CachePolicy
 import okhttp3.OkHttpClient
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.yhchat.canary.ui.conversation.ConversationViewModel
+import com.yhchat.canary.ui.profile.UserProfileActivity
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -78,6 +80,9 @@ class MainActivity : ComponentActivity() {
                 var currentChatType by remember { mutableStateOf(0) }
                 var currentChatName by remember { mutableStateOf("") }
                 var pendingLoginToken by remember { mutableStateOf<String?>(null) }
+                
+                // 保持ConversationScreen的ViewModel状态，避免重新创建
+                val conversationViewModel: ConversationViewModel = viewModel()
 
                 // 同步ViewModel状态到本地状态
                 LaunchedEffect(savedToken) {
@@ -93,10 +98,10 @@ class MainActivity : ComponentActivity() {
                         userRepository?.getUserInfo()?.onSuccess { user ->
                             userId = user.id
                             mainViewModel.onLoginSuccess(loginToken, user.id)
-                        }?.onFailure {
-                            // 如果获取用户信息失败，使用token的后8位作为userId
-                            userId = "user_${loginToken.takeLast(8)}"
-                            mainViewModel.onLoginSuccess(loginToken, userId)
+                        }?.onFailure { error ->
+                            // 获取用户信息失败，显示错误并保持登录状态无效
+                            println("获取用户信息失败: ${error.message}")
+                            // 不设置userId，保持登录失败状态
                         }
                         pendingLoginToken = null
                     }
@@ -125,6 +130,9 @@ class MainActivity : ComponentActivity() {
                                 userId = userId,
                                 onBackClick = {
                                     currentScreen = "conversation"
+                                },
+                                onAvatarClick = { userId, userName ->
+                                    UserProfileActivity.start(this@MainActivity, userId, userName)
                                 },
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -162,6 +170,7 @@ class MainActivity : ComponentActivity() {
                                             // 显示菜单
                                         },
                                         tokenRepository = tokenRepository,
+                                        viewModel = conversationViewModel, // 使用共享的ViewModel
                                         modifier = Modifier.padding(paddingValues)
                                     )
                                 }
@@ -194,12 +203,9 @@ class MainActivity : ComponentActivity() {
                                             onBackClick = {
                                                 currentScreen = "conversation"
                                             },
-                                            onItemClick = { searchItem ->
+                                            onItemClick = {
                                                 // 处理搜索项点击，可以跳转到聊天界面
-                                                currentChatId = searchItem.friendId
-                                                currentChatType = searchItem.friendType
-                                                currentChatName = searchItem.nickname
-                                                currentScreen = "chat"
+                                                // TODO: 实现具体的点击处理逻辑
                                             },
                                             tokenRepository = tokenRepository,
                                             modifier = Modifier.padding(paddingValues)
@@ -223,6 +229,10 @@ class MainActivity : ComponentActivity() {
                                             userId = userId,
                                             onBackClick = {
                                                 currentScreen = "conversation"
+                                            },
+                                            onAvatarClick = { userId, userName ->
+                                                println("MainActivity: 点击头像 - userId: $userId, userName: $userName")
+                                                UserProfileActivity.start(this@MainActivity, userId, userName)
                                             },
                                             modifier = Modifier.fillMaxSize()
                                         )

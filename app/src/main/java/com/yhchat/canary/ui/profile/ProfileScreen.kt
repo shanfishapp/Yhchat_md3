@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,8 +21,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import com.yhchat.canary.data.repository.UserRepository
+import com.yhchat.canary.ui.settings.SettingsActivity
+import android.text.TextUtils
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -35,6 +39,7 @@ fun ProfileScreen(
     userRepository: UserRepository? = null,
     tokenRepository: com.yhchat.canary.data.repository.TokenRepository? = null
 ) {
+    val context = LocalContext.current
     val viewModel = remember {
         val repo = userRepository ?: com.yhchat.canary.data.repository.UserRepository(com.yhchat.canary.data.api.ApiClient.apiService, null)
         if (tokenRepository != null) {
@@ -50,18 +55,36 @@ fun ProfileScreen(
     }
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier = modifier.fillMaxSize()
     ) {
-        // 顶部标题
-        Text(
-            text = "我的",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 24.dp)
+        // 顶部应用栏
+        TopAppBar(
+            title = {
+                Text(
+                    text = "我的",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            actions = {
+                IconButton(
+                    onClick = {
+                        SettingsActivity.start(context)
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "设置"
+                    )
+                }
+            }
         )
+        
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
 
         when {
             uiState.isLoading -> {
@@ -120,8 +143,8 @@ fun ProfileScreen(
             }
         }
     }
+    }
 }
-
 @Composable
 private fun UserProfileContent(
     userProfile: com.yhchat.canary.data.model.UserProfile,
@@ -168,14 +191,14 @@ private fun UserProfileContent(
                 
                 // 用户名
                 Text(
-                    text = userProfile.name,
+                    text = userProfile.nickname,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
-                
+
                 // 用户ID
                 Text(
-                    text = "ID: ${userProfile.id}",
+                    text = "ID: ${userProfile.userId}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -229,32 +252,33 @@ private fun UserProfileContent(
                 )
                 
                 // 手机号
-                if (!userProfile.phone.isNullOrEmpty()) {
+                if (!TextUtils.isEmpty(userProfile.phone)) {
                     ProfileInfoItem(
                         icon = Icons.Default.Phone,
                         label = "手机号",
-                        value = userProfile.phone
+                        value = userProfile.phone!!
                     )
                 }
-                
+
                 // 邮箱
-                if (!userProfile.email.isNullOrEmpty()) {
+                if (!TextUtils.isEmpty(userProfile.
+                    email)) {
                     ProfileInfoItem(
                         icon = Icons.Default.Email,
                         label = "邮箱",
-                        value = userProfile.email
+                        value = userProfile.email!!
                     )
                 }
-                
+
                 // 云湖币
                 if (userProfile.coin != null && userProfile.coin > 0) {
                     ProfileInfoItem(
                         icon = Icons.Default.AccountCircle,
-                        label = "云湖币",
+                        label = "金币",
                         value = "%.2f".format(userProfile.coin)
                     )
                 }
-                
+
                 // VIP到期时间
                 if (userProfile.isVip == 1 && userProfile.vipExpiredTime != null && userProfile.vipExpiredTime > 0) {
                     val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
@@ -265,13 +289,13 @@ private fun UserProfileContent(
                         value = dateFormat.format(expiredDate)
                     )
                 }
-                
+
                 // 邀请码
-                if (!userProfile.invitationCode.isNullOrEmpty()) {
+                if (!TextUtils.isEmpty(userProfile.invitationCode)) {
                     ProfileInfoItem(
                         icon = Icons.Default.Person,
                         label = "邀请码",
-                        value = userProfile.invitationCode
+                        value = userProfile.invitationCode!!
                     )
                 }
             }
@@ -315,3 +339,4 @@ private fun ProfileInfoItem(
         }
     }
 }
+ 

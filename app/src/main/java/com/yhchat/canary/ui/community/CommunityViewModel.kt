@@ -23,6 +23,14 @@ class CommunityViewModel @Inject constructor(
     private val _boardListState = MutableStateFlow(BoardListState())
     val boardListState: StateFlow<BoardListState> = _boardListState.asStateFlow()
     
+    // 关注分区列表状态
+    private val _followingBoardListState = MutableStateFlow(BoardListState())
+    val followingBoardListState: StateFlow<BoardListState> = _followingBoardListState.asStateFlow()
+    
+    // 我的文章列表状态
+    private val _myPostListState = MutableStateFlow(MyPostListState())
+    val myPostListState: StateFlow<MyPostListState> = _myPostListState.asStateFlow()
+    
     // 文章列表状态
     private val _postListState = MutableStateFlow(CommunityPostListState())
     val postListState: StateFlow<CommunityPostListState> = _postListState.asStateFlow()
@@ -66,6 +74,79 @@ class CommunityViewModel @Inject constructor(
                 }
             )
         }
+    }
+    
+    /**
+     * 加载关注的分区列表
+     */
+    fun loadFollowingBoardList(token: String) {
+        viewModelScope.launch {
+            _followingBoardListState.value = _followingBoardListState.value.copy(isLoading = true, error = null)
+            
+            communityRepository.getFollowingBoardList(
+                token = token,
+                typ = 2,
+                size = 1000,
+                page = 1
+            ).fold(
+                onSuccess = { response ->
+                    _followingBoardListState.value = _followingBoardListState.value.copy(
+                        isLoading = false,
+                        boards = response.data.boards,
+                        total = response.data.total,
+                        currentPage = 1,
+                        hasMore = false
+                    )
+                },
+                onFailure = { error ->
+                    _followingBoardListState.value = _followingBoardListState.value.copy(
+                        isLoading = false,
+                        error = error.message ?: "加载关注分区列表失败"
+                    )
+                }
+            )
+        }
+    }
+    
+    /**
+     * 加载我的文章列表
+     */
+    fun loadMyPostList(token: String, page: Int = 1) {
+        viewModelScope.launch {
+            _myPostListState.value = _myPostListState.value.copy(isLoading = true, error = null)
+            
+            communityRepository.getMyPostList(
+                token = token,
+                size = 20,
+                page = page
+            ).fold(
+                onSuccess = { response ->
+                    _myPostListState.value = _myPostListState.value.copy(
+                        isLoading = false,
+                        posts = response.data.posts,
+                        total = response.data.total,
+                        currentPage = page,
+                        hasMore = page * 20 < response.data.total
+                    )
+                },
+                onFailure = { error ->
+                    _myPostListState.value = _myPostListState.value.copy(
+                        isLoading = false,
+                        error = error.message ?: "加载我的文章列表失败"
+                    )
+                }
+            )
+        }
+    }
+    
+    /**
+     * 加载更多我的文章
+     */
+    fun loadMoreMyPosts(token: String) {
+        val currentState = _myPostListState.value
+        if (currentState.isLoading || !currentState.hasMore) return
+        
+        loadMyPostList(token, currentState.currentPage + 1)
     }
     
     
@@ -296,5 +377,17 @@ data class CommunityPostListState(
     val currentPage: Int = 1,
     val hasMore: Boolean = false,
     val boardId: Int? = null,
+    val error: String? = null
+)
+
+/**
+ * 我的文章列表状态
+ */
+data class MyPostListState(
+    val isLoading: Boolean = false,
+    val posts: List<CommunityPost> = emptyList(),
+    val total: Int = 0,
+    val currentPage: Int = 1,
+    val hasMore: Boolean = false,
     val error: String? = null
 )

@@ -381,3 +381,47 @@ data class CreatePostData(
     @SerializedName("audioUrl")
     val postId: Int  // 注意：API返回的字段名是audioUrl，但实际是文章ID
 )
+
+/**
+ * 我的文章列表响应
+ */
+data class MyPostListResponse(
+    @SerializedName("code")
+    val code: Int,
+    
+    @SerializedName("data")
+    val data: MyPostListData,
+    
+    @SerializedName("msg")
+    val msg: String
+)
+
+data class MyPostListData(
+    @SerializedName("posts")
+    val posts: List<CommunityPost>,
+    
+    @SerializedName("total")
+    val total: Int
+)
+
+/**
+ * 关注分区列表响应
+ */
+data class FollowingBoardListResponse(
+    @SerializedName("code")
+    val code: Int,
+    
+    @SerializedName("data")
+    val data: FollowingBoardListData,
+    
+    @SerializedName("msg")
+    val msg: String
+)
+
+data class FollowingBoardListData(
+    @SerializedName("ba")
+    val boards: List<CommunityBoard>,
+    
+    @SerializedName("total")
+    val total: Int
+)

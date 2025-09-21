@@ -1,6 +1,7 @@
 package com.yhchat.canary.ui.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -9,9 +10,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.activity.compose.BackHandler
@@ -22,17 +24,23 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.google.accompanist.swiperefresh.SwipeRefresh
-import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import com.yhchat.canary.ui.components.MarkdownText
 import com.yhchat.canary.ui.components.HtmlWebView
 import com.yhchat.canary.ui.components.ChatInputBar
+import com.yhchat.canary.ui.components.ImageUtils
+import com.yhchat.canary.ui.components.ImageViewer
+import com.yhchat.canary.ui.components.LinkText
+import com.yhchat.canary.ui.components.LinkDetector
 import com.yhchat.canary.data.model.ChatMessage
 import com.yhchat.canary.data.model.MessageContent
 import java.text.SimpleDateFormat
@@ -41,7 +49,7 @@ import java.util.*
 /**
  * 聊天界面
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun ChatScreen(
     chatId: String,
@@ -50,12 +58,17 @@ fun ChatScreen(
     userId: String,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: ChatViewModel = viewModel()
+    viewModel: ChatViewModel = viewModel(),
+    onAvatarClick: (String, String) -> Unit = { _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val messages = viewModel.messages
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    
+    // 图片预览状态
+    var showImageViewer by remember { mutableStateOf(false) }
+    var currentImageUrl by remember { mutableStateOf("") }
     
     // 初始化聊天
     LaunchedEffect(chatId, chatType, userId) {
@@ -68,7 +81,10 @@ fun ChatScreen(
     }
 
     // 下拉刷新状态
-    val swipeRefreshState = rememberSwipeRefreshState(uiState.isRefreshing)
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = uiState.isRefreshing,
+        onRefresh = { viewModel.loadMoreMessages() }
+    )
     
     Column(
         modifier = modifier.fillMaxSize()
@@ -84,7 +100,7 @@ fun ChatScreen(
             navigationIcon = {
                 IconButton(onClick = onBackClick) {
                     Icon(
-                        imageVector = Icons.Default.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "返回"
                     )
                 }
@@ -93,7 +109,6 @@ fun ChatScreen(
                 containerColor = MaterialTheme.colorScheme.primaryContainer
             )
         )
-        
         // 错误信息
         uiState.error?.let { error ->
             Card(
@@ -110,10 +125,10 @@ fun ChatScreen(
                         .padding(12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = error,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
+                ) {
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
                         modifier = Modifier.weight(1f)
                     )
                     TextButton(
@@ -124,97 +139,113 @@ fun ChatScreen(
                 }
             }
         }
-        
-        // 消息列表
-        Box(
-            modifier = Modifier.weight(1f)
-        ) {
-            SwipeRefresh(
-                state = swipeRefreshState,
-                onRefresh = { viewModel.refreshMessages() }
-            ) {
-                if (uiState.isLoading && messages.isEmpty()) {
-                    // 初始加载状态
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        } else {
-            LazyColumn(
-                state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        reverseLayout = true // 最新消息在底部
-                    ) {
-                        items(
-                            items = messages.reversed(), // 反转显示顺序
-                            key = { it.msgId }
-                        ) { message ->
-                    MessageItem(
-                        message = message,
-                                isMyMessage = viewModel.isMyMessage(message),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
 
-                        // 加载更多指示器
-                        if (messages.isNotEmpty()) {
-                            item {
-                                LaunchedEffect(Unit) {
-                                    viewModel.loadMoreMessages()
-                                }
-                                
-                                if (uiState.isLoading) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(16.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(24.dp)
-                                        )
-                                    }
+        // 消息列表（占据中间可用空间）
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .pullRefresh(pullRefreshState)
+        ) {
+            if (uiState.isLoading && messages.isEmpty()) {
+                // 初始加载状态
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    reverseLayout = true // 最新消息在底部
+                ) {
+                    items(
+                        items = messages.reversed(), // 反转显示顺序
+                        key = { it.msgId }
+                    ) { message ->
+                        MessageItem(
+                            message = message,
+                            isMyMessage = viewModel.isMyMessage(message),
+                            modifier = Modifier.fillMaxWidth(),
+                            onImageClick = { imageUrl ->
+                                currentImageUrl = imageUrl
+                                showImageViewer = true
+                            },
+                            onAvatarClick = onAvatarClick
+                        )
+                    }
+
+                    // 加载更多指示器
+                    if (messages.isNotEmpty()) {
+                        item {
+                            LaunchedEffect(Unit) {
+                                viewModel.loadMoreMessages()
+                            }
+
+                            if (uiState.isLoading) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp)
+                                    )
                                 }
                             }
                         }
+                    }
 
-                        // 空状态
-                        if (messages.isEmpty() && !uiState.isLoading) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                        text = "暂无消息\n开始对话吧",
-                                style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center
-                            )
+                    // 空状态
+                    if (messages.isEmpty() && !uiState.isLoading) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "暂无消息\n开始对话吧",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
-            }
+
+            // 下拉刷新指示器
+            PullRefreshIndicator(
+                refreshing = uiState.isRefreshing,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
+            // 下拉刷新指示器
+            PullRefreshIndicator(
+                refreshing = uiState.isRefreshing,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
         }
 
-        // 消息输入栏
+        // 底部输入栏
         ChatInputBar(
             text = inputText,
             onTextChange = { inputText = it },
             onSendMessage = {
-                if (inputText.isNotBlank()) {
-                    viewModel.sendTextMessage(inputText.trim())
-                    inputText = ""
-                }
-            },
+                        if (inputText.isNotBlank()) {
+                            viewModel.sendTextMessage(inputText.trim())
+                            inputText = ""
+                        }
+                    },
             onImageClick = {
                 // TODO: 实现图片选择功能
             },
@@ -223,6 +254,20 @@ fun ChatScreen(
             },
             onCameraClick = {
                 // TODO: 实现相机拍照功能
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 8.dp)
+        )
+    }
+    
+    // 图片预览器
+    if (showImageViewer && currentImageUrl.isNotEmpty()) {
+        ImageViewer(
+            imageUrl = currentImageUrl,
+            onDismiss = {
+                showImageViewer = false
+                currentImageUrl = ""
             }
         )
     }
@@ -235,7 +280,9 @@ fun ChatScreen(
 private fun MessageItem(
     message: ChatMessage,
     isMyMessage: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onImageClick: (String) -> Unit = {},
+    onAvatarClick: (String, String) -> Unit = { _, _ -> }
 ) {
     Row(
         modifier = modifier,
@@ -248,14 +295,17 @@ private fun MessageItem(
         if (!isMyMessage) {
             // 发送者头像
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(message.sender.avatarUrl)
-                    .crossfade(true)
-                    .build(),
+                model = ImageUtils.createAvatarImageRequest(
+                    context = LocalContext.current,
+                    url = message.sender.avatarUrl
+                ),
                 contentDescription = message.sender.name,
                 modifier = Modifier
                     .size(40.dp)
-                    .clip(CircleShape),
+                    .clip(CircleShape)
+                    .clickable {
+                        onAvatarClick(message.sender.chatId, message.sender.name)
+                    },
                 contentScale = ContentScale.Crop
             )
             
@@ -293,14 +343,20 @@ private fun MessageItem(
                 color = if (isMyMessage) {
                         MaterialTheme.colorScheme.primary 
                 } else {
-                        MaterialTheme.colorScheme.surfaceVariant
+                        MaterialTheme.colorScheme.surface
+                },
+                tonalElevation = if (isMyMessage) {
+                    0.dp  // 自己的消息使用纯色
+                } else {
+                    2.dp  // 对方的消息使用浅色高程
                 }
             ) {
                 MessageContentView(
                     content = message.content,
                     contentType = message.contentType,
                     isMyMessage = isMyMessage,
-                    modifier = Modifier.padding(12.dp)
+                    modifier = Modifier.padding(12.dp),
+                    onImageClick = onImageClick
                 )
             }
 
@@ -315,17 +371,20 @@ private fun MessageItem(
 
         if (isMyMessage) {
             Spacer(modifier = Modifier.width(8.dp))
-            
+
             // 自己的头像
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(message.sender.avatarUrl)
-                    .crossfade(true)
-                    .build(),
+                model = ImageUtils.createAvatarImageRequest(
+                    context = LocalContext.current,
+                    url = message.sender.avatarUrl
+                ),
                 contentDescription = "我",
                 modifier = Modifier
                     .size(40.dp)
-                    .clip(CircleShape),
+                    .clip(CircleShape)
+                    .clickable {
+                        onAvatarClick(message.sender.chatId, message.sender.name)
+                    },
                 contentScale = ContentScale.Crop
             )
         }
@@ -340,12 +399,13 @@ private fun MessageContentView(
     content: MessageContent,
     contentType: Int,
     isMyMessage: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onImageClick: (String) -> Unit = {}
 ) {
     val textColor = if (isMyMessage) {
                                 MaterialTheme.colorScheme.onPrimary 
     } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
+                                MaterialTheme.colorScheme.onSurface
     }
 
     Column(modifier = modifier) {
@@ -353,25 +413,40 @@ private fun MessageContentView(
             1 -> {
                 // 文本消息
                 content.text?.let { text ->
-                    Text(
-                        text = text,
-                        color = textColor,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    if (LinkDetector.containsLink(text)) {
+                        // 包含链接的文本
+                        LinkText(
+                            text = text,
+                            style = MaterialTheme.typography.bodyMedium.copy(color = textColor),
+                            linkColor = if (isMyMessage) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            }
+                        )
+                    } else {
+                        // 普通文本
+                        Text(
+                            text = text,
+                            color = textColor,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
             }
             2 -> {
                 // 图片消息
                 content.imageUrl?.let { imageUrl ->
                         AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(imageUrl)
-                            .crossfade(true)
-                            .build(),
+                        model = ImageUtils.createImageRequest(
+                            context = LocalContext.current,
+                            url = imageUrl
+                        ),
                             contentDescription = "图片",
                             modifier = Modifier
                                 .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp)),
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onImageClick(imageUrl) },
                             contentScale = ContentScale.Crop
                         )
                     }
@@ -393,7 +468,7 @@ private fun MessageContentView(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                         Icon(
-                            imageVector = Icons.Default.Send, // 用作文件图标的临时替代
+                            imageVector = Icons.AutoMirrored.Filled.Send, // 用作文件图标的临时替代
                             contentDescription = "文件",
                             tint = textColor,
                             modifier = Modifier.size(24.dp)
@@ -423,7 +498,7 @@ private fun MessageContentView(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Send, // 用作语音图标的临时替代
+                        imageVector = Icons.AutoMirrored.Filled.Send, // 用作语音图标的临时替代
                         contentDescription = "语音",
                         tint = textColor,
                         modifier = Modifier.size(24.dp)
@@ -443,7 +518,11 @@ private fun MessageContentView(
                 content.text?.let { markdownText ->
                     MarkdownText(
                         markdown = markdownText,
-                        textColor = textColor,
+                        textColor = if (isMyMessage) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -457,14 +536,153 @@ private fun MessageContentView(
                     )
                 }
             }
-            else -> {
-                // 其他类型消息，显示文本内容
-                content.text?.let { text ->
+            25 -> {
+                // 表情消息 (单个表情)
+                content.stickerItemId?.let { stickerId ->
+                    // 根据表情ID构建URL
+                    val stickerImageUrl = "https://chat-img.jwznb.com/sticker/${stickerId}"
+                    
+                    AsyncImage(
+                        model = ImageUtils.createStickerImageRequest(
+                            context = LocalContext.current,
+                            url = stickerImageUrl
+                        ),
+                        contentDescription = "表情",
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Fit
+                    )
+                } ?: run {
+                    // 如果没有sticker_item_id，检查是否有特殊的sticker_url
+                    content.stickerUrl?.let { stickerUrl ->
+                        if (stickerUrl.startsWith("https://chat-img.jwznb.com/sticker/") || 
+                            stickerUrl.startsWith("https://chat-img.jwznb.com/expression/")) {
+                            AsyncImage(
+                                model = ImageUtils.createStickerImageRequest(
+                                    context = LocalContext.current,
+                                    url = stickerUrl
+                                ),
+                                contentDescription = "表情",
+                                modifier = Modifier
+                                    .size(120.dp)
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Fit
+                            )
+                        } else {
+                            // 其他类型的sticker_url，作为普通图片处理
+                            AsyncImage(
+                                model = ImageUtils.createImageRequest(
+                                    context = LocalContext.current,
+                                    url = stickerUrl
+                                ),
+                                contentDescription = "贴纸",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    }
+                }
+            }
+            26 -> {
+                // 表情包消息 (来自表情包的表情)
+                content.stickerPackId?.let { packId ->
+                    // 如果有具体的表情ID，使用表情ID；否则显示表情包信息
+                    content.stickerItemId?.let { stickerId ->
+                        val stickerImageUrl = "https://chat-img.jwznb.com/sticker/${stickerId}"
+                        
+                        AsyncImage(
+                            model = ImageUtils.createStickerImageRequest(
+                                context = LocalContext.current,
+                                url = stickerImageUrl
+                            ),
+                            contentDescription = "表情包",
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Fit
+                        )
+                    } ?: run {
+                        // 没有具体表情ID时，显示表情包信息
+                        Text(
+                            text = "表情包 (ID: $packId)",
+                            color = textColor,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                } ?: run {
+                    // 检查是否有sticker_url
+                    content.stickerUrl?.let { stickerUrl ->
+                        if (stickerUrl.startsWith("https://chat-img.jwznb.com/sticker/") || 
+                            stickerUrl.startsWith("https://chat-img.jwznb.com/expression/")) {
+                            AsyncImage(
+                                model = ImageUtils.createStickerImageRequest(
+                                    context = LocalContext.current,
+                                    url = stickerUrl
+                                ),
+                                contentDescription = "表情包",
+                                modifier = Modifier
+                                    .size(120.dp)
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
+                    }
+                }
+            }
+            7 -> {
+                // 个人收藏表情
+                content.expressionId?.let { expressionId ->
+                    // 根据表情ID构建URL  
+                    val expressionImageUrl = "https://chat-img.jwznb.com/expression/${expressionId}"
+                    
+                    AsyncImage(
+                        model = ImageUtils.createStickerImageRequest(
+                            context = LocalContext.current,
+                            url = expressionImageUrl
+                        ),
+                        contentDescription = "个人表情",
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Fit
+                    )
+                        }
+                    }
+            19 -> {
+                // 视频消息 - 已移除视频播放功能，显示提示文本
+                content.videoUrl?.let { videoPath ->
                     Text(
-                        text = text,
+                        text = "📹 视频消息 (暂不支持播放)",
                         color = textColor,
                         style = MaterialTheme.typography.bodyMedium
                     )
+                }
+            }
+                    else -> {
+                // 其他类型消息，显示文本内容
+                content.text?.let { text ->
+                    if (LinkDetector.containsLink(text)) {
+                        // 包含链接的文本
+                        LinkText(
+                            text = text,
+                            style = MaterialTheme.typography.bodyMedium.copy(color = textColor),
+                            linkColor = if (isMyMessage) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            }
+                        )
+                    } else {
+                        // 普通文本
+                        Text(
+                            text = text,
+                            color = textColor,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
             }
         }
@@ -478,12 +696,37 @@ private fun MessageContentView(
                     .clip(RoundedCornerShape(4.dp)),
                 color = textColor.copy(alpha = 0.1f)
             ) {
-            Text(
-                    text = "引用消息: $quoteText",
-                    color = textColor.copy(alpha = 0.8f),
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(8.dp)
-                )
+                Row(
+                    modifier = Modifier.padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 引用消息的图片（如果有）
+                    content.quoteImageUrl?.let { imageUrl ->
+                        AsyncImage(
+                            model = ImageUtils.createImageRequest(
+                                context = LocalContext.current,
+                                url = imageUrl
+                            ),
+                            contentDescription = "引用图片",
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .clickable { onImageClick(imageUrl) },
+                            contentScale = ContentScale.Crop
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    
+                    // 引用消息文本
+                    Text(
+                        text = quoteText,
+                        color = textColor.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }

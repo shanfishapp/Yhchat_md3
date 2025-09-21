@@ -49,7 +49,7 @@ dependencyResolutionManagement {
         // 华为云Maven镜像
         maven { url = uri("https://mirrors.huaweicloud.com/repository/maven/") }
         
-   
+
 
         
         // 官方仓库作为后备

@@ -86,6 +86,15 @@ dependencies {
     // 图片加载
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
+    implementation("io.coil-kt:coil-svg:2.5.0") // SVG支持
+    
+    // 图片预览器 - 使用兼容SDK21的PhotoView
+    implementation("com.github.chrisbanes:PhotoView:2.3.0")
+    // AppCompat 支持 (PhotoView 需要)
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    
+    // 权限处理
+    implementation("com.google.accompanist:accompanist-permissions:0.32.0")
     
     // Markwon Markdown 解析和渲染
     implementation("io.noties.markwon:core:4.6.2")
@@ -112,9 +121,15 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
     
+    // SQLCipher 加密数据库支持
+    implementation("net.zetetic:android-database-sqlcipher:4.5.4")
+    implementation("androidx.sqlite:sqlite-ktx:2.4.0")
+    
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    // Hilt Navigation for Compose (needed for hiltViewModel)
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -62,15 +62,15 @@ fun StickyConversations(
         // 置顶会话标题
         Text(
             text = "置顶会话",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
         )
 
         // 置顶会话横向列表
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             stickyData?.sticky?.let { stickyList ->
@@ -91,7 +91,7 @@ fun StickyConversations(
 
         // 分隔线
         Divider(
-            modifier = Modifier.padding(vertical = 8.dp),
+            modifier = Modifier.padding(vertical = 6.dp),
             color = MaterialTheme.colorScheme.outlineVariant
         )
     }
@@ -108,10 +108,10 @@ fun StickyConversationItem(
 ) {
     Column(
         modifier = modifier
-            .width(80.dp)
+            .width(64.dp)
             .clickable { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         // 头像
         Box {
@@ -123,7 +123,7 @@ fun StickyConversationItem(
                     .build(),
                 contentDescription = "头像",
                 modifier = Modifier
-                    .size(56.dp)
+                    .size(42.dp)
                     .clip(CircleShape),
                 contentScale = ContentScale.Crop,
                 error = androidx.compose.ui.res.painterResource(id = R.drawable.ic_person)
@@ -133,7 +133,7 @@ fun StickyConversationItem(
             if (stickyItem.certificationLevel > 0) {
                 Box(
                     modifier = Modifier
-                        .size(16.dp)
+                        .size(12.dp)
                         .background(
                             when (stickyItem.certificationLevel) {
                                 1 -> Color(0xFF4CAF50) // 官方 - 绿色
@@ -153,7 +153,7 @@ fun StickyConversationItem(
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.White,
-                        fontSize = 8.sp
+                        fontSize = 7.sp
                     )
                 }
             }
@@ -162,11 +162,12 @@ fun StickyConversationItem(
         // 会话名称
         Text(
             text = stickyItem.chatName,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier.width(70.dp)
+            modifier = Modifier.width(58.dp),
+            fontSize = 11.sp
         )
 
         // 会话类型标识
@@ -182,9 +183,9 @@ fun StickyConversationItem(
                 text = typeText,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 10.sp,
+                fontSize = 9.sp,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.width(70.dp)
+                modifier = Modifier.width(58.dp)
             )
         }
     }

@@ -5,7 +5,9 @@ import androidx.room.Room
 import com.yhchat.canary.data.api.ApiService
 import com.yhchat.canary.data.local.AppDatabase
 import com.yhchat.canary.data.repository.CommunityRepository
+import com.yhchat.canary.data.repository.FriendRepository
 import com.yhchat.canary.data.repository.TokenRepository
+import com.yhchat.canary.data.repository.ConversationRepository
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
@@ -32,11 +34,26 @@ object RepositoryFactory {
         CommunityRepository(apiService)
     }
     
+    val friendRepository: FriendRepository by lazy {
+        FriendRepository(apiService)
+    }
+    
+    val conversationRepository: ConversationRepository by lazy {
+        ConversationRepository(apiService)
+    }
+    
     /**
      * 获取社区仓库实例
      */
     fun getCommunityRepository(context: Context): CommunityRepository {
         return communityRepository
+    }
+    
+    /**
+     * 获取好友仓库实例
+     */
+    fun getFriendRepository(context: Context): FriendRepository {
+        return friendRepository
     }
     
     /**
@@ -49,5 +66,12 @@ object RepositoryFactory {
             "app_database"
         ).build()
         return TokenRepository(database.userTokenDao())
+    }
+    
+    /**
+     * 获取会话仓库实例
+     */
+    fun getConversationRepository(context: Context): ConversationRepository {
+        return conversationRepository
     }
 }

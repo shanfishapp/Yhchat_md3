@@ -3,7 +3,7 @@ package com.yhchat.canary.ui.search
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yhchat.canary.data.api.ApiService
-import com.yhchat.canary.data.model.SearchData
+import com.yhchat.canary.data.api.SearchData
 import com.yhchat.canary.data.repository.UserRepository
 import com.yhchat.canary.data.repository.TokenRepository
 import dagger.hilt.android.lifecycle.HiltViewModel

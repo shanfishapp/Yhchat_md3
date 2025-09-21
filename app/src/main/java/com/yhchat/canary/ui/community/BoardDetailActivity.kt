@@ -115,7 +115,13 @@ fun BoardDetailScreen(
                 }
             },
             actions = {
-                IconButton(onClick = { /* 搜索功能 */ }) {
+                IconButton(onClick = {
+                    // 跳转到搜索Activity
+                    val intent = Intent(context, SearchActivity::class.java).apply {
+                        putExtra("token", token)
+                    }
+                    context.startActivity(intent)
+                }) {
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = "搜索"
@@ -128,6 +134,15 @@ fun BoardDetailScreen(
         boardDetailState.board?.let { board ->
             BoardInfoCard(
                 board = board,
+                onGroupListClick = {
+                    // 跳转到群聊列表Activity
+                    val intent = Intent(context, GroupListActivity::class.java).apply {
+                        putExtra("board_id", boardId)
+                        putExtra("board_name", board.name)
+                        putExtra("token", token)
+                    }
+                    context.startActivity(intent)
+                },
                 modifier = Modifier.padding(16.dp)
             )
         }
@@ -257,6 +272,7 @@ fun BoardDetailScreen(
 @Composable
 fun BoardInfoCard(
     board: CommunityBoard,
+    onGroupListClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -290,7 +306,20 @@ fun BoardInfoCard(
                 ) {
                     InfoItem(label = "成员", value = board.memberNum.toString())
                     InfoItem(label = "文章", value = board.postNum.toString())
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { onGroupListClick() }
+                    ) {
                     InfoItem(label = "群聊", value = board.groupNum.toString())
+                        if (board.groupNum > 0) {
+                            Text(
+                                text = " >",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
+                        }
+                    }
                 }
                 
                 Spacer(modifier = Modifier.height(4.dp))

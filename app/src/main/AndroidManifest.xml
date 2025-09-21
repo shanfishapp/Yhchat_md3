@@ -4,6 +4,13 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    
+    <!-- 存储权限用于保存图片 -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
     <application
         android:name=".CanaryApplication"
@@ -46,6 +53,48 @@
             android:name=".ui.community.PostDetailActivity"
             android:exported="false"
             android:label="文章详情"
+            android:theme="@style/Theme.YhchatCanary" />
+            
+        <!-- WebView Activity -->
+        <activity
+            android:name=".ui.webview.WebViewActivity"
+            android:exported="false"
+            android:label="网页"
+            android:theme="@style/Theme.YhchatCanary" />
+            
+        <!-- 设置 Activity -->
+        <activity
+            android:name=".ui.settings.SettingsActivity"
+            android:exported="false"
+            android:label="设置"
+            android:theme="@style/Theme.YhchatCanary" />
+            
+        <!-- HTML 设置 Activity -->
+        <activity
+            android:name=".ui.settings.HtmlSettingsActivity"
+            android:exported="false"
+            android:label="HTML 设置"
+            android:theme="@style/Theme.YhchatCanary" />
+
+        <!-- 用户资料 Activity -->
+        <activity
+            android:name=".ui.profile.UserProfileActivity"
+            android:exported="false"
+            android:label="用户资料"
+            android:theme="@style/Theme.YhchatCanary" />
+            
+        <!-- 群聊列表 Activity -->
+        <activity
+            android:name=".ui.community.GroupListActivity"
+            android:exported="false"
+            android:label="群聊列表"
+            android:theme="@style/Theme.YhchatCanary" />
+            
+        <!-- 搜索 Activity -->
+        <activity
+            android:name=".ui.community.SearchActivity"
+            android:exported="false"
+            android:label="搜索"
             android:theme="@style/Theme.YhchatCanary" />
     </application>
 

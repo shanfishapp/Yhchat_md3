@@ -265,8 +265,9 @@ class ChatViewModel @Inject constructor(
 
     /**
      * 检查消息是否来自当前用户
+     * 使用direction字段判断：right=自己发送，left=对方发送
      */
     fun isMyMessage(message: ChatMessage): Boolean {
-        return message.sender.chatId == currentUserId
+        return message.direction == "right"
     }
 }

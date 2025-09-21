@@ -226,6 +226,7 @@ class MessageRepository @Inject constructor(
             fileUrl = if (protoMsg.content.fileUrl.isNotEmpty()) protoMsg.content.fileUrl else null,
             form = if (protoMsg.content.form.isNotEmpty()) protoMsg.content.form else null,
             quoteMsgText = if (protoMsg.content.quoteMsgText.isNotEmpty()) protoMsg.content.quoteMsgText else null,
+            quoteImageUrl = null, // Proto中可能没有这个字段，暂时设为null
             stickerUrl = if (protoMsg.content.stickerUrl.isNotEmpty()) protoMsg.content.stickerUrl else null,
             postId = if (protoMsg.content.postId.isNotEmpty()) protoMsg.content.postId else null,
             postTitle = if (protoMsg.content.postTitle.isNotEmpty()) protoMsg.content.postTitle else null,

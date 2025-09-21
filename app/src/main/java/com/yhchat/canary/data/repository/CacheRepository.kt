@@ -1,0 +1,252 @@
+package com.yhchat.canary.data.repository
+
+import android.content.Context
+import com.yhchat.canary.data.local.AppDatabase
+import com.yhchat.canary.data.local.CachedConversation
+import com.yhchat.canary.data.local.CachedMessage
+import com.yhchat.canary.data.model.Conversation
+import com.yhchat.canary.data.model.ChatMessage
+import com.yhchat.canary.data.model.MessageContent
+import com.yhchat.canary.data.model.MessageSender
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+import javax.inject.Singleton
+import dagger.hilt.android.qualifiers.ApplicationContext
+
+/**
+ * 缓存仓库 - 管理本地加密数据库
+ */
+@Singleton
+class CacheRepository @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
+    
+    private val database = AppDatabase.getDatabase(context)
+    private val conversationDao = database.cachedConversationDao()
+    private val messageDao = database.cachedMessageDao()
+    
+    // ========== 会话缓存 ==========
+    
+    /**
+     * 获取所有缓存的会话
+     */
+    fun getCachedConversations(): Flow<List<Conversation>> {
+        return conversationDao.getAllConversations().map { cachedList ->
+            cachedList.map { cached ->
+                Conversation(
+                    chatId = cached.chatId,
+                    chatType = cached.chatType,
+                    name = cached.name,
+                    chatContent = cached.chatContent,
+                    timestampMs = cached.timestampMs,
+                    timestamp = cached.timestamp,
+                    unreadMessage = cached.unreadMessage,
+                    at = cached.at,
+                    avatarUrl = cached.avatarUrl,
+                    doNotDisturb = cached.doNotDisturb,
+                    certificationLevel = cached.certificationLevel
+                )
+            }
+        }
+    }
+    
+    /**
+     * 同步获取所有缓存的会话
+     */
+    suspend fun getCachedConversationsSync(): List<Conversation> {
+        return conversationDao.getAllConversationsSync().map { cached ->
+            Conversation(
+                chatId = cached.chatId,
+                chatType = cached.chatType,
+                name = cached.name,
+                chatContent = cached.chatContent,
+                timestampMs = cached.timestampMs,
+                timestamp = cached.timestamp,
+                unreadMessage = cached.unreadMessage,
+                at = cached.at,
+                avatarUrl = cached.avatarUrl,
+                doNotDisturb = cached.doNotDisturb,
+                certificationLevel = cached.certificationLevel
+            )
+        }
+    }
+    
+    /**
+     * 缓存会话列表
+     */
+    suspend fun cacheConversations(conversations: List<Conversation>) {
+        val cachedConversations = conversations.map { conversation ->
+            CachedConversation(
+                chatId = conversation.chatId,
+                chatType = conversation.chatType,
+                name = conversation.name,
+                chatContent = conversation.chatContent,
+                timestampMs = conversation.timestampMs,
+                timestamp = conversation.timestamp,
+                unreadMessage = conversation.unreadMessage,
+                at = conversation.at,
+                avatarUrl = conversation.avatarUrl,
+                doNotDisturb = conversation.doNotDisturb,
+                certificationLevel = conversation.certificationLevel
+            )
+        }
+        conversationDao.insertConversations(cachedConversations)
+    }
+    
+    /**
+     * 更新会话的最后消息
+     */
+    suspend fun updateConversationLastMessage(chatId: String, lastMessage: String, timestamp: Long) {
+        conversationDao.updateLastMessage(chatId, lastMessage, timestamp)
+    }
+    
+    /**
+     * 标记会话为已读
+     */
+    suspend fun markConversationAsRead(chatId: String) {
+        conversationDao.markAsRead(chatId)
+    }
+    
+    // ========== 消息缓存 ==========
+    
+    /**
+     * 获取缓存的消息
+     */
+    fun getCachedMessages(chatId: String): Flow<List<ChatMessage>> {
+        return messageDao.getMessages(chatId).map { cachedList ->
+            cachedList.map { cached ->
+                ChatMessage(
+                    msgId = cached.msgId,
+                    sender = MessageSender(
+                        chatId = cached.senderChatId,
+                        chatType = cached.chatType,
+                        name = cached.senderName,
+                        avatarUrl = cached.senderAvatarUrl
+                    ),
+                    direction = cached.direction,
+                    contentType = cached.contentType,
+                    content = MessageContent(
+                        text = cached.contentText,
+                        imageUrl = cached.contentImageUrl,
+                        fileName = cached.contentFileName,
+                        fileUrl = cached.contentFileUrl,
+                        quoteMsgText = cached.quoteMsgText,
+                        quoteImageUrl = cached.quoteImageUrl
+                    ),
+                    sendTime = cached.sendTime,
+                    msgSeq = cached.msgSeq,
+                    editTime = cached.editTime,
+                    msgDeleteTime = cached.msgDeleteTime,
+                    quoteMsgId = cached.quoteMsgId
+                )
+            }
+        }
+    }
+    
+    /**
+     * 同步获取缓存的消息
+     */
+    suspend fun getCachedMessagesSync(chatId: String): List<ChatMessage> {
+        return messageDao.getMessagesSync(chatId).map { cached ->
+            ChatMessage(
+                msgId = cached.msgId,
+                sender = MessageSender(
+                    chatId = cached.senderChatId,
+                    chatType = cached.chatType,
+                    name = cached.senderName,
+                    avatarUrl = cached.senderAvatarUrl
+                ),
+                direction = cached.direction,
+                contentType = cached.contentType,
+                content = MessageContent(
+                    text = cached.contentText,
+                    imageUrl = cached.contentImageUrl,
+                    fileName = cached.contentFileName,
+                    fileUrl = cached.contentFileUrl,
+                    quoteMsgText = cached.quoteMsgText,
+                    quoteImageUrl = cached.quoteImageUrl
+                ),
+                sendTime = cached.sendTime,
+                msgSeq = cached.msgSeq,
+                editTime = cached.editTime,
+                msgDeleteTime = cached.msgDeleteTime,
+                quoteMsgId = cached.quoteMsgId
+            )
+        }
+    }
+    
+    /**
+     * 缓存消息
+     */
+    suspend fun cacheMessage(message: ChatMessage) {
+        val cachedMessage = CachedMessage(
+            msgId = message.msgId,
+            chatId = message.sender.chatId,
+            chatType = message.sender.chatType,
+            senderChatId = message.sender.chatId,
+            senderName = message.sender.name,
+            senderAvatarUrl = message.sender.avatarUrl,
+            direction = message.direction,
+            contentType = message.contentType,
+            contentText = message.content.text,
+            contentImageUrl = message.content.imageUrl,
+            contentFileName = message.content.fileName,
+            contentFileUrl = message.content.fileUrl,
+            quoteMsgText = message.content.quoteMsgText,
+            quoteImageUrl = message.content.quoteImageUrl,
+            sendTime = message.sendTime,
+            msgSeq = message.msgSeq,
+            editTime = message.editTime,
+            msgDeleteTime = message.msgDeleteTime,
+            quoteMsgId = message.quoteMsgId
+        )
+        messageDao.insertMessage(cachedMessage)
+    }
+    
+    /**
+     * 批量缓存消息
+     */
+    suspend fun cacheMessages(messages: List<ChatMessage>) {
+        val cachedMessages = messages.map { message ->
+            CachedMessage(
+                msgId = message.msgId,
+                chatId = message.sender.chatId,
+                chatType = message.sender.chatType,
+                senderChatId = message.sender.chatId,
+                senderName = message.sender.name,
+                senderAvatarUrl = message.sender.avatarUrl,
+                direction = message.direction,
+                contentType = message.contentType,
+                contentText = message.content.text,
+                contentImageUrl = message.content.imageUrl,
+                contentFileName = message.content.fileName,
+                contentFileUrl = message.content.fileUrl,
+                quoteMsgText = message.content.quoteMsgText,
+                quoteImageUrl = message.content.quoteImageUrl,
+                sendTime = message.sendTime,
+                msgSeq = message.msgSeq,
+                editTime = message.editTime,
+                msgDeleteTime = message.msgDeleteTime,
+                quoteMsgId = message.quoteMsgId
+            )
+        }
+        messageDao.insertMessages(cachedMessages)
+    }
+    
+    /**
+     * 清理旧消息（超过30天）
+     */
+    suspend fun cleanOldMessages() {
+        val thirtyDaysAgo = System.currentTimeMillis() - (30 * 24 * 60 * 60 * 1000L)
+        messageDao.deleteOldMessages(thirtyDaysAgo)
+    }
+    
+    /**
+     * 清除所有缓存数据
+     */
+    suspend fun clearAllCache() {
+        conversationDao.clearAllConversations()
+        messageDao.clearAllMessages()
+    }
+}

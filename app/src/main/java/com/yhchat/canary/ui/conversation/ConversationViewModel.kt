@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.yhchat.canary.data.model.Conversation
 import com.yhchat.canary.data.repository.ConversationRepository
 import com.yhchat.canary.data.repository.TokenRepository
+import com.yhchat.canary.data.repository.CacheRepository
 import com.yhchat.canary.data.websocket.WebSocketManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -16,7 +17,8 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class ConversationViewModel @Inject constructor(
-    private val conversationRepository: ConversationRepository
+    private val conversationRepository: ConversationRepository,
+    private val cacheRepository: CacheRepository
 ) : ViewModel() {
 
     private val webSocketManager = WebSocketManager.getInstance()
@@ -25,6 +27,9 @@ class ConversationViewModel @Inject constructor(
         // 启动WebSocket观察
         observeWebSocketConversations()
         observeWebSocketMessages()
+        
+        // 立即加载缓存数据
+        loadCachedConversations()
     }
 
     fun setTokenRepository(tokenRepository: TokenRepository) {
@@ -40,7 +45,21 @@ class ConversationViewModel @Inject constructor(
     val conversations: StateFlow<List<Conversation>> = _conversations.asStateFlow()
     
     /**
-     * 加载会话列表
+     * 立即加载缓存数据
+     */
+    private fun loadCachedConversations() {
+        viewModelScope.launch {
+            cacheRepository.getCachedConversations().collect { cachedConversations ->
+                if (cachedConversations.isNotEmpty()) {
+                    _conversations.value = cachedConversations
+                    _uiState.value = _uiState.value.copy(isLoading = false)
+                }
+            }
+        }
+    }
+    
+    /**
+     * 加载会话列表（从网络，并缓存）
      */
     fun loadConversations(token: String) {
         viewModelScope.launch {
@@ -50,12 +69,22 @@ class ConversationViewModel @Inject constructor(
                 .onSuccess { conversationList ->
                     _conversations.value = conversationList
                     _uiState.value = _uiState.value.copy(isLoading = false)
+                    
+                    // 缓存到本地数据库
+                    cacheRepository.cacheConversations(conversationList)
                 }
                 .onFailure { error ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = error.message
-                    )
+                    // 网络失败时，尝试使用缓存数据
+                    val cachedConversations = cacheRepository.getCachedConversationsSync()
+                    if (cachedConversations.isNotEmpty()) {
+                        _conversations.value = cachedConversations
+                        _uiState.value = _uiState.value.copy(isLoading = false)
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = error.message
+                        )
+                    }
                 }
         }
     }
@@ -125,37 +154,57 @@ class ConversationViewModel @Inject constructor(
      * 用新消息更新会话列表
      */
     private fun updateConversationWithNewMessage(message: com.yhchat.canary.data.model.ChatMessage) {
-        val currentConversations = _conversations.value.toMutableList()
-        val conversationIndex = currentConversations.indexOfFirst { it.chatId == message.sender.chatId }
-        
-        if (conversationIndex >= 0) {
-            // 更新现有会话
-            val conversation = currentConversations[conversationIndex]
-            val updatedConversation = conversation.copy(
-                chatContent = message.content.text ?: "",
-                timestampMs = message.sendTime,
-                unreadMessage = conversation.unreadMessage + 1
-            )
-            currentConversations[conversationIndex] = updatedConversation
-        } else {
-            // 创建新会话
-            val newConversation = Conversation(
-                chatId = message.sender.chatId,
-                chatType = message.sender.chatType,
-                name = message.sender.name,
-                chatContent = message.content.text ?: "",
-                timestampMs = message.sendTime,
-                unreadMessage = 1,
-                at = 0,
-                avatarUrl = message.sender.avatarUrl,
-                timestamp = message.sendTime / 1000
-            )
-            currentConversations.add(0, newConversation)
+        viewModelScope.launch {
+            // 缓存消息到数据库
+            cacheRepository.cacheMessage(message)
+            
+            val currentConversations = _conversations.value.toMutableList()
+            val conversationIndex = currentConversations.indexOfFirst { it.chatId == message.sender.chatId }
+            
+            if (conversationIndex >= 0) {
+                // 更新现有会话
+                val conversation = currentConversations[conversationIndex]
+                val updatedConversation = conversation.copy(
+                    chatContent = message.content.text ?: "",
+                    timestampMs = message.sendTime,
+                    // 如果开启免打扰，不增加未读计数
+                    unreadMessage = if (conversation.doNotDisturb == 1) {
+                        conversation.unreadMessage
+                    } else {
+                        conversation.unreadMessage + 1
+                    }
+                )
+                currentConversations[conversationIndex] = updatedConversation
+                
+                // 更新缓存中的会话
+                cacheRepository.updateConversationLastMessage(
+                    message.sender.chatId, 
+                    message.content.text ?: "", 
+                    message.sendTime
+                )
+            } else {
+                // 创建新会话
+                val newConversation = Conversation(
+                    chatId = message.sender.chatId,
+                    chatType = message.sender.chatType,
+                    name = message.sender.name,
+                    chatContent = message.content.text ?: "",
+                    timestampMs = message.sendTime,
+                    unreadMessage = 1,
+                    at = 0,
+                    avatarUrl = message.sender.avatarUrl,
+                    timestamp = message.sendTime / 1000
+                )
+                currentConversations.add(0, newConversation)
+                
+                // 缓存新会话
+                cacheRepository.cacheConversations(listOf(newConversation))
+            }
+            
+            // 按时间排序
+            currentConversations.sortByDescending { it.timestampMs }
+            _conversations.value = currentConversations
         }
-        
-        // 按时间排序
-        currentConversations.sortByDescending { it.timestampMs }
-        _conversations.value = currentConversations
     }
     
     /**

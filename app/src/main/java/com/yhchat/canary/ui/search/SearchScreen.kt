@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -26,7 +27,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.yhchat.canary.data.di.RepositoryFactory
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.yhchat.canary.data.model.SearchItem
 import androidx.compose.ui.res.painterResource
 import com.yhchat.canary.R
 import com.yhchat.canary.data.repository.TokenRepository
@@ -38,7 +38,7 @@ import com.yhchat.canary.data.repository.TokenRepository
 @Composable
 fun SearchScreen(
     onBackClick: () -> Unit,
-    onItemClick: (SearchItem) -> Unit,
+    onItemClick: () -> Unit,
     tokenRepository: TokenRepository?,
     modifier: Modifier = Modifier
 ) {
@@ -53,6 +53,11 @@ fun SearchScreen(
     val uiState by viewModel.uiState.collectAsState()
     val searchResult by viewModel.searchResult.collectAsState()
     var searchText by remember { mutableStateOf("") }
+
+    // 处理系统返回键/手势返回
+    BackHandler {
+        onBackClick()
+    }
 
     Column(
         modifier = modifier.fillMaxSize()
@@ -140,43 +145,90 @@ fun SearchScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
-                    result.list.forEach { category ->
-                        // 分类标题
-                        item {
-                            Text(
-                                text = category.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                            )
-                        }
-
-                        // 分类内容
-                        category.list?.let { items ->
-                            if (items.isNotEmpty()) {
-                                items(items) { item ->
-                                    SearchItem(
-                                        item = item,
-                                        onClick = { onItemClick(item) }
-                                    )
-                                }
-                            } else {
-                                item {
-                                    Text(
-                                        text = "暂无结果",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                    )
+                    // 显示分区搜索结果
+                    result.boards?.let { boards ->
+                        if (boards.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "分区",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                )
+                            }
+                            items(boards) { board ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                                        .clickable { /* 处理分区点击 */ },
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        AsyncImage(
+                                            model = board.avatar,
+                                            contentDescription = board.name,
+                                            modifier = Modifier
+                                                .size(48.dp)
+                                                .clip(CircleShape),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = board.name,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
                                 }
                             }
-                        } ?: item {
-                            Text(
-                                text = "暂无结果",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                            )
+                        }
+                    }
+                    
+                    // 显示文章搜索结果
+                    result.posts?.let { posts ->
+                        if (posts.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "文章",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                )
+                            }
+                            items(posts) { post ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                                        .clickable { /* 处理文章点击 */ },
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp)
+                                    ) {
+                                        Text(
+                                            text = post.title,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = post.content,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 2
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -203,90 +255,6 @@ fun SearchScreen(
                         )
                     }
                 }
-            }
-        }
-    }
-}
-
-/**
- * 搜索项
- */
-@Composable
-fun SearchItem(
-    item: SearchItem,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clickable { onClick() },
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // 头像
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(item.avatarUrl)
-                    .addHeader("Referer", "https://myapp.jwznb.com")
-                    .crossfade(true)
-                    .build(),
-                contentDescription = "头像",
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop,
-                error = painterResource(id = R.drawable.ic_person)
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // 信息
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = item.nickname,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium
-                )
-
-                if (!item.name.isNullOrEmpty() && item.name != item.nickname) {
-                    Text(
-                        text = item.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // 类型标识
-                val typeText = when (item.friendType) {
-                    1 -> "用户"
-                    2 -> "群组"
-                    3 -> "机器人"
-                    else -> "未知"
-                }
-
-                Text(
-                    text = typeText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-
-            // 匹配度
-            if (item.hit > 0) {
-                Text(
-                    text = "${item.hit} 匹配",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
     }
