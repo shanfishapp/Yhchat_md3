@@ -1,0 +1,317 @@
+package com.yhchat.canary.ui.profile
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import com.yhchat.canary.data.repository.UserRepository
+import java.text.SimpleDateFormat
+import java.util.*
+
+/**
+ * 我的界面
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProfileScreen(
+    modifier: Modifier = Modifier,
+    userRepository: UserRepository? = null,
+    tokenRepository: com.yhchat.canary.data.repository.TokenRepository? = null
+) {
+    val viewModel = remember {
+        val repo = userRepository ?: com.yhchat.canary.data.repository.UserRepository(com.yhchat.canary.data.api.ApiClient.apiService, null)
+        if (tokenRepository != null) {
+            repo.setTokenRepository(tokenRepository)
+        }
+        ProfileViewModel(repo)
+    }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    
+    // 在界面显示时加载用户资料
+    LaunchedEffect(Unit) {
+        viewModel.loadUserProfile()
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // 顶部标题
+        Text(
+            text = "我的",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
+
+        when {
+            uiState.isLoading -> {
+                // 加载状态
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+            
+            uiState.error != null -> {
+                // 错误状态
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Text(
+                        text = "加载失败",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = uiState.error ?: "未知错误",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+        Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = { viewModel.loadUserProfile() }
+                    ) {
+                        Text("重试")
+                    }
+                }
+            }
+            
+            uiState.userProfile != null -> {
+                // 成功状态 - 显示用户信息
+                uiState.userProfile?.let { userProfile ->
+                    UserProfileContent(
+                        userProfile = userProfile,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+            
+            else -> {
+                // 空状态
+                Text(
+                    text = "暂无用户信息",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UserProfileContent(
+    userProfile: com.yhchat.canary.data.model.UserProfile,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // 头像和姓名部分
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // 头像
+                if (!userProfile.avatarUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = userProfile.avatarUrl,
+                        contentDescription = "用户头像",
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.AccountCircle,
+                        contentDescription = "默认头像",
+                        modifier = Modifier.size(80.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // 用户名
+                Text(
+                    text = userProfile.name,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                // 用户ID
+                Text(
+                    text = "ID: ${userProfile.id}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                // VIP 标识
+                if (userProfile.isVip == 1) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .background(
+                                MaterialTheme.colorScheme.tertiary,
+                                RoundedCornerShape(16.dp)
+                            )
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = "VIP",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onTertiary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "VIP",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onTertiary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+        
+        // 详细信息部分
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+        Text(
+                    text = "详细信息",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                
+                // 手机号
+                if (!userProfile.phone.isNullOrEmpty()) {
+                    ProfileInfoItem(
+                        icon = Icons.Default.Phone,
+                        label = "手机号",
+                        value = userProfile.phone
+                    )
+                }
+                
+                // 邮箱
+                if (!userProfile.email.isNullOrEmpty()) {
+                    ProfileInfoItem(
+                        icon = Icons.Default.Email,
+                        label = "邮箱",
+                        value = userProfile.email
+                    )
+                }
+                
+                // 云湖币
+                if (userProfile.coin != null && userProfile.coin > 0) {
+                    ProfileInfoItem(
+                        icon = Icons.Default.AccountCircle,
+                        label = "云湖币",
+                        value = "%.2f".format(userProfile.coin)
+                    )
+                }
+                
+                // VIP到期时间
+                if (userProfile.isVip == 1 && userProfile.vipExpiredTime != null && userProfile.vipExpiredTime > 0) {
+                    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                    val expiredDate = Date(userProfile.vipExpiredTime * 1000) // 假设是秒级时间戳
+                    ProfileInfoItem(
+                        icon = Icons.Default.Star,
+                        label = "VIP到期时间",
+                        value = dateFormat.format(expiredDate)
+                    )
+                }
+                
+                // 邀请码
+                if (!userProfile.invitationCode.isNullOrEmpty()) {
+                    ProfileInfoItem(
+                        icon = Icons.Default.Person,
+                        label = "邀请码",
+                        value = userProfile.invitationCode
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileInfoItem(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        
+        Spacer(modifier = Modifier.width(12.dp))
+        
+        Column {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
