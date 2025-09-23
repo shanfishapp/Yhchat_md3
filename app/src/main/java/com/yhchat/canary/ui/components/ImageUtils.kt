@@ -57,11 +57,17 @@ object ImageUtils {
         url: String,
         enableHardware: Boolean = true
     ): ImageRequest {
-        return ImageRequest.Builder(context)
+        val builder = ImageRequest.Builder(context)
             .data(url)
             .allowHardware(enableHardware)
             .crossfade(true)
-            .build()
+            
+        // 为chat-img.jwznb.com域名添加Referer头
+        if (url.contains("chat-img.jwznb.com")) {
+            builder.setHeader("Referer", "https://myapp.jwznb.com")
+        }
+        
+        return builder.build()
     }
     
     /**
@@ -72,10 +78,16 @@ object ImageUtils {
         url: String,
         enableHardware: Boolean = true
     ): ImageRequest {
-        return ImageRequest.Builder(context)
+        val builder = ImageRequest.Builder(context)
             .data(url)
             .allowHardware(enableHardware)
             .crossfade(true)
-            .build()
+            
+        // 为chat-img.jwznb.com域名添加Referer头
+        if (url.contains("chat-img.jwznb.com")) {
+            builder.setHeader("Referer", "https://myapp.jwznb.com")
+        }
+        
+        return builder.build()
     }
 }

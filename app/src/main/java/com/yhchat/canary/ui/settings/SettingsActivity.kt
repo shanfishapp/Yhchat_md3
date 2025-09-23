@@ -26,7 +26,9 @@ import androidx.compose.ui.unit.dp
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import com.yhchat.canary.MainActivity
 import com.yhchat.canary.data.repository.TokenRepository
+import com.yhchat.canary.data.repository.NavigationRepository
 import com.yhchat.canary.data.local.AppDatabase
+import com.yhchat.canary.data.di.RepositoryFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -37,11 +39,21 @@ import kotlinx.coroutines.launch
 class SettingsActivity : ComponentActivity() {
     
     companion object {
+        private const val EXTRA_HAS_NAVIGATION_REPO = "has_navigation_repo"
+        private const val EXTRA_HAS_TOKEN_REPO = "has_token_repo"
+        
         /**
          * 启动设置Activity
          */
-        fun start(context: Context) {
-            val intent = Intent(context, SettingsActivity::class.java)
+        fun start(
+            context: Context, 
+            navigationRepository: NavigationRepository? = null,
+            tokenRepository: TokenRepository? = null
+        ) {
+            val intent = Intent(context, SettingsActivity::class.java).apply {
+                putExtra(EXTRA_HAS_NAVIGATION_REPO, navigationRepository != null)
+                putExtra(EXTRA_HAS_TOKEN_REPO, tokenRepository != null)
+            }
             context.startActivity(intent)
         }
     }
@@ -50,185 +62,27 @@ class SettingsActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
+        val hasNavigationRepo = intent.getBooleanExtra(EXTRA_HAS_NAVIGATION_REPO, false)
+        val hasTokenRepo = intent.getBooleanExtra(EXTRA_HAS_TOKEN_REPO, false)
+        
+        // 重新创建repository实例
+        val navigationRepository = if (hasNavigationRepo) {
+            RepositoryFactory.getNavigationRepository(this)
+        } else null
+        
+        val tokenRepository = if (hasTokenRepo) {
+            RepositoryFactory.getTokenRepository(this)
+        } else null
+        
         setContent {
             YhchatCanaryTheme {
                 SettingsScreen(
-                    onBackClick = { finish() }
-                )
-            }
-        }
-    }
-}
-
-/**
- * 设置界面
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SettingsScreen(
-    onBackClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    var showLogoutDialog by remember { mutableStateOf(false) }
-    
-    Column(
-        modifier = modifier.fillMaxSize()
-    ) {
-        // 顶部应用栏
-        TopAppBar(
-            title = {
-                Text(
-                    text = "设置",
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = onBackClick) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "返回"
-                    )
-                }
-            }
-        )
-        
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            item {
-                // HTML 设置
-                SettingsItem(
-                    title = "HTML 设置",
-                    subtitle = "配置网页浏览器相关设置",
-                    icon = Icons.Default.Code,
-                    onClick = {
-                        HtmlSettingsActivity.start(context)
-                    }
-                )
-            }
-            
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
-            }
-            
-            item {
-                // 退出登录按钮 - 醒目的红色背景
-                Button(
-                    onClick = {
-                        showLogoutDialog = true
+                    navigationRepository = navigationRepository,
+                    tokenRepository = tokenRepository,
+                    onLogout = {
+                        performLogout(this@SettingsActivity)
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ExitToApp,
-                        contentDescription = "退出登录",
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "退出登录",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
-    }
-    
-    // 退出登录确认对话框
-    if (showLogoutDialog) {
-        AlertDialog(
-            onDismissRequest = { showLogoutDialog = false },
-            title = {
-                Text("确认退出")
-            },
-            text = {
-                Text("确定要退出登录吗？")
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showLogoutDialog = false
-                        performLogout(context)
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text("退出")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showLogoutDialog = false }
-                ) {
-                    Text("取消")
-                }
-            }
-        )
-    }
-}
-
-/**
- * 设置项组件
- */
-@Composable
-fun SettingsItem(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth(),
-        onClick = onClick,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    modifier = Modifier.fillMaxSize()
                 )
             }
         }
@@ -241,14 +95,11 @@ fun SettingsItem(
 private fun performLogout(context: Context) {
     CoroutineScope(Dispatchers.IO).launch {
         try {
-            // 1. 获取数据库实例
-            val database = AppDatabase.getDatabase(context)
-            val tokenDao = database.userTokenDao()
+            // 1. 使用新的TokenRepository清除token
+            val tokenRepository = RepositoryFactory.getTokenRepository(context)
+            tokenRepository.clearToken()
             
-            // 2. 清除token存储
-            tokenDao.clearTokens()
-            
-            // 3. 在主线程中跳转到登录界面
+            // 2. 在主线程中跳转到登录界面
             CoroutineScope(Dispatchers.Main).launch {
                 // 清除任务栈并启动MainActivity（会自动显示登录界面）
                 val intent = Intent(context, MainActivity::class.java).apply {

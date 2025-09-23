@@ -59,9 +59,13 @@ fun SearchScreen(
         onBackClick()
     }
 
-    Column(
-        modifier = modifier.fillMaxSize()
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
     ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
         // 顶部应用栏
         TopAppBar(
             title = {
@@ -145,87 +149,98 @@ fun SearchScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
-                    // 显示分区搜索结果
-                    result.boards?.let { boards ->
-                        if (boards.isNotEmpty()) {
-                            item {
-                                Text(
-                                    text = "分区",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                )
-                            }
-                            items(boards) { board ->
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                                        .clickable { /* 处理分区点击 */ },
-                                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(16.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        AsyncImage(
-                                            model = board.avatar,
-                                            contentDescription = board.name,
-                                            modifier = Modifier
-                                                .size(48.dp)
-                                                .clip(CircleShape),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text(
-                                            text = board.name,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
+                    // 根据API文档，result.list包含不同类别的搜索结果
+                    result.list.forEach { category ->
+                        category.list?.let { items ->
+                            if (items.isNotEmpty()) {
+                                item {
+                                    Text(
+                                        text = category.title,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                    )
                                 }
-                            }
-                        }
-                    }
-                    
-                    // 显示文章搜索结果
-                    result.posts?.let { posts ->
-                        if (posts.isNotEmpty()) {
-                            item {
-                                Text(
-                                    text = "文章",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                )
-                            }
-                            items(posts) { post ->
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                                        .clickable { /* 处理文章点击 */ },
-                                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                                ) {
-                                    Column(
+                                
+                                items(items) { searchItem ->
+                                    Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(16.dp)
+                                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                                            .clickable { 
+                                                // 根据friendType处理点击事件
+                                                onItemClick()
+                                            },
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                                     ) {
-                                        Text(
-                                            text = post.title,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = post.content,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 2
-                                        )
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(16.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            AsyncImage(
+                                                model = ImageRequest.Builder(context)
+                                                    .data(searchItem.avatarUrl)
+                                                    .crossfade(true)
+                                                    .placeholder(R.drawable.ic_launcher_foreground)
+                                                    .error(R.drawable.ic_launcher_foreground)
+                                                    .build(),
+                                                contentDescription = searchItem.nickname,
+                                                modifier = Modifier
+                                                    .size(48.dp)
+                                                    .clip(CircleShape),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                            
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            
+                                            Column(
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Text(
+                                                    text = searchItem.nickname,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                                
+                                                if (searchItem.name?.isNotEmpty() == true) {
+                                                    Text(
+                                                        text = searchItem.name,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                            
+                                            // 显示类型标签
+                                            Surface(
+                                                color = when (searchItem.friendType) {
+                                                    1 -> MaterialTheme.colorScheme.primaryContainer
+                                                    2 -> MaterialTheme.colorScheme.secondaryContainer
+                                                    3 -> MaterialTheme.colorScheme.tertiaryContainer
+                                                    else -> MaterialTheme.colorScheme.surfaceVariant
+                                                },
+                                                shape = MaterialTheme.shapes.small
+                                            ) {
+                                                Text(
+                                                    text = when (searchItem.friendType) {
+                                                        1 -> "用户"
+                                                        2 -> "群组"
+                                                        3 -> "机器人"
+                                                        else -> "未知"
+                                                    },
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = when (searchItem.friendType) {
+                                                        1 -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                        2 -> MaterialTheme.colorScheme.onSecondaryContainer
+                                                        3 -> MaterialTheme.colorScheme.onTertiaryContainer
+                                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                                    }
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -256,6 +271,7 @@ fun SearchScreen(
                     }
                 }
             }
+        }
         }
     }
 }

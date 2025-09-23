@@ -120,12 +120,6 @@ fun ConversationScreen(
                         contentDescription = "搜索"
                     )
                 }
-                IconButton(onClick = onMenuClick) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "菜单"
-                    )
-                }
             }
         )
         

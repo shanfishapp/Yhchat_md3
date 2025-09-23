@@ -270,16 +270,16 @@ fun WebViewScreen(
                 .weight(1f),
             update = { view ->
                 // 每次重新组合时更新WebView设置
-                val htmlSettings = HtmlSettingsActivity.getSettings(context)
+                val prefs = context.getSharedPreferences("html_settings", Context.MODE_PRIVATE)
                 view.settings.apply {
                     // 基础设置
-                    javaScriptEnabled = htmlSettings.javaScriptEnabled
-                    domStorageEnabled = htmlSettings.domStorageEnabled
-                    loadWithOverviewMode = htmlSettings.loadWithOverviewMode
-                    useWideViewPort = htmlSettings.useWideViewPort
-                    builtInZoomControls = htmlSettings.builtInZoomControls
-                    displayZoomControls = htmlSettings.displayZoomControls
-                    setSupportZoom(htmlSettings.supportZoom)
+                    javaScriptEnabled = prefs.getBoolean("enable_javascript", true)
+                    domStorageEnabled = true
+                    loadWithOverviewMode = prefs.getBoolean("allow_zoom", true)
+                    useWideViewPort = prefs.getBoolean("allow_zoom", true)
+                    builtInZoomControls = prefs.getBoolean("allow_zoom", true)
+                    displayZoomControls = false
+                    setSupportZoom(prefs.getBoolean("allow_zoom", true))
                     
                     // 现代化WebView设置
                     javaScriptCanOpenWindowsAutomatically = true
@@ -287,19 +287,31 @@ fun WebViewScreen(
                     allowContentAccess = true
                     allowUniversalAccessFromFileURLs = false
                     allowFileAccessFromFileURLs = false
-                    loadsImagesAutomatically = true
+                    loadsImagesAutomatically = prefs.getBoolean("load_images", true)
                     blockNetworkImage = false
                     blockNetworkLoads = false
                     
                     // 缓存设置
-                    cacheMode = WebSettings.LOAD_DEFAULT
+                    val cacheModeValue = prefs.getInt("cache_mode", 0)
+                    cacheMode = when (cacheModeValue) {
+                        1 -> WebSettings.LOAD_NO_CACHE
+                        2 -> WebSettings.LOAD_CACHE_ONLY
+                        3 -> WebSettings.LOAD_CACHE_ELSE_NETWORK
+                        else -> WebSettings.LOAD_DEFAULT
+                    }
                     databaseEnabled = true
                     
                     // 媒体设置
                     mediaPlaybackRequiresUserGesture = false
                     
-                    // 现代User Agent
-                    userAgentString = "Mozilla/5.0 (Linux; Android ${Build.VERSION.RELEASE}; ${Build.MODEL}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.210 Mobile Safari/537.36"
+                    // User Agent设置
+                    val userAgentValue = prefs.getString("user_agent", "default") ?: "default"
+                    userAgentString = when (userAgentValue) {
+                        "desktop_chrome" -> "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                        "mobile_chrome" -> "Mozilla/5.0 (Linux; Android ${Build.VERSION.RELEASE}; ${Build.MODEL}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.210 Mobile Safari/537.36"
+                        "ios_safari" -> "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+                        else -> "Mozilla/5.0 (Linux; Android ${Build.VERSION.RELEASE}; ${Build.MODEL}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.210 Mobile Safari/537.36"
+                    }
                     
                     // 混合内容设置（允许HTTPS页面加载HTTP资源）
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {

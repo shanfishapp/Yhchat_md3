@@ -31,11 +31,21 @@ interface ApiService {
         @Body request: SmsCaptchaRequest
     ): Response<Map<String, Any>>
 
+    @POST("v1/verification/get-email-verification-code")
+    suspend fun getEmailVerificationCode(
+        @Body request: EmailVerificationRequest
+    ): Response<Map<String, Any>>
+
+    @POST("v1/user/forget-password")
+    suspend fun changePassword(
+        @Body request: ChangePasswordRequest
+    ): Response<Map<String, Any>>
+
     @POST("v1/search/home-search")
     suspend fun homeSearch(
         @Header("token") token: String,
-        @Body request: SearchRequest
-    ): Response<SearchResponse>
+        @Body request: com.yhchat.canary.data.model.SearchRequest
+    ): Response<com.yhchat.canary.data.model.SearchResponse>
 
     @POST("v1/sticky/list")
     suspend fun getStickyList(
@@ -171,6 +181,18 @@ interface ApiService {
         @Header("token") token: String,
         @Body request: BoardInfoRequest
     ): Response<com.yhchat.canary.data.model.BoardInfoResponse>
+    
+    @POST("v1/community/ba/user-follow-ba")
+    suspend fun followBoard(
+        @Header("token") token: String,
+        @Body request: FollowBoardRequest
+    ): Response<ApiStatus>
+
+    @POST("v1/community/ba/user-unfollow-ba")
+    suspend fun unfollowBoard(
+        @Header("token") token: String,
+        @Body request: UnfollowBoardRequest
+    ): Response<ApiStatus>
     
     @POST("v1/community/posts/post-list")
     suspend fun getPostList(
@@ -634,4 +656,23 @@ data class GroupListData(
     
     @SerializedName("total")
     val total: Int
+)
+
+/**
+ * 关注分区请求
+ */
+data class FollowBoardRequest(
+    @SerializedName("baId")
+    val baId: Int,
+    
+    @SerializedName("followSource")
+    val followSource: Int = 2
+)
+
+/**
+ * 取消关注分区请求
+ */
+data class UnfollowBoardRequest(
+    @SerializedName("baId")
+    val baId: Int
 )

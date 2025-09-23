@@ -8,6 +8,8 @@ import com.yhchat.canary.data.repository.CommunityRepository
 import com.yhchat.canary.data.repository.FriendRepository
 import com.yhchat.canary.data.repository.TokenRepository
 import com.yhchat.canary.data.repository.ConversationRepository
+import com.yhchat.canary.data.repository.NavigationRepository
+import com.yhchat.canary.data.repository.UserRepository
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
@@ -65,7 +67,7 @@ object RepositoryFactory {
             AppDatabase::class.java,
             "app_database"
         ).build()
-        return TokenRepository(database.userTokenDao())
+        return TokenRepository(database.userTokenDao(), context)
     }
     
     /**
@@ -73,5 +75,19 @@ object RepositoryFactory {
      */
     fun getConversationRepository(context: Context): ConversationRepository {
         return conversationRepository
+    }
+    
+    /**
+     * 获取导航配置仓库实例
+     */
+    fun getNavigationRepository(context: Context): NavigationRepository {
+        return NavigationRepository(context)
+    }
+    
+    /**
+     * 获取用户仓库实例
+     */
+    fun getUserRepository(context: Context): UserRepository {
+        return UserRepository(apiService, null)
     }
 }

@@ -2,8 +2,10 @@ package com.yhchat.canary.ui.login
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -62,14 +64,19 @@ fun LoginScreen(
         viewModel.getCaptcha()
     }
     
+    val scrollState = rememberScrollState()
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .verticalScroll(scrollState)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // 添加顶部间距，确保内容不会贴顶
+        Spacer(modifier = Modifier.height(32.dp))
         // Logo
         Box(
             modifier = Modifier
@@ -88,8 +95,6 @@ fun LoginScreen(
             )
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
-        
         // 应用名称
         Text(
             text = "云湖聊天",
@@ -98,7 +103,7 @@ fun LoginScreen(
             color = MaterialTheme.colorScheme.primary
         )
         
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(16.dp))
         
         // 登录方式选择
         TabRow(
@@ -116,8 +121,6 @@ fun LoginScreen(
                 text = { Text("邮箱登录") }
             )
         }
-        
-        Spacer(modifier = Modifier.height(24.dp))
         
         // 登录表单
         Card(
@@ -304,8 +307,6 @@ fun LoginScreen(
             }
         }
         
-        Spacer(modifier = Modifier.height(24.dp))
-        
         // 底部说明
         Text(
             text = "登录即表示同意用户协议和隐私政策",
@@ -313,5 +314,8 @@ fun LoginScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
+        
+        // 添加底部间距，确保内容不会贴底
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }

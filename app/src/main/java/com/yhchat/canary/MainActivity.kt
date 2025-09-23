@@ -6,6 +6,8 @@ import dagger.hilt.android.AndroidEntryPoint
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +31,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.yhchat.canary.ui.conversation.ConversationViewModel
 import com.yhchat.canary.ui.profile.UserProfileActivity
+import com.yhchat.canary.data.di.RepositoryFactory
+import com.yhchat.canary.data.model.NavigationItem
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -36,8 +41,17 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
-        // 配置Coil ImageLoader，为chat-img.jwznb.com添加Referer
+        // 配置Coil ImageLoader，为chat-img.jwznb.com添加Referer，支持GIF和WebP
         val imageLoader = ImageLoader.Builder(this)
+            .components {
+                // 添加GIF支持
+                if (android.os.Build.VERSION.SDK_INT >= 28) {
+                    add(coil.decode.ImageDecoderDecoder.Factory())
+                } else {
+                    add(coil.decode.GifDecoder.Factory())
+                }
+                // WebP支持已经内置在Coil中
+            }
             .okHttpClient {
                 OkHttpClient.Builder()
                     .addInterceptor { chain ->
@@ -83,6 +97,11 @@ class MainActivity : ComponentActivity() {
                 
                 // 保持ConversationScreen的ViewModel状态，避免重新创建
                 val conversationViewModel: ConversationViewModel = viewModel()
+                
+                // 导航配置
+                val navigationRepository = remember { RepositoryFactory.getNavigationRepository(this@MainActivity) }
+                val navigationConfig by navigationRepository.navigationConfig.collectAsStateWithLifecycle()
+                val visibleNavItems = navigationConfig.getVisibleItems()
 
                 // 同步ViewModel状态到本地状态
                 LaunchedEffect(savedToken) {
@@ -139,103 +158,149 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     else -> {
-                        // 主界面，包含底部导航栏
+                        // 主界面，包含底部导航栏和HorizontalPager
+                        val coroutineScope = rememberCoroutineScope()
+                        val pagerState = rememberPagerState { visibleNavItems.size }
+                        
+                        // 获取当前页面对应的导航项ID
+                        val currentPageItem = if (visibleNavItems.isNotEmpty() && pagerState.currentPage < visibleNavItems.size) {
+                            visibleNavItems[pagerState.currentPage].id
+                        } else {
+                            currentScreen
+                        }
+                        
+                        // 优化后的页面同步逻辑
+                        LaunchedEffect(currentScreen, visibleNavItems) {
+                            val targetIndex = visibleNavItems.indexOfFirst { it.id == currentScreen }
+                            if (targetIndex >= 0 && targetIndex != pagerState.currentPage && !pagerState.isScrollInProgress) {
+                                pagerState.scrollToPage(targetIndex)
+                            }
+                        }
+                        
+                        LaunchedEffect(pagerState.currentPage, visibleNavItems) {
+                            if (visibleNavItems.isNotEmpty() && pagerState.currentPage < visibleNavItems.size) {
+                                val newScreen = visibleNavItems[pagerState.currentPage].id
+                                if (newScreen != currentScreen && !pagerState.isScrollInProgress) {
+                                    currentScreen = newScreen
+                                }
+                            }
+                        }
+                        
                         Scaffold(
                             bottomBar = {
                                 BottomNavigationBar(
-                                    currentScreen = currentScreen,
+                                    currentScreen = currentPageItem,
+                                    visibleItems = visibleNavItems,
                                     onScreenChange = { screen ->
+                                        val targetIndex = visibleNavItems.indexOfFirst { it.id == screen }
+                                        if (targetIndex >= 0) {
+                                            coroutineScope.launch {
+                                                pagerState.scrollToPage(targetIndex)
+                                            }
+                                        }
                                         currentScreen = screen
                                     }
                                 )
                             }
                         ) { paddingValues ->
-                            when (currentScreen) {
-                                "conversation" -> {
-                                    ConversationScreen(
-                                        token = token,
-                                        userId = userId,
-                                        onConversationClick = { chatId, chatType, chatName ->
-                                            currentChatId = chatId
-                                            currentChatType = chatType
-                                            currentChatName = chatName
-                                            currentScreen = "chat"
-                                        },
-                                        onSearchClick = {
-                                            if (isInitialized) {
-                                                currentScreen = "search"
-                                            }
-                                        },
-                                        onMenuClick = {
-                                            // 显示菜单
-                                        },
-                                        tokenRepository = tokenRepository,
-                                        viewModel = conversationViewModel, // 使用共享的ViewModel
-                                        modifier = Modifier.padding(paddingValues)
-                                    )
-                                }
-                                "community" -> {
-                                    CommunityScreen(
-                                        token = token,
-                                        modifier = Modifier.padding(paddingValues)
-                                    )
-                                }
-                                "contacts" -> {
-                                    ContactsScreen(
-                                        modifier = Modifier.padding(paddingValues)
-                                    )
-                                }
-                                "discover" -> {
-                                    DiscoverScreen(
-                                        modifier = Modifier.padding(paddingValues)
-                                    )
-                                }
-                                "profile" -> {
-                                    ProfileScreen(
-                                        modifier = Modifier.padding(paddingValues),
-                                        userRepository = userRepository,
-                                        tokenRepository = tokenRepository
-                                    )
-                                }
-                                "search" -> {
-                                    if (isInitialized && tokenRepository != null) {
-                                        SearchScreen(
-                                            onBackClick = {
-                                                currentScreen = "conversation"
-                                            },
-                                            onItemClick = {
-                                                // 处理搜索项点击，可以跳转到聊天界面
-                                                // TODO: 实现具体的点击处理逻辑
-                                            },
-                                            tokenRepository = tokenRepository,
-                                            modifier = Modifier.padding(paddingValues)
-                                        )
-                                    } else {
-                                        // 数据库还未初始化，显示加载状态
-                                        Box(
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            CircularProgressIndicator()
+                            if (visibleNavItems.isNotEmpty()) {
+                                HorizontalPager(
+                                    state = pagerState,
+                                    modifier = Modifier.fillMaxSize()
+                                ) { page ->
+                                    val navItem = visibleNavItems[page]
+                                    when (navItem.id) {
+                                        "conversation" -> {
+                                            ConversationScreen(
+                                                token = token,
+                                                userId = userId,
+                                                onConversationClick = { chatId, chatType, chatName ->
+                                                    currentChatId = chatId
+                                                    currentChatType = chatType
+                                                    currentChatName = chatName
+                                                    currentScreen = "chat"
+                                                },
+                                                onSearchClick = {
+                                                    if (isInitialized) {
+                                                        currentScreen = "search"
+                                                    }
+                                                },
+                                                onMenuClick = { },
+                                                tokenRepository = tokenRepository,
+                                                viewModel = conversationViewModel,
+                                                modifier = Modifier.padding(paddingValues)
+                                            )
+                                        }
+                                        "community" -> {
+                                            CommunityScreen(
+                                                token = token,
+                                                modifier = Modifier.padding(paddingValues)
+                                            )
+                                        }
+                                        "contacts" -> {
+                                            ContactsScreen(
+                                                modifier = Modifier.padding(paddingValues)
+                                            )
+                                        }
+                                        "discover" -> {
+                                            DiscoverScreen(
+                                                modifier = Modifier.padding(paddingValues)
+                                            )
+                                        }
+                                        "profile" -> {
+                                            ProfileScreen(
+                                                modifier = Modifier.padding(paddingValues),
+                                                userRepository = userRepository,
+                                                tokenRepository = tokenRepository,
+                                                navigationRepository = navigationRepository
+                                            )
                                         }
                                     }
                                 }
-                                "chat" -> {
-                                    if (currentChatId.isNotEmpty()) {
-                                        ChatScreen(
-                                            chatId = currentChatId,
-                                            chatType = currentChatType,
-                                            chatName = currentChatName,
-                                            userId = userId,
-                                            onBackClick = {
-                                                currentScreen = "conversation"
-                                            },
-                                            onAvatarClick = { userId, userName ->
-                                                println("MainActivity: 点击头像 - userId: $userId, userName: $userName")
-                                                UserProfileActivity.start(this@MainActivity, userId, userName)
-                                            },
-                                            modifier = Modifier.fillMaxSize()
-                                        )
+                            } else {
+                                // 没有可见的导航项时显示空状态
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("没有可用的导航项")
+                                }
+                            }
+                            
+                            // 处理特殊页面（如chat和search）
+                            if (currentScreen == "chat" && currentChatId.isNotEmpty()) {
+                                ChatScreen(
+                                    chatId = currentChatId,
+                                    chatType = currentChatType,
+                                    chatName = currentChatName,
+                                    userId = userId,
+                                    onBackClick = {
+                                        currentScreen = "conversation"
+                                    },
+                                    onAvatarClick = { userId, userName ->
+                                        UserProfileActivity.start(this@MainActivity, userId, userName)
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else if (currentScreen == "search") {
+                                if (isInitialized && tokenRepository != null) {
+                                    SearchScreen(
+                                        onBackClick = {
+                                            currentScreen = "conversation"
+                                        },
+                                        onItemClick = {
+                                            // 处理搜索项点击，可以跳转到聊天界面
+                                            // TODO: 实现具体的点击处理逻辑
+                                        },
+                                        tokenRepository = tokenRepository,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator()
                                     }
                                 }
                             }

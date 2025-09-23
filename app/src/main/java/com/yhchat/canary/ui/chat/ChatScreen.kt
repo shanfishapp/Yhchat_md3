@@ -284,6 +284,16 @@ private fun MessageItem(
     onImageClick: (String) -> Unit = {},
     onAvatarClick: (String, String) -> Unit = { _, _ -> }
 ) {
+    // 检查是否为撤回消息
+    if (message.msgDeleteTime != null) {
+        // 撤回消息显示
+        RecallMessageItem(
+            message = message,
+            modifier = modifier
+        )
+        return
+    }
+    
     Row(
         modifier = modifier,
         horizontalArrangement = if (isMyMessage) {
@@ -386,6 +396,36 @@ private fun MessageItem(
                         onAvatarClick(message.sender.chatId, message.sender.name)
                     },
                 contentScale = ContentScale.Crop
+            )
+        }
+    }
+}
+
+/**
+ * 撤回消息项
+ */
+@Composable
+private fun RecallMessageItem(
+    message: ChatMessage,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Surface(
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .widthIn(max = 280.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            tonalElevation = 1.dp
+        ) {
+            Text(
+                text = "${message.sender.name} 在 ${formatRecallTime(message.msgDeleteTime!!)} 撤回了一条消息",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
         }
     }
@@ -536,16 +576,55 @@ private fun MessageContentView(
                     )
                 }
             }
-            25 -> {
-                // 表情消息 (单个表情)
-                content.stickerItemId?.let { stickerId ->
-                    // 根据表情ID构建URL
-                    val stickerImageUrl = "https://chat-img.jwznb.com/sticker/${stickerId}"
-                    
+            7 -> {
+                // 表情消息 (包括表情包和个人收藏表情)
+                // 根据示例，contentType: 7 统一处理表情消息，直接使用 imageUrl
+                content.imageUrl?.let { imageUrl ->
                     AsyncImage(
                         model = ImageUtils.createStickerImageRequest(
                             context = LocalContext.current,
-                            url = stickerImageUrl
+                            url = imageUrl
+                        ),
+                        contentDescription = when {
+                            content.expressionId != null && content.expressionId != "0" -> "个人收藏表情"
+                            content.stickerPackId != null -> "表情包"
+                            else -> "表情"
+                        },
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Fit
+                    )
+                } ?: run {
+                    // 如果没有 imageUrl，尝试使用 stickerUrl 拼接完整URL
+                    content.stickerUrl?.let { stickerUrl ->
+                        val fullUrl = if (stickerUrl.startsWith("http")) {
+                            stickerUrl
+                        } else {
+                            "https://chat-img.jwznb.com/$stickerUrl"
+                        }
+                        
+                        AsyncImage(
+                            model = ImageUtils.createStickerImageRequest(
+                                context = LocalContext.current,
+                                url = fullUrl
+                            ),
+                            contentDescription = "表情",
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                }
+            }
+            25 -> {
+                // 兼容旧的表情消息类型 (如果还有使用的话)
+                content.imageUrl?.let { imageUrl ->
+                    AsyncImage(
+                        model = ImageUtils.createStickerImageRequest(
+                            context = LocalContext.current,
+                            url = imageUrl
                         ),
                         contentDescription = "表情",
                         modifier = Modifier
@@ -553,104 +632,24 @@ private fun MessageContentView(
                             .clip(RoundedCornerShape(8.dp)),
                         contentScale = ContentScale.Fit
                     )
-                } ?: run {
-                    // 如果没有sticker_item_id，检查是否有特殊的sticker_url
-                    content.stickerUrl?.let { stickerUrl ->
-                        if (stickerUrl.startsWith("https://chat-img.jwznb.com/sticker/") || 
-                            stickerUrl.startsWith("https://chat-img.jwznb.com/expression/")) {
-                            AsyncImage(
-                                model = ImageUtils.createStickerImageRequest(
-                                    context = LocalContext.current,
-                                    url = stickerUrl
-                                ),
-                                contentDescription = "表情",
-                                modifier = Modifier
-                                    .size(120.dp)
-                                    .clip(RoundedCornerShape(8.dp)),
-                                contentScale = ContentScale.Fit
-                            )
-                        } else {
-                            // 其他类型的sticker_url，作为普通图片处理
-                            AsyncImage(
-                                model = ImageUtils.createImageRequest(
-                                    context = LocalContext.current,
-                                    url = stickerUrl
-                                ),
-                                contentDescription = "贴纸",
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp)),
-                                contentScale = ContentScale.Crop
-                            )
-                        }
-                    }
                 }
             }
             26 -> {
-                // 表情包消息 (来自表情包的表情)
-                content.stickerPackId?.let { packId ->
-                    // 如果有具体的表情ID，使用表情ID；否则显示表情包信息
-                    content.stickerItemId?.let { stickerId ->
-                        val stickerImageUrl = "https://chat-img.jwznb.com/sticker/${stickerId}"
-                        
-                        AsyncImage(
-                            model = ImageUtils.createStickerImageRequest(
-                                context = LocalContext.current,
-                                url = stickerImageUrl
-                            ),
-                            contentDescription = "表情包",
-                            modifier = Modifier
-                                .size(120.dp)
-                                .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Fit
-                        )
-                    } ?: run {
-                        // 没有具体表情ID时，显示表情包信息
-                        Text(
-                            text = "表情包 (ID: $packId)",
-                            color = textColor,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                } ?: run {
-                    // 检查是否有sticker_url
-                    content.stickerUrl?.let { stickerUrl ->
-                        if (stickerUrl.startsWith("https://chat-img.jwznb.com/sticker/") || 
-                            stickerUrl.startsWith("https://chat-img.jwznb.com/expression/")) {
-                            AsyncImage(
-                                model = ImageUtils.createStickerImageRequest(
-                                    context = LocalContext.current,
-                                    url = stickerUrl
-                                ),
-                                contentDescription = "表情包",
-                                modifier = Modifier
-                                    .size(120.dp)
-                                    .clip(RoundedCornerShape(8.dp)),
-                                contentScale = ContentScale.Fit
-                            )
-                        }
-                    }
-                }
-            }
-            7 -> {
-                // 个人收藏表情
-                content.expressionId?.let { expressionId ->
-                    // 根据表情ID构建URL  
-                    val expressionImageUrl = "https://chat-img.jwznb.com/expression/${expressionId}"
-                    
+                // 兼容旧的表情包消息类型 (如果还有使用的话)
+                content.imageUrl?.let { imageUrl ->
                     AsyncImage(
                         model = ImageUtils.createStickerImageRequest(
                             context = LocalContext.current,
-                            url = expressionImageUrl
+                            url = imageUrl
                         ),
-                        contentDescription = "个人表情",
+                        contentDescription = "表情包",
                         modifier = Modifier
                             .size(120.dp)
                             .clip(RoundedCornerShape(8.dp)),
                         contentScale = ContentScale.Fit
                     )
-                        }
-                    }
+                }
+            }
             19 -> {
                 // 视频消息 - 已移除视频播放功能，显示提示文本
                 content.videoUrl?.let { videoPath ->
@@ -762,6 +761,14 @@ private fun formatTimestamp(timestamp: Long): String {
             SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(date)
         }
     }
+}
+
+/**
+ * 格式化撤回时间（只显示时:分）
+ */
+private fun formatRecallTime(timestamp: Long): String {
+    val date = Date(timestamp)
+    return SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)
 }
 
 /**

@@ -137,8 +137,27 @@ data class SearchRequest(
     val word: String
 )
 
+/**
+ * 搜索响应
+ */
+data class SearchResponse(
+    @SerializedName("code")
+    val code: Int,
+    
+    @SerializedName("data")
+    val data: SearchData,
+    
+    @SerializedName("msg")
+    val msg: String
+)
 
-
+/**
+ * 搜索数据
+ */
+data class SearchData(
+    @SerializedName("list")
+    val list: List<SearchCategory>
+)
 
 /**
  * 搜索类别
@@ -617,5 +636,33 @@ data class UserInfoResponse(
     
     @SerializedName("data")
     val data: UserProfile? = null
+)
+
+/**
+ * 更改密码请求
+ */
+data class ChangePasswordRequest(
+    @SerializedName("email")
+    val email: String,
+    
+    @SerializedName("captcha")
+    val captcha: String,
+    
+    @SerializedName("password")
+    val password: String
+)
+
+/**
+ * 邮箱验证码请求
+ */
+data class EmailVerificationRequest(
+    @SerializedName("email")
+    val email: String,
+    
+    @SerializedName("code")
+    val code: String,
+    
+    @SerializedName("id")
+    val id: String
 )
 

@@ -400,4 +400,57 @@ class CommunityRepository @Inject constructor(
         val request = GroupListRequest(baId = boardId, size = size, page = page)
         return apiService.getBoardGroupList(token, request)
     }
+    
+    /**
+     * 关注分区
+     */
+    suspend fun followBoard(
+        token: String,
+        boardId: Int,
+        followSource: Int = 2
+    ): Result<ApiStatus> {
+        return try {
+            val request = FollowBoardRequest(baId = boardId, followSource = followSource)
+            val response = apiService.followBoard(token, request)
+            
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null && body.code == 1) {
+                    Result.success(body)
+                } else {
+                    Result.failure(Exception("API返回错误: ${body?.message ?: "未知错误"}"))
+                }
+            } else {
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 取消关注分区
+     */
+    suspend fun unfollowBoard(
+        token: String,
+        boardId: Int
+    ): Result<ApiStatus> {
+        return try {
+            val request = UnfollowBoardRequest(baId = boardId)
+            val response = apiService.unfollowBoard(token, request)
+            
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null && body.code == 1) {
+                    Result.success(body)
+                } else {
+                    Result.failure(Exception("API返回错误: ${body?.message ?: "未知错误"}"))
+                }
+            } else {
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

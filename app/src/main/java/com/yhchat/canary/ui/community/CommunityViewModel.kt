@@ -85,7 +85,7 @@ class CommunityViewModel @Inject constructor(
             
             communityRepository.getFollowingBoardList(
                 token = token,
-                typ = 2,
+                typ = 1,
                 size = 1000,
                 page = 1
             ).fold(
@@ -345,10 +345,31 @@ class CommunityViewModel @Inject constructor(
     }
     
     /**
+     * 关注/取消关注分区
+     */
+    fun followBoard(token: String, boardId: Int) {
+        viewModelScope.launch {
+            communityRepository.followBoard(token, boardId).fold(
+                onSuccess = {
+                    // 重新加载关注分区列表
+                    loadFollowingBoardList(token)
+                },
+                onFailure = { error ->
+                    _followingBoardListState.value = _followingBoardListState.value.copy(
+                        error = error.message ?: "关注操作失败"
+                    )
+                }
+            )
+        }
+    }
+    
+    /**
      * 清除错误
      */
     fun clearError() {
         _boardListState.value = _boardListState.value.copy(error = null)
+        _followingBoardListState.value = _followingBoardListState.value.copy(error = null)
+        _myPostListState.value = _myPostListState.value.copy(error = null)
         _postListState.value = _postListState.value.copy(error = null)
         _postDetailState.value = _postDetailState.value.copy(error = null)
         _commentListState.value = _commentListState.value.copy(error = null)

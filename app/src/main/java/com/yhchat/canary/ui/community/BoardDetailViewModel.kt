@@ -27,6 +27,9 @@ class BoardDetailViewModel @Inject constructor(
     private val _postListState = MutableStateFlow(PostListState())
     val postListState: StateFlow<PostListState> = _postListState.asStateFlow()
     
+    private val _followState = MutableStateFlow(FollowState())
+    val followState: StateFlow<FollowState> = _followState.asStateFlow()
+    
     /**
      * 加载分区详情
      */
@@ -106,11 +109,53 @@ class BoardDetailViewModel @Inject constructor(
     }
     
     /**
+     * 关注/取消关注分区
+     */
+    fun followBoard(token: String, boardId: Int) {
+        viewModelScope.launch {
+            _followState.value = _followState.value.copy(isLoading = true, error = null)
+            
+            val board = _boardDetailState.value.board
+            val isCurrentlyFollowed = board?.isFollowed == "1"
+            
+            val result = if (isCurrentlyFollowed) {
+                // 当前已关注，执行取消关注
+                communityRepository.unfollowBoard(token, boardId)
+            } else {
+                // 当前未关注，执行关注
+                communityRepository.followBoard(token, boardId)
+            }
+            
+            result.onSuccess {
+                _followState.value = _followState.value.copy(
+                    isLoading = false,
+                    isSuccess = true
+                )
+                // 重新加载分区详情以获取最新的关注状态
+                loadBoardDetail(token, boardId)
+            }.onFailure { error ->
+                _followState.value = _followState.value.copy(
+                    isLoading = false,
+                    error = error.message
+                )
+            }
+        }
+    }
+    
+    /**
+     * 重置关注状态
+     */
+    fun resetFollowState() {
+        _followState.value = FollowState()
+    }
+    
+    /**
      * 清除错误信息
      */
     fun clearError() {
         _boardDetailState.value = _boardDetailState.value.copy(error = null)
         _postListState.value = _postListState.value.copy(error = null)
+        _followState.value = _followState.value.copy(error = null)
     }
 }
 
@@ -133,5 +178,14 @@ data class PostListState(
     val currentPage: Int = 1,
     val hasMore: Boolean = false,
     val boardId: Int? = null,
+    val error: String? = null
+)
+
+/**
+ * 关注状态
+ */
+data class FollowState(
+    val isLoading: Boolean = false,
+    val isSuccess: Boolean = false,
     val error: String? = null
 )

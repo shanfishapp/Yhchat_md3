@@ -142,7 +142,11 @@ fun CommunityTabScreen(
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize()
-        ) { page ->
+        ) { 
+            
+            
+            
+            page ->
             when (page) {
                 0 -> {
                     // 分区列表

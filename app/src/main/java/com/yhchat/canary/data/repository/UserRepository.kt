@@ -121,6 +121,53 @@ class UserRepository @Inject constructor(
     }
 
     /**
+     * 获取邮箱验证码
+     */
+    suspend fun getEmailVerificationCode(email: String, captchaCode: String, captchaId: String): Result<Map<String, Any>> {
+        return try {
+            val request = EmailVerificationRequest(
+                email = email,
+                code = captchaCode,
+                id = captchaId
+            )
+            val response = apiService.getEmailVerificationCode(request)
+            if (response.isSuccessful) {
+                val emailResponse = response.body()
+                if (emailResponse?.get("code") == 1) {
+                    Result.success(emailResponse)
+                } else {
+                    Result.failure(Exception(emailResponse?.get("msg")?.toString() ?: "获取邮箱验证码失败"))
+                }
+            } else {
+                Result.failure(Exception("获取邮箱验证码失败: ${response.code()} - ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * 更改密码
+     */
+    suspend fun changePassword(request: ChangePasswordRequest): Result<Map<String, Any>> {
+        return try {
+            val response = apiService.changePassword(request)
+            if (response.isSuccessful) {
+                val changePasswordResponse = response.body()
+                if (changePasswordResponse?.get("code") == 1) {
+                    Result.success(changePasswordResponse)
+                } else {
+                    Result.failure(Exception(changePasswordResponse?.get("msg")?.toString() ?: "更改密码失败"))
+                }
+            } else {
+                Result.failure(Exception("更改密码失败: ${response.code()} - ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
      * 获取短信验证码
      */
     suspend fun getSmsCaptcha(mobile: String, captchaCode: String, captchaId: String): Result<Boolean> {
@@ -152,7 +199,7 @@ class UserRepository @Inject constructor(
     /**
      * 首页搜索
      */
-    suspend fun homeSearch(word: String): Result<com.yhchat.canary.data.api.SearchData> {
+    suspend fun homeSearch(word: String): Result<com.yhchat.canary.data.model.SearchData> {
         return try {
             val token = getToken()
             println("搜索前获取到的token: $token")
@@ -161,7 +208,9 @@ class UserRepository @Inject constructor(
                 return Result.failure(Exception("未登录"))
             }
             println("使用token进行搜索: $token")
-            val request = com.yhchat.canary.data.api.SearchRequest(keyword = word)
+            val request = com.yhchat.canary.data.model.SearchRequest(
+                word = word
+            )
             val response = apiService.homeSearch(token, request)
             println("搜索API响应状态: ${response.code()}")
             println("搜索API响应体: ${response.body()}")

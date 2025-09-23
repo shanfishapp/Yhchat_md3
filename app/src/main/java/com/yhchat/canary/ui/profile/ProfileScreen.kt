@@ -2,10 +2,13 @@ package com.yhchat.canary.ui.profile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
@@ -24,7 +27,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import com.yhchat.canary.data.repository.UserRepository
+import com.yhchat.canary.data.repository.NavigationRepository
 import com.yhchat.canary.ui.settings.SettingsActivity
+import com.yhchat.canary.ui.settings.NavigationSettingsActivity
 import android.text.TextUtils
 import java.text.SimpleDateFormat
 import java.util.*
@@ -37,7 +42,8 @@ import java.util.*
 fun ProfileScreen(
     modifier: Modifier = Modifier,
     userRepository: UserRepository? = null,
-    tokenRepository: com.yhchat.canary.data.repository.TokenRepository? = null
+    tokenRepository: com.yhchat.canary.data.repository.TokenRepository? = null,
+    navigationRepository: NavigationRepository? = null
 ) {
     val context = LocalContext.current
     val viewModel = remember {
@@ -68,7 +74,7 @@ fun ProfileScreen(
             actions = {
                 IconButton(
                     onClick = {
-                        SettingsActivity.start(context)
+                        SettingsActivity.start(context, navigationRepository, tokenRepository)
                     }
                 ) {
                     Icon(
@@ -79,9 +85,12 @@ fun ProfileScreen(
             }
         )
         
+        val scrollState = rememberScrollState()
+        
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(scrollState)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -128,6 +137,8 @@ fun ProfileScreen(
                 uiState.userProfile?.let { userProfile ->
                     UserProfileContent(
                         userProfile = userProfile,
+                        navigationRepository = navigationRepository,
+                        tokenRepository = tokenRepository,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -148,17 +159,19 @@ fun ProfileScreen(
 @Composable
 private fun UserProfileContent(
     userProfile: com.yhchat.canary.data.model.UserProfile,
+    navigationRepository: NavigationRepository? = null,
+    tokenRepository: com.yhchat.canary.data.repository.TokenRepository? = null,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Column(
         modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // 头像和姓名部分
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
+            modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
             shape = RoundedCornerShape(12.dp)
         ) {
@@ -300,6 +313,9 @@ private fun UserProfileContent(
                 }
             }
         }
+        
+        // 添加底部间距，确保内容不会贴底
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
@@ -335,6 +351,64 @@ private fun ProfileInfoItem(
                 text = value,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileSettingItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            Icon(
+                imageVector = Icons.Default.ArrowForward,
+                contentDescription = "前往",
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

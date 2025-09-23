@@ -121,9 +121,8 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
     
-    // SQLCipher 加密数据库支持
-    implementation("net.zetetic:android-database-sqlcipher:4.5.4")
-    implementation("androidx.sqlite:sqlite-ktx:2.4.0")
+    // Security - 使用Android官方的安全存储方案
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
     
     // Hilt
     implementation(libs.hilt.android)

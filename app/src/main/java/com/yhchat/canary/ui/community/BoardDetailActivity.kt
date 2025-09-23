@@ -12,7 +12,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -80,6 +82,7 @@ fun BoardDetailScreen(
     // 获取状态
     val boardDetailState by viewModel.boardDetailState.collectAsState()
     val postListState by viewModel.postListState.collectAsState()
+    val followState by viewModel.followState.collectAsState()
     
     // 加载数据
     LaunchedEffect(boardId, token) {
@@ -115,6 +118,29 @@ fun BoardDetailScreen(
                 }
             },
             actions = {
+                // 关注按钮
+                boardDetailState.board?.let { board ->
+                    IconButton(
+                        onClick = {
+                            viewModel.followBoard(token, boardId)
+                        },
+                        enabled = !followState.isLoading
+                    ) {
+                        if (followState.isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = if (board.isFollowed == "1") Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                contentDescription = if (board.isFollowed == "1") "取消关注" else "关注",
+                                tint = if (board.isFollowed == "1") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+                
                 IconButton(onClick = {
                     // 跳转到搜索Activity
                     val intent = Intent(context, SearchActivity::class.java).apply {
@@ -143,6 +169,10 @@ fun BoardDetailScreen(
                     }
                     context.startActivity(intent)
                 },
+                onFollowClick = {
+                    viewModel.followBoard(token, boardId)
+                },
+                followState = followState,
                 modifier = Modifier.padding(16.dp)
             )
         }
@@ -273,6 +303,8 @@ fun BoardDetailScreen(
 fun BoardInfoCard(
     board: CommunityBoard,
     onGroupListClick: () -> Unit,
+    onFollowClick: () -> Unit,
+    followState: FollowState,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -331,23 +363,35 @@ fun BoardInfoCard(
                 )
             }
             
-            // 关注状态
-            Surface(
-                color = if (board.isFollowed == "1") 
-                    MaterialTheme.colorScheme.primary 
-                else 
-                    MaterialTheme.colorScheme.surfaceVariant,
-                shape = MaterialTheme.shapes.small
-            ) {
-                Text(
-                    text = if (board.isFollowed == "1") "已关注" else "未关注",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (board.isFollowed == "1") 
-                        MaterialTheme.colorScheme.onPrimary 
+            // 关注状态按钮
+            Button(
+                onClick = onFollowClick,
+                enabled = !followState.isLoading,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (board.isFollowed == "1") 
+                        MaterialTheme.colorScheme.surface 
                     else 
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                        MaterialTheme.colorScheme.primary,
+                    contentColor = if (board.isFollowed == "1") 
+                        MaterialTheme.colorScheme.onSurface 
+                    else 
+                        MaterialTheme.colorScheme.onPrimary
+                ),
+                modifier = Modifier.height(32.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+            ) {
+                if (followState.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 1.dp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                } else {
+                    Text(
+                        text = if (board.isFollowed == "1") "已关注" else "未关注",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
         }
     }

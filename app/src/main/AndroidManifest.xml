@@ -75,6 +75,13 @@
             android:exported="false"
             android:label="HTML 设置"
             android:theme="@style/Theme.YhchatCanary" />
+            
+        <!-- 导航栏设置 Activity -->
+        <activity
+            android:name=".ui.settings.NavigationSettingsActivity"
+            android:exported="false"
+            android:label="导航栏管理"
+            android:theme="@style/Theme.YhchatCanary" />
 
         <!-- 用户资料 Activity -->
         <activity
@@ -95,6 +102,14 @@
             android:name=".ui.community.SearchActivity"
             android:exported="false"
             android:label="搜索"
+            android:theme="@style/Theme.YhchatCanary" />
+        <activity
+            android:name=".ui.settings.ChangePasswordActivity"
+            android:exported="false"
+            android:label="更改密码
+
+
+"
             android:theme="@style/Theme.YhchatCanary" />
     </application>
 
