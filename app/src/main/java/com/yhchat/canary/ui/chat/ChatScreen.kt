@@ -12,14 +12,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material3.*
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -43,6 +46,12 @@ import com.yhchat.canary.ui.components.LinkText
 import com.yhchat.canary.ui.components.LinkDetector
 import com.yhchat.canary.data.model.ChatMessage
 import com.yhchat.canary.data.model.MessageContent
+import com.yhchat.canary.service.AudioPlayerService
+import com.yhchat.canary.service.FileDownloadService
+import com.yhchat.canary.utils.PermissionUtils
+import android.app.Activity
+import android.content.Context
+import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -61,6 +70,7 @@ fun ChatScreen(
     viewModel: ChatViewModel = viewModel(),
     onAvatarClick: (String, String) -> Unit = { _, _ -> }
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val messages = viewModel.messages
     var inputText by remember { mutableStateOf("") }
@@ -237,28 +247,37 @@ fun ChatScreen(
         }
 
         // 底部输入栏
-        ChatInputBar(
-            text = inputText,
-            onTextChange = { inputText = it },
-            onSendMessage = {
-                        if (inputText.isNotBlank()) {
-                            viewModel.sendTextMessage(inputText.trim())
-                            inputText = ""
-                        }
-                    },
-            onImageClick = {
-                // TODO: 实现图片选择功能
-            },
-            onFileClick = {
-                // TODO: 实现文件选择功能
-            },
-            onCameraClick = {
-                // TODO: 实现相机拍照功能
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp)
-        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            tonalElevation = 8.dp,
+            shadowElevation = 8.dp
+        ) {
+            ChatInputBar(
+                text = inputText,
+                onTextChange = { inputText = it },
+                onSendMessage = {
+                    if (inputText.isNotBlank()) {
+                        viewModel.sendTextMessage(inputText.trim())
+                        inputText = ""
+                    }
+                },
+                onImageClick = {
+                    // TODO: 实现图片选择功能
+                },
+                onFileClick = {
+                    // TODO: 实现文件选择功能
+                },
+                onCameraClick = {
+                    // TODO: 实现相机拍照功能
+                },
+                modifier = Modifier.padding(
+                    start = 8.dp,
+                    end = 8.dp,
+                    top = 8.dp,
+                    bottom = 16.dp // 增加底部间距，避免粘在最底部
+                )
+            )
+        }
     }
     
     // 图片预览器
@@ -447,6 +466,7 @@ private fun MessageContentView(
     } else {
                                 MaterialTheme.colorScheme.onSurface
     }
+    val context = LocalContext.current
 
     Column(modifier = modifier) {
         when (contentType) {
@@ -504,54 +524,69 @@ private fun MessageContentView(
             4 -> {
                 // 文件消息
                 content.fileName?.let { fileName ->
-                    Row(
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                content.fileUrl?.let { fileUrl ->
+                                    handleFileDownload(
+                                        context = context,
+                                        fileUrl = fileUrl,
+                                        fileName = fileName,
+                                        fileSize = content.fileSize ?: 0L
+                                    )
+                                }
+                            },
+                        color = textColor.copy(alpha = 0.1f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send, // 用作文件图标的临时替代
-                            contentDescription = "文件",
-                            tint = textColor,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = fileName,
-                                color = textColor,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Send, // 用作文件图标的临时替代
+                                contentDescription = "文件",
+                                tint = textColor,
+                                modifier = Modifier.size(24.dp)
                             )
-                            content.fileSize?.let { size ->
-                            Text(
-                                    text = formatFileSize(size),
-                                    color = textColor.copy(alpha = 0.7f),
-                                    style = MaterialTheme.typography.labelSmall
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = fileName,
+                                    color = textColor,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
                                 )
+                                content.fileSize?.let { size ->
+                                    Text(
+                                        text = formatFileSize(size),
+                                        color = textColor.copy(alpha = 0.7f),
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
                             }
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = "下载",
+                                tint = textColor.copy(alpha = 0.7f),
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
                     }
                 }
             }
             11 -> {
                 // 语音消息
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send, // 用作语音图标的临时替代
-                        contentDescription = "语音",
-                        tint = textColor,
-                        modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                    content.audioTime?.let { duration ->
-                            Text(
-                            text = formatAudioDuration(duration),
-                            color = textColor,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                        }
+                content.audioUrl?.let { audioUrl ->
+                    AudioMessageView(
+                        audioUrl = audioUrl,
+                        duration = content.audioTime ?: 0,
+                        textColor = textColor,
+                        senderName = "语音消息"
+                    )
+                }
             }
             3 -> {
                 // Markdown消息
@@ -790,4 +825,114 @@ private fun formatAudioDuration(seconds: Long): String {
     val minutes = seconds / 60
     val remainingSeconds = seconds % 60
     return "${minutes}:${remainingSeconds.toString().padStart(2, '0')}"
+}
+
+private fun handleFileDownload(
+    context: Context,
+    fileUrl: String,
+    fileName: String,
+    fileSize: Long
+) {
+    if (!PermissionUtils.hasAllDownloadPermissions(context)) {
+        if (context is Activity) {
+            PermissionUtils.requestAllDownloadPermissions(context)
+            Toast.makeText(context, "请先授予下载所需权限", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "当前上下文无法申请权限", Toast.LENGTH_SHORT).show()
+        }
+        return
+    }
+
+    Toast.makeText(context, "开始下载：$fileName", Toast.LENGTH_SHORT).show()
+    FileDownloadService.startDownload(
+        context = context,
+        fileUrl = fileUrl,
+        fileName = fileName,
+        fileSize = fileSize
+    )
+}
+
+/**
+ * 语音消息视图
+ */
+@Composable
+private fun AudioMessageView(
+    audioUrl: String,
+    duration: Long,
+    textColor: Color,
+    senderName: String,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var isCurrentlyPlaying by remember { mutableStateOf(false) }
+    
+    // 检查当前是否正在播放这个音频
+    LaunchedEffect(audioUrl) {
+        // 这里可以添加检查当前播放状态的逻辑
+        // 暂时简化处理
+    }
+    
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable {
+                // 点击播放语音
+                AudioPlayerService.startPlayAudio(
+                    context = context,
+                    audioUrl = audioUrl,
+                    title = "$senderName 的语音"
+                )
+                isCurrentlyPlaying = !isCurrentlyPlaying
+            },
+        color = textColor.copy(alpha = 0.1f)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 播放/暂停图标
+            Icon(
+                imageVector = if (isCurrentlyPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = if (isCurrentlyPlaying) "暂停" else "播放",
+                tint = textColor,
+                modifier = Modifier.size(24.dp)
+            )
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            // 音频波形效果 (简化版本)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                repeat(5) { index ->
+                    val height = if (isCurrentlyPlaying) {
+                        // 简单的动画效果
+                        (8 + (index * 2)).dp
+                    } else {
+                        6.dp
+                    }
+                    
+                    Box(
+                        modifier = Modifier
+                            .width(3.dp)
+                            .height(height)
+                            .background(
+                                textColor.copy(alpha = 0.6f),
+                                RoundedCornerShape(1.dp)
+                            )
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            // 时长显示
+            Text(
+                text = formatAudioDuration(duration),
+                color = textColor,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
 }

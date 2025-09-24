@@ -1,5 +1,6 @@
 package com.yhchat.canary.ui.community
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -10,14 +11,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Drafts
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.yhchat.canary.data.di.RepositoryFactory
+import com.yhchat.canary.data.repository.DraftRepository
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 
 /**
@@ -31,6 +35,12 @@ class CreatePostActivity : ComponentActivity() {
         val boardId = intent.getIntExtra("board_id", 0)
         val boardName = intent.getStringExtra("board_name") ?: "发布文章"
         val token = intent.getStringExtra("token") ?: ""
+        
+        // 草稿相关参数
+        val draftId = intent.getStringExtra("draft_id")
+        val draftTitle = intent.getStringExtra("draft_title") ?: ""
+        val draftContent = intent.getStringExtra("draft_content") ?: ""
+        val draftMarkdownMode = intent.getBooleanExtra("draft_markdown_mode", false)
         
         setContent {
             YhchatCanaryTheme {
@@ -47,7 +57,17 @@ class CreatePostActivity : ComponentActivity() {
                     token = token,
                     viewModel = viewModel,
                     onBackClick = { finish() },
-                    onPostCreated = { finish() }
+                    onPostCreated = { finish() },
+                    onDraftBoxClick = {
+                        // 跳转到草稿箱Activity
+                        val intent = Intent(this@CreatePostActivity, DraftBoxActivity::class.java).apply {
+                            putExtra("token", token)
+                        }
+                        startActivity(intent)
+                    },
+                    draftTitle = draftTitle,
+                    draftContent = draftContent,
+                    draftMarkdownMode = draftMarkdownMode
                 )
             }
         }
@@ -66,18 +86,37 @@ fun CreatePostScreen(
     viewModel: CreatePostViewModel,
     onBackClick: () -> Unit,
     onPostCreated: () -> Unit,
+    onDraftBoxClick: () -> Unit,
+    draftTitle: String = "",
+    draftContent: String = "",
+    draftMarkdownMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    var title by remember { mutableStateOf("") }
-    var content by remember { mutableStateOf("") }
-    var isMarkdownMode by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val draftRepository = remember { DraftRepository(context) }
+    
+    var title by remember { mutableStateOf(draftTitle) }
+    var content by remember { mutableStateOf(draftContent) }
+    var isMarkdownMode by remember { mutableStateOf(draftMarkdownMode) }
     
     val createPostState by viewModel.createPostState.collectAsState()
+    
+    // 控制退出确认对话框
+    var showExitDialog by remember { mutableStateOf(false) }
     
     // 监听创建结果
     LaunchedEffect(createPostState.isSuccess) {
         if (createPostState.isSuccess) {
             onPostCreated()
+        }
+    }
+    
+    // 处理返回按键
+    BackHandler {
+        if (title.isNotBlank() || content.isNotBlank()) {
+            showExitDialog = true
+        } else {
+            onBackClick()
         }
     }
     
@@ -94,7 +133,13 @@ fun CreatePostScreen(
                 )
             },
             navigationIcon = {
-                IconButton(onClick = onBackClick) {
+                IconButton(onClick = {
+                    if (title.isNotBlank() || content.isNotBlank()) {
+                        showExitDialog = true
+                    } else {
+                        onBackClick()
+                    }
+                }) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
                         contentDescription = "返回"
@@ -102,6 +147,17 @@ fun CreatePostScreen(
                 }
             },
             actions = {
+                // 草稿箱按钮
+                IconButton(
+                    onClick = onDraftBoxClick
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Drafts,
+                        contentDescription = "草稿箱"
+                    )
+                }
+                
+                // 发布按钮
                 IconButton(
                     onClick = {
                         if (title.isNotBlank() && content.isNotBlank()) {
@@ -258,5 +314,48 @@ fun CreatePostScreen(
                 Text(if (createPostState.isLoading) "发布中..." else "发布文章")
             }
         }
+    }
+    
+    // 退出确认对话框
+    if (showExitDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitDialog = false },
+            title = {
+                Text("保存草稿")
+            },
+            text = {
+                Text("您有未保存的内容，是否保存为草稿？")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        // 保存草稿
+                        if (title.isNotBlank() || content.isNotBlank()) {
+                            draftRepository.saveDraft(
+                                title = title.trim(),
+                                content = content.trim(),
+                                boardId = boardId,
+                                boardName = boardName,
+                                isMarkdownMode = isMarkdownMode
+                            )
+                        }
+                        showExitDialog = false
+                        onBackClick()
+                    }
+                ) {
+                    Text("保存")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showExitDialog = false
+                        onBackClick()
+                    }
+                ) {
+                    Text("不保存")
+                }
+            }
+        )
     }
 }

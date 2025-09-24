@@ -10,6 +10,7 @@ import com.yhchat.canary.data.repository.TokenRepository
 import com.yhchat.canary.data.repository.ConversationRepository
 import com.yhchat.canary.data.repository.NavigationRepository
 import com.yhchat.canary.data.repository.UserRepository
+import com.yhchat.canary.data.repository.DraftRepository
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
@@ -89,5 +90,12 @@ object RepositoryFactory {
      */
     fun getUserRepository(context: Context): UserRepository {
         return UserRepository(apiService, null)
+    }
+    
+    /**
+     * 获取草稿仓库实例
+     */
+    fun getDraftRepository(context: Context): DraftRepository {
+        return DraftRepository(context)
     }
 }

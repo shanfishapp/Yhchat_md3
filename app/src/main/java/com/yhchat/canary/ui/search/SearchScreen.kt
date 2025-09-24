@@ -38,7 +38,7 @@ import com.yhchat.canary.data.repository.TokenRepository
 @Composable
 fun SearchScreen(
     onBackClick: () -> Unit,
-    onItemClick: () -> Unit,
+    onItemClick: (chatId: String, chatType: Int, chatName: String) -> Unit,
     tokenRepository: TokenRepository?,
     modifier: Modifier = Modifier
 ) {
@@ -163,13 +163,17 @@ fun SearchScreen(
                                 }
                                 
                                 items(items) { searchItem ->
-                                    Card(
+                                        Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(horizontal = 16.dp, vertical = 4.dp)
                                             .clickable { 
-                                                // 根据friendType处理点击事件
-                                                onItemClick()
+                                                // 根据friendType处理点击事件，进入聊天界面
+                                                onItemClick(
+                                                    searchItem.friendId,
+                                                    searchItem.friendType,
+                                                    searchItem.nickname
+                                                )
                                             },
                                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                                     ) {

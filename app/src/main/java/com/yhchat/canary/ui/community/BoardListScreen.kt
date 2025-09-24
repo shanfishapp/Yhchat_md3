@@ -14,8 +14,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import coil.compose.AsyncImage
 import com.yhchat.canary.data.model.CommunityBoard
+import com.yhchat.canary.ui.components.ImageUtils
 
 /**
  * 分区列表界面
@@ -128,6 +132,7 @@ fun BoardItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -142,9 +147,14 @@ fun BoardItem(
         ) {
             // 分区头像
             AsyncImage(
-                model = board.avatar,
+                model = ImageUtils.createImageRequest(
+                    context = context,
+                    url = board.avatar
+                ),
                 contentDescription = board.name,
-                modifier = Modifier.size(64.dp),
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(8.dp)),
                 contentScale = ContentScale.Crop
             )
             

@@ -49,12 +49,10 @@ fun ChatInputBar(
     val keyboardController = LocalSoftwareKeyboardController.current
     
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        shadowElevation = 12.dp,
-        tonalElevation = 4.dp,
-        shape = RoundedCornerShape(24.dp),
+        modifier = modifier.fillMaxWidth(),
+        shadowElevation = 4.dp,
+        tonalElevation = 2.dp,
+        shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface
     ) {
         Column {
@@ -87,9 +85,9 @@ fun ChatInputBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // 加号按钮
                 IconButton(
@@ -97,14 +95,10 @@ fun ChatInputBar(
                         showAttachMenu = !showAttachMenu
                         if (showAttachMenu) {
                             keyboardController?.hide()
-           
-           
-           
-           
                         }
                     },
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(44.dp)
                         .background(
                             MaterialTheme.colorScheme.primaryContainer,
                             CircleShape
@@ -113,7 +107,8 @@ fun ChatInputBar(
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = "附件",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
                 
@@ -123,7 +118,7 @@ fun ChatInputBar(
                     onValueChange = onTextChange,
                     modifier = Modifier
                         .weight(1f)
-                        .heightIn(min = 40.dp, max = 120.dp),
+                        .heightIn(min = 44.dp, max = 120.dp),
                     placeholder = { 
                         Text(
                             text = placeholder,
@@ -131,11 +126,13 @@ fun ChatInputBar(
                         ) 
                     },
                     maxLines = 4,
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(22.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                        cursorColor = MaterialTheme.colorScheme.primary
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
                     )
                 )
                 
@@ -148,7 +145,7 @@ fun ChatInputBar(
                     },
                     enabled = text.isNotBlank(),
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(44.dp)
                         .background(
                             if (text.isNotBlank()) 
                                 MaterialTheme.colorScheme.primary 
@@ -163,7 +160,8 @@ fun ChatInputBar(
                         tint = if (text.isNotBlank()) 
                             MaterialTheme.colorScheme.onPrimary 
                         else 
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

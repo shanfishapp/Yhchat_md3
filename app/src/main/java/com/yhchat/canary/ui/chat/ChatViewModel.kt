@@ -32,6 +32,7 @@ class ChatViewModel @Inject constructor(
     private var currentUserId: String = ""
     private var hasMoreMessages: Boolean = true
     private var oldestMsgSeq: Long = 0
+    private var oldestMsgId: String? = null
 
     private val tag = "ChatViewModel"
 
@@ -55,6 +56,7 @@ class ChatViewModel @Inject constructor(
         _messages.clear()
         hasMoreMessages = true
         oldestMsgSeq = 0
+        oldestMsgId = null
         
         // 加载初始消息
         loadMessages()
@@ -77,12 +79,13 @@ class ChatViewModel @Inject constructor(
                     error = null
                 )
 
-                val result = if (oldestMsgSeq > 0 && !refresh) {
-                    // 加载更多历史消息
-                    messageRepository.getMessagesBySeq(
+                val result = if (!oldestMsgId.isNullOrEmpty() && !refresh) {
+                    // 加载更多历史消息 - 使用最老的消息ID
+                    messageRepository.getMessages(
                         chatId = currentChatId,
                         chatType = currentChatType,
-                        msgSeq = oldestMsgSeq
+                        msgCount = 20,
+                        msgId = oldestMsgId
                     )
                 } else {
                     // 加载最新消息
@@ -107,9 +110,15 @@ class ChatViewModel @Inject constructor(
                             _messages.addAll(0, sortedNewMessages)
                         }
 
-                        // 更新最旧消息的序列号
+                        // 更新最旧消息的序列号和ID
                         if (newMessages.isNotEmpty()) {
                             oldestMsgSeq = newMessages.minOfOrNull { it.msgSeq ?: 0L } ?: oldestMsgSeq
+                            // 找到发送时间最早的消息ID作为oldestMsgId
+                            val oldestMessage = newMessages.minByOrNull { it.sendTime }
+                            if (oldestMessage != null) {
+                                oldestMsgId = oldestMessage.msgId
+                                Log.d(tag, "Updated oldestMsgId to: $oldestMsgId, sendTime: ${oldestMessage.sendTime}")
+                            }
                         }
 
                         // 检查是否还有更多消息
@@ -150,7 +159,7 @@ class ChatViewModel @Inject constructor(
             return
         }
         
-        Log.d(tag, "Loading more messages from seq: $oldestMsgSeq")
+        Log.d(tag, "Loading more messages from msgId: $oldestMsgId, seq: $oldestMsgSeq")
         loadMessages(refresh = false)
     }
 
@@ -254,6 +263,7 @@ class ChatViewModel @Inject constructor(
     fun refreshMessages() {
         Log.d(tag, "Refreshing messages")
         oldestMsgSeq = 0
+        oldestMsgId = null
         hasMoreMessages = true
         loadMessages(refresh = true)
     }

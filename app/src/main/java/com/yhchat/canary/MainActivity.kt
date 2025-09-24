@@ -288,9 +288,12 @@ class MainActivity : ComponentActivity() {
                                         onBackClick = {
                                             currentScreen = "conversation"
                                         },
-                                        onItemClick = {
-                                            // 处理搜索项点击，可以跳转到聊天界面
-                                            // TODO: 实现具体的点击处理逻辑
+                                        onItemClick = { chatId, chatType, chatName ->
+                                            // 处理搜索项点击，跳转到聊天界面
+                                            currentChatId = chatId
+                                            currentChatType = chatType
+                                            currentChatName = chatName
+                                            currentScreen = "chat"
                                         },
                                         tokenRepository = tokenRepository,
                                         modifier = Modifier.fillMaxSize()

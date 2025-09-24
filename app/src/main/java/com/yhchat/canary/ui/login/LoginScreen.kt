@@ -59,7 +59,7 @@ fun LoginScreen(
         }
     }
     
-    // 获取验证码
+    // 获取初始验证码
     LaunchedEffect(Unit) {
         viewModel.getCaptcha()
     }
@@ -134,77 +134,21 @@ fun LoginScreen(
                 when (selectedTab) {
                     0 -> {
                         // 手机登录
-                        OutlinedTextField(
-                            value = mobile,
-                            onValueChange = { mobile = it },
-                            label = { Text("手机号") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-
-                        // 图片验证码
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = imageCaptcha,
-                                onValueChange = { imageCaptcha = it },
-                                label = { Text("图片验证码") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
-                            )
-
-                            Button(
-                                onClick = { viewModel.getCaptcha() },
-                                enabled = !uiState.isLoading
-                            ) {
-                                Text("获取图片")
-                            }
-                        }
-
-                        // 短信验证码
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = smsCaptcha,
-                                onValueChange = { smsCaptcha = it },
-                                label = { Text("短信验证码") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
-                            )
-
-                            Button(
-                                onClick = { viewModel.getSmsCaptcha(mobile, imageCaptcha) },
-                                enabled = !uiState.isLoading && mobile.isNotBlank() && imageCaptcha.isNotBlank()
-                            ) {
-                                Text("获取短信")
-                            }
-                        }
                         
-                        // 验证码图片显示
+                        // 验证码图片显示 - 移到最上面
                         captchaData?.let { captcha ->
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                             ) {
-                                Column(
-                                    modifier = Modifier.padding(16.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
-                                    Text(
-                                        text = "验证码图片",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                    // 使用Coil显示base64图片
+                                    // 验证码图片
                                     androidx.compose.foundation.Image(
                                         painter = rememberAsyncImagePainter(
                                             model = android.util.Base64.decode(
@@ -218,18 +162,86 @@ fun LoginScreen(
                                         ),
                                         contentDescription = "验证码图片",
                                         modifier = Modifier
-                                            .height(80.dp)
-                                            .fillMaxWidth(),
+                                            .height(60.dp)
+                                            .width(120.dp),
                                         contentScale = ContentScale.Fit
                                     )
-
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = "请输入上图中的验证码",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    
+                                    // 刷新按钮
+                                    OutlinedButton(
+                                        onClick = { viewModel.getCaptcha() },
+                                        enabled = !uiState.isLoading,
+                                        modifier = Modifier.height(40.dp)
+                                    ) {
+                                        Text("刷新验证码")
+                                    }
                                 }
+                            }
+                        }
+                        
+                        // 手机号输入
+                        OutlinedTextField(
+                            value = mobile,
+                            onValueChange = { mobile = it },
+                            label = { Text("手机号") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            supportingText = { Text("请输入11位手机号码") }
+                        )
+
+                        // 图片验证码输入
+                        OutlinedTextField(
+                            value = imageCaptcha,
+                            onValueChange = { imageCaptcha = it },
+                            label = { Text("图片验证码") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            supportingText = { Text("请输入上方图片中的验证码") }
+                        )
+
+                        // 短信验证码输入和获取按钮
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            OutlinedTextField(
+                                value = smsCaptcha,
+                                onValueChange = { smsCaptcha = it },
+                                label = { Text("短信验证码") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                supportingText = { Text("请输入6位短信验证码") }
+                            )
+
+                            Button(
+                                onClick = { 
+                                    viewModel.getSmsCaptcha(mobile, imageCaptcha)
+                                },
+                                enabled = !uiState.isLoading && mobile.isNotBlank() && imageCaptcha.isNotBlank(),
+                                modifier = Modifier
+                                    .height(56.dp)
+                                    .padding(top = 8.dp)
+                            ) {
+                                Text("获取短信")
+                            }
+                        }
+                        
+                        // 成功提示
+                        if (uiState.smsSuccess) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                            ) {
+                                Text(
+                                    text = "短信验证码发送成功，请查收",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(12.dp)
+                                )
                             }
                         }
                     }

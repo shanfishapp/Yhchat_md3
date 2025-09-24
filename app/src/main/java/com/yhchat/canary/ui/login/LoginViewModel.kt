@@ -86,17 +86,23 @@ class LoginViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
             userRepository.getSmsCaptcha(mobile, captchaCode, captchaData.id)
-                .onSuccess { success ->
+                .onSuccess { response ->
+                    // 检查响应是否包含success字符
+                    val isSuccess = response.toString().contains("success", ignoreCase = true)
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = null
+                        error = null,
+                        smsSuccess = isSuccess
                     )
-                    println("短信验证码发送成功")
+                    if (isSuccess) {
+                        println("短信验证码发送成功")
+                    }
                 }
                 .onFailure { error ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = "获取短信验证码失败: ${error.message}"
+                        error = "获取短信验证码失败: ${error.message}",
+                        smsSuccess = false
                     )
                 }
         }
@@ -190,5 +196,6 @@ data class LoginUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val loginSuccess: Boolean = false,
-    val loginData: LoginData? = null
+    val loginData: LoginData? = null,
+    val smsSuccess: Boolean = false
 )

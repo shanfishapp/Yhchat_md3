@@ -24,9 +24,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.yhchat.canary.data.di.RepositoryFactory
+import com.yhchat.canary.ui.components.ImageUtils
 import com.yhchat.canary.data.model.CommunityBoard
 import com.yhchat.canary.data.model.CommunityPost
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
@@ -118,29 +122,6 @@ fun BoardDetailScreen(
                 }
             },
             actions = {
-                // 关注按钮
-                boardDetailState.board?.let { board ->
-                    IconButton(
-                        onClick = {
-                            viewModel.followBoard(token, boardId)
-                        },
-                        enabled = !followState.isLoading
-                    ) {
-                        if (followState.isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(
-                                imageVector = if (board.isFollowed == "1") Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                                contentDescription = if (board.isFollowed == "1") "取消关注" else "关注",
-                                tint = if (board.isFollowed == "1") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-                
                 IconButton(onClick = {
                     // 跳转到搜索Activity
                     val intent = Intent(context, SearchActivity::class.java).apply {
@@ -273,7 +254,7 @@ fun BoardDetailScreen(
         }
         }
         
-        // 浮空发文章按钮
+        // 浮空发文章按钮 - 位置稍微上移
         FloatingActionButton(
             onClick = {
                 // 启动发文章Activity
@@ -286,7 +267,7 @@ fun BoardDetailScreen(
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(16.dp)
+                .padding(bottom = 24.dp, end = 16.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.Add,
@@ -316,9 +297,14 @@ fun BoardInfoCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             AsyncImage(
-                model = board.avatar,
+                model = ImageUtils.createImageRequest(
+                    context = LocalContext.current,
+                    url = board.avatar
+                ),
                 contentDescription = board.name,
-                modifier = Modifier.size(64.dp),
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(8.dp)),
                 contentScale = ContentScale.Crop
             )
             
@@ -446,9 +432,14 @@ fun PostListItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AsyncImage(
-                    model = post.senderAvatar,
+                    model = ImageUtils.createAvatarImageRequest(
+                        context = LocalContext.current,
+                        url = post.senderAvatar
+                    ),
                     contentDescription = post.senderNickname,
-                    modifier = Modifier.size(32.dp),
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape),
                     contentScale = ContentScale.Crop
                 )
                 

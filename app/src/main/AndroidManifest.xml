@@ -5,12 +5,23 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
-    <!-- 存储权限用于保存图片 -->
+    <!-- 音频播放权限 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    
+    <!-- 文件下载权限 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    
+    <!-- 存储权限用于保存图片和文件 -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" 
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    
+    <!-- 通知权限 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".CanaryApplication"
@@ -46,6 +57,13 @@
             android:name=".ui.community.CreatePostActivity"
             android:exported="false"
             android:label="发布文章"
+            android:theme="@style/Theme.YhchatCanary" />
+            
+        <!-- 草稿箱Activity -->
+        <activity
+            android:name=".ui.community.DraftBoxActivity"
+            android:exported="false"
+            android:label="草稿箱"
             android:theme="@style/Theme.YhchatCanary" />
             
         <!-- 文章详情Activity -->
@@ -102,15 +120,30 @@
             android:name=".ui.community.SearchActivity"
             android:exported="false"
             android:label="搜索"
+
+
+
+
             android:theme="@style/Theme.YhchatCanary" />
         <activity
             android:name=".ui.settings.ChangePasswordActivity"
             android:exported="false"
-            android:label="更改密码
-
-
-"
+            android:label="更改密码"
             android:theme="@style/Theme.YhchatCanary" />
+            
+        <!-- 语音播放服务 -->
+        <service
+            android:name=".service.AudioPlayerService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+            
+        <!-- 文件下载服务 -->
+        <service
+            android:name=".service.FileDownloadService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 
 </manifest>
