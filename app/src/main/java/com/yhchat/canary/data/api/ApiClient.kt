@@ -7,7 +7,8 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import java.util.concurrent.TimeUnit
+import java.util.concurrent
+    .TimeUnit
 
 /**
  * API客户端配置
@@ -49,7 +50,7 @@ object ApiClient {
             .build()
     }
     
-    // Web API服务 (chat-web-go.jwzhd.com)
+    // Web API服务 (chat-web-go.jwzhd.com) - JSON格式
     private val webRetrofit: Retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(WEB_BASE_URL)
@@ -57,11 +58,11 @@ object ApiClient {
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
     }
-    
+
     val apiService: ApiService by lazy {
         retrofit.create(ApiService::class.java)
     }
-    
+
     val webApiService: WebApiService by lazy {
         webRetrofit.create(WebApiService::class.java)
     }

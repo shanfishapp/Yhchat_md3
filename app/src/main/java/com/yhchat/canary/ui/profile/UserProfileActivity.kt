@@ -129,9 +129,13 @@ fun UserProfileScreen(
         }
     }
 
-    Column(
-        modifier = modifier.fillMaxSize()
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
     ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
         // 顶部应用栏
         TopAppBar(
             title = {
@@ -214,6 +218,7 @@ fun UserProfileScreen(
                 onDismiss = { viewModel.dismissAddFriendDialog() }
             )
         }
+        }
     }
 }
 
@@ -225,12 +230,16 @@ private fun UserProfileContent(
     userProfile: UserProfile,
     onAddFriendClick: (UserProfile) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
         // 头像和基本信息卡片
         Card(
             modifier = Modifier
@@ -413,6 +422,7 @@ private fun UserProfileContent(
                 fontWeight = FontWeight.Medium
             )
         }
+    }
     }
 }
 

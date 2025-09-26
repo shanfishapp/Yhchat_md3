@@ -37,16 +37,16 @@ fun HtmlWebView(
                     margin: 0;
                     padding: 8px;
                     background-color: ${String.format("#%06X", backgroundColor and 0xFFFFFF)};
-                    color: #000000 !important;
+                    color: ${String.format("#%06X", textColor and 0xFFFFFF)} !important;
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                     font-size: 14px;
                     line-height: 1.4;
                 }
                 * {
-                    color: #000000 !important;
+                    color: ${String.format("#%06X", textColor and 0xFFFFFF)} !important;
                 }
                 p, div, span, h1, h2, h3, h4, h5, h6 {
-                    color: #000000 !important;
+                    color: ${String.format("#%06X", textColor and 0xFFFFFF)} !important;
                 }
                 img {
                     max-width: 100%;

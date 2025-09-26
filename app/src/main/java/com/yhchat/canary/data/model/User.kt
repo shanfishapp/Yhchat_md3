@@ -666,3 +666,183 @@ data class EmailVerificationRequest(
     val id: String
 )
 
+/**
+ * 机器人信息
+ * 基于 yhapi/v1/bot.md 的 bot-info 接口
+ */
+data class BotInfo(
+    @SerializedName("id")
+    val id: Int? = null,
+    @SerializedName("bot_id")
+    val botId: String? = null,
+    @SerializedName("name") // bot.md中使用name字段
+
+
+
+    val nickname: String? = null,
+    @SerializedName("name_id") // bot.md中使用name_id字段
+    val nicknameId: Int? = null,
+    @SerializedName("avatar_id")
+    val avatarId: Int? = null,
+    @SerializedName("avatar_url")
+    val avatarUrl: String? = null,
+    @SerializedName("token")
+    val token: String? = null,
+    @SerializedName("link")
+    val link: String? = null,
+    @SerializedName("introduction")
+    val introduction: String? = null,
+    @SerializedName("create_by")
+    val createBy: String? = null,
+    @SerializedName("create_time")
+    val createTime: Long? = null,
+    @SerializedName("headcount")
+    val headcount: Int? = null,
+    @SerializedName("private")
+    val private: Int? = null,
+    @SerializedName("is_stop")
+    val isStop: Int? = null, // 是否停用，0-启用，1-停用
+    @SerializedName("always_agree")
+    val alwaysAgree: Int? = null, // 自动进群，0-不自动进群，1-自动进群
+    @SerializedName("do_not_disturb")
+    val doNotDisturb: Int? = null, // 免打扰，0-不免打扰，1-免打扰
+    @SerializedName("top")
+    val top: Int? = null, // 置顶，0-未置顶，1-已置顶
+    @SerializedName("group_limit")
+    val groupLimit: Int? = null // 限制进群，0-允许进群，1-限制进群
+)
+
+/**
+ * 机器人信息响应
+ */
+data class BotInfoResponse(
+    @SerializedName("code")
+    val code: Int,
+    @SerializedName("data")
+    val data: BotInfoData,
+    @SerializedName("msg")
+    val msg: String
+)
+
+/**
+ * 机器人信息数据
+ */
+data class BotInfoData(
+    @SerializedName("bot")
+    val bot: BotInfo
+)
+
+/**
+ * Web用户信息响应
+ */
+data class WebUserInfoResponse(
+    @SerializedName("code")
+    val code: Int,
+    @SerializedName("data")
+    val data: WebUserInfoData,
+    @SerializedName("msg")
+    val msg: String
+)
+
+/**
+ * Web用户信息数据
+ */
+data class WebUserInfoData(
+    @SerializedName("user")
+    val user: WebUserDetailInfo
+)
+
+/**
+ * Web用户详细信息
+ */
+data class WebUserDetailInfo(
+    @SerializedName("user_id")
+    val userId: String,
+    @SerializedName("username")
+    val username: String,
+    @SerializedName("nickname")
+    val nickname: String,
+    @SerializedName("avatar_url")
+    val avatarUrl: String,
+    @SerializedName("email")
+    val email: String? = null,
+    @SerializedName("phone")
+    val phone: String? = null,
+    @SerializedName("create_time")
+    val createTime: Long,
+    @SerializedName("last_login_time")
+    val lastLoginTime: Long? = null,
+    @SerializedName("status")
+    val status: Int
+)
+
+/**
+ * 群聊信息
+ */
+data class GroupInfo(
+    @SerializedName("id")
+    val id: Int? = null,
+    @SerializedName("group_id")
+    val groupId: String? = null,
+    @SerializedName("name")
+    val name: String? = null,
+    @SerializedName("introduction")
+    val introduction: String? = null,
+    @SerializedName("create_by")
+    val createBy: String? = null,
+    @SerializedName("create_time")
+    val createTime: Long? = null,
+    @SerializedName("avatar_id")
+    val avatarId: Int? = null,
+    @SerializedName("avatar_url")
+    val avatarUrl: String? = null,
+    @SerializedName("headcount")
+    val headcount: Int? = null,
+    @SerializedName("read_history")
+    val readHistory: Int? = null,
+    @SerializedName("category")
+    val category: String? = null
+)
+
+/**
+ * 群聊信息响应
+ */
+data class GroupInfoResponse(
+    @SerializedName("code")
+    val code: Int,
+    @SerializedName("data")
+    val data: GroupInfoData,
+    @SerializedName("msg")
+    val msg: String
+)
+
+/**
+ * 群聊信息数据
+ */
+data class GroupInfoData(
+    @SerializedName("group")
+    val group: GroupInfo
+)
+
+/**
+ * 用户信息 (用于搜索)
+ */
+data class UserInfo(
+    @SerializedName("user_id")
+    val userId: String? = null,
+    @SerializedName("nickname")
+    val nickname: String? = null,
+    @SerializedName("avatar_url")
+    val avatarUrl: String? = null,
+    @SerializedName("register_time")
+    val registerTime: Long? = null,
+    @SerializedName("register_time_text")
+    val registerTimeText: String? = null,
+    @SerializedName("on_line_day")
+    val onLineDay: Int? = null,
+    @SerializedName("continuous_on_line_day")
+    val continuousOnLineDay: Int? = null,
+    @SerializedName("is_vip")
+    val isVip: Int? = null
+)
+

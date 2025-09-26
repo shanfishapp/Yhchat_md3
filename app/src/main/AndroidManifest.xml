@@ -131,6 +131,20 @@
             android:label="更改密码"
             android:theme="@style/Theme.YhchatCanary" />
             
+        <!-- 机器人信息 Activity -->
+        <activity
+            android:name=".ui.bot.BotInfoActivity"
+            android:exported="false"
+            android:label="机器人信息"
+            android:theme="@style/Theme.YhchatCanary" />
+            
+        <!-- 综合搜索 Activity -->
+        <activity
+            android:name=".ui.search.ComprehensiveSearchActivity"
+            android:exported="false"
+            android:label="综合搜索"
+            android:theme="@style/Theme.YhchatCanary" />
+            
         <!-- 语音播放服务 -->
         <service
             android:name=".service.AudioPlayerService"

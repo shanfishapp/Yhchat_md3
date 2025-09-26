@@ -1,224 +1,295 @@
 package com.yhchat.canary.data.websocket
 
 import android.util.Log
-import com.google.gson.Gson
-import com.google.gson.JsonObject
-import com.yhchat.canary.data.model.Conversation
-import com.yhchat.canary.data.model.WebSocketMessage
+import com.yhchat.canary.data.model.ChatMessage
+import com.yhchat.canary.data.repository.ConversationRepository
+import com.yhchat.canary.data.repository.MessageRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import okhttp3.*
-import java.util.*
-import java.util.concurrent.TimeUnit
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
- * WebSocket管理器
+ * WebSocket管理器 - 协调WebSocket服务和数据存储
+ * 负责处理收到的消息并更新本地数据
  */
-class WebSocketManager private constructor() {
+@Singleton
+class WebSocketManager @Inject constructor(
+    private val webSocketService: WebSocketService,
+    private val messageRepository: MessageRepository,
+    private val conversationRepository: ConversationRepository
+) {
+    private val tag = "WebSocketManager"
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
-    companion object {
-        private const val TAG = "WebSocketManager"
-        private const val WS_URL = "wss://chat-ws-go.jwzhd.com/ws"
-        private const val HEARTBEAT_INTERVAL = 30L // 30秒心跳
+    // 是否已经初始化监听
+    private var isListening = false
+    
+    /**
+     * 开始监听WebSocket消息并处理数据更新
+     */
+    fun startListening() {
+        if (isListening) {
+            Log.d(tag, "Already listening to WebSocket messages")
+            return
+        }
         
-        @Volatile
-        private var INSTANCE: WebSocketManager? = null
+        isListening = true
+        Log.d(tag, "Starting to listen to WebSocket messages")
         
-        fun getInstance(): WebSocketManager {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: WebSocketManager().also { INSTANCE = it }
+        // 监听消息事件并处理
+        scope.launch {
+            webSocketService.messageEvents.collect { event ->
+                handleMessageEvent(event)
+            }
+        }
+        
+        // 监听会话更新事件
+        scope.launch {
+            webSocketService.conversationUpdates.collect { update ->
+                handleConversationUpdate(update)
             }
         }
     }
     
-    private val client = OkHttpClient.Builder()
-        .pingInterval(HEARTBEAT_INTERVAL, TimeUnit.SECONDS)
-        .build()
-    
-    private var webSocket: WebSocket? = null
-    private var isConnected = false
-    private var heartbeatJob: Job? = null
-    
-    // 消息流
-    private val _messages = MutableSharedFlow<WebSocketMessage>()
-    val messages: SharedFlow<WebSocketMessage> = _messages.asSharedFlow()
-    
-    // 会话更新流
-    private val _conversations = MutableSharedFlow<List<Conversation>>()
-    val conversations: SharedFlow<List<Conversation>> = _conversations.asSharedFlow()
+    /**
+     * 停止监听
+     */
+    fun stopListening() {
+        isListening = false
+        scope.cancel()
+    }
     
     /**
      * 连接WebSocket
      */
-    fun connect(token: String, userId: String, platform: String = "android", deviceId: String = UUID.randomUUID().toString()) {
-        if (isConnected) {
-            Log.d(TAG, "WebSocket already connected")
-            return
-        }
-        
-        val request = Request.Builder()
-            .url(WS_URL)
-            .build()
-        
-        webSocket = client.newWebSocket(request, object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) {
-                Log.d(TAG, "WebSocket connected")
-                isConnected = true
-                
-                // 发送登录消息
-                sendLoginMessage(token, userId, platform, deviceId)
-                
-                // 启动心跳
-                startHeartbeat()
-            }
-            
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                Log.d(TAG, "Received text message: $text")
-                handleTextMessage(text)
-            }
-            
-            override fun onMessage(webSocket: WebSocket, bytes: okio.ByteString) {
-                Log.d(TAG, "Received binary message: ${bytes.size} bytes")
-                handleBinaryMessage(bytes.toByteArray())
-            }
-            
-            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                Log.d(TAG, "WebSocket closing: $code $reason")
-                isConnected = false
-                stopHeartbeat()
-            }
-            
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                Log.d(TAG, "WebSocket closed: $code $reason")
-                isConnected = false
-                stopHeartbeat()
-            }
-            
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                Log.e(TAG, "WebSocket failed", t)
-                isConnected = false
-                stopHeartbeat()
-                
-                // 自动重连
-                CoroutineScope(Dispatchers.IO).launch {
-                    delay(5000) // 5秒后重连
-                    if (!isConnected) {
-                        connect(token, userId, platform, deviceId)
-                    }
-                }
-            }
-        })
+    suspend fun connect(userId: String, platform: String = "android") {
+        startListening() // 确保开始监听
+        webSocketService.connect(userId, platform)
     }
     
     /**
-     * 发送登录消息
-     */
-    private fun sendLoginMessage(token: String, userId: String, platform: String, deviceId: String) {
-        val loginMessage = JsonObject().apply {
-            addProperty("seq", UUID.randomUUID().toString())
-            addProperty("cmd", "login")
-            add("data", JsonObject().apply {
-                addProperty("userId", userId)
-                addProperty("token", token)
-                addProperty("platform", platform)
-                addProperty("deviceId", deviceId)
-            })
-        }
-        
-        webSocket?.send(Gson().toJson(loginMessage))
-    }
-    
-    /**
-     * 启动心跳
-     */
-    private fun startHeartbeat() {
-        heartbeatJob = CoroutineScope(Dispatchers.IO).launch {
-            while (isConnected) {
-                try {
-                    val heartbeatMessage = JsonObject().apply {
-                        addProperty("seq", UUID.randomUUID().toString())
-                        addProperty("cmd", "heartbeat")
-                        add("data", JsonObject())
-                    }
-                    
-                    webSocket?.send(Gson().toJson(heartbeatMessage))
-                    Log.d(TAG, "Sent heartbeat")
-                    
-                    delay(HEARTBEAT_INTERVAL * 1000)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Heartbeat failed", e)
-                    break
-                }
-            }
-        }
-    }
-    
-    /**
-     * 停止心跳
-     */
-    private fun stopHeartbeat() {
-        heartbeatJob?.cancel()
-        heartbeatJob = null
-    }
-    
-    /**
-     * 处理文本消息
-     */
-    private fun handleTextMessage(text: String) {
-        try {
-            val gson = Gson()
-            val message = gson.fromJson(text, JsonObject::class.java)
-            val cmd = message.get("cmd")?.asString
-            
-            when (cmd) {
-                "heartbeat_ack" -> {
-                    Log.d(TAG, "Received heartbeat ack")
-                }
-                else -> {
-                    Log.d(TAG, "Unknown command: $cmd")
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to parse text message", e)
-        }
-    }
-    
-    /**
-     * 处理二进制消息
-     */
-    private fun handleBinaryMessage(bytes: ByteArray) {
-        try {
-            val message = WebSocketMessageParser.parseWebSocketMessage(bytes)
-            if (message != null) {
-                Log.d(TAG, "Parsed WebSocket message: ${message.cmd}")
-                _messages.tryEmit(message)
-                
-                // 如果是推送消息，更新会话列表
-                if (message.cmd == "push_message" && message.data != null) {
-                    val msg = message.data["message"] as? com.yhchat.canary.data.model.ChatMessage
-                    if (msg != null) {
-                        // 这里可以更新会话列表的最后一条消息
-                        Log.d(TAG, "New message in chat ${msg.sender.chatId}: ${msg.content.text}")
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to parse binary message", e)
-        }
-    }
-    
-    /**
-     * 断开连接
+     * 断开WebSocket连接
      */
     fun disconnect() {
-        isConnected = false
-        stopHeartbeat()
-        webSocket?.close(1000, "Normal closure")
-        webSocket = null
+        webSocketService.disconnect()
     }
     
     /**
-     * 检查连接状态
+     * 发送草稿同步
      */
-    fun isConnected(): Boolean = isConnected
+    fun sendDraftInput(chatId: String, input: String) {
+        webSocketService.sendDraftInput(chatId, input)
+    }
+    
+    /**
+     * 获取连接状态流
+     */
+    fun getConnectionState(): SharedFlow<ConnectionState> {
+        return webSocketService.connectionState
+    }
+    
+    /**
+     * 获取消息事件流 - 供UI监听
+     */
+    fun getMessageEvents(): SharedFlow<MessageEvent> {
+        return webSocketService.messageEvents
+    }
+    
+    /**
+     * 处理消息事件
+     */
+    private suspend fun handleMessageEvent(event: MessageEvent) {
+        try {
+            when (event) {
+                is MessageEvent.NewMessage -> {
+                    Log.d(tag, "Handling new message: ${event.message.msgId}")
+                    
+                    // 将新消息插入到本地数据库/缓存
+                    insertMessageToLocal(event.message)
+                }
+                
+                is MessageEvent.MessageEdited -> {
+                    Log.d(tag, "Handling edited message: ${event.message.msgId}")
+                    
+                    // 更新本地消息
+                    updateLocalMessage(event.message)
+                }
+                
+                is MessageEvent.MessageDeleted -> {
+                    Log.d(tag, "Handling deleted message: ${event.msgId}")
+                    
+                    // 删除本地消息
+                    deleteLocalMessage(event.msgId)
+                }
+                
+                is MessageEvent.DraftUpdated -> {
+                    Log.d(tag, "Handling draft update for chat: ${event.chatId}")
+                    
+                    // 可以在这里处理草稿同步，比如更新UI状态
+                    // 暂时只记录日志
+                }
+                
+                is MessageEvent.BotBoardMessage -> {
+                    Log.d(tag, "Handling bot board message from: ${event.botId}")
+                    
+                    // 处理机器人公告消息
+                    // 可以显示为系统消息或特殊通知
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error handling message event", e)
+        }
+    }
+    
+    /**
+     * 处理会话更新
+     */
+    private suspend fun handleConversationUpdate(update: ConversationUpdate) {
+        try {
+            when (update) {
+                is ConversationUpdate.NewMessage -> {
+                    Log.d(tag, "Updating conversation for new message from: ${update.message.sender.chatId}")
+                    
+                    // 更新会话的最后一条消息和时间
+                    updateConversationLastMessage(update.message)
+                }
+                
+                is ConversationUpdate.MessageEdited -> {
+                    Log.d(tag, "Updating conversation for edited message: ${update.message.msgId}")
+                    
+                    // 如果编辑的是最后一条消息，需要更新会话显示
+                    updateConversationIfLastMessage(update.message)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error handling conversation update", e)
+        }
+    }
+    
+    /**
+     * 将新消息插入到本地存储
+     */
+    private suspend fun insertMessageToLocal(message: ChatMessage) {
+        try {
+            // 检查消息是否已存在，避免重复插入
+            val existingMessage = messageRepository.getMessageById(message.msgId)
+            if (existingMessage != null) {
+                Log.d(tag, "Message ${message.msgId} already exists, skipping insert")
+                return
+            }
+            
+            // 插入新消息到本地数据库
+            messageRepository.insertMessage(message)
+            
+            Log.d(tag, "Inserted new message: ${message.msgId}")
+            
+        } catch (e: Exception) {
+            Log.e(tag, "Error inserting message to local storage", e)
+        }
+    }
+    
+    /**
+     * 更新本地消息
+     */
+    private suspend fun updateLocalMessage(message: ChatMessage) {
+        try {
+            messageRepository.updateMessage(message)
+            Log.d(tag, "Updated local message: ${message.msgId}")
+        } catch (e: Exception) {
+            Log.e(tag, "Error updating local message", e)
+        }
+    }
+    
+    /**
+     * 删除本地消息
+     */
+    private suspend fun deleteLocalMessage(msgId: String) {
+        try {
+            messageRepository.deleteMessage(msgId)
+            Log.d(tag, "Deleted local message: $msgId")
+        } catch (e: Exception) {
+            Log.e(tag, "Error deleting local message", e)
+        }
+    }
+    
+    /**
+     * 更新会话的最后一条消息
+     */
+    private suspend fun updateConversationLastMessage(message: ChatMessage) {
+        try {
+            // 更新会话列表中的最后消息信息
+            conversationRepository.updateLastMessage(
+                chatId = message.sender.chatId,
+                chatType = message.sender.chatType,
+                lastMessage = getMessagePreview(message),
+                lastMessageTime = message.sendTime,
+                unreadCount = 1 // 新消息，未读数+1
+            )
+            
+            Log.d(tag, "Updated conversation last message for: ${message.sender.chatId}")
+            
+        } catch (e: Exception) {
+            Log.e(tag, "Error updating conversation last message", e)
+        }
+    }
+    
+    /**
+     * 如果是最后一条消息则更新会话
+     */
+    private suspend fun updateConversationIfLastMessage(message: ChatMessage) {
+        try {
+            // 检查是否是会话的最后一条消息
+            val lastMessage = messageRepository.getLastMessage(
+                message.sender.chatId, 
+                message.sender.chatType
+            )
+            
+            if (lastMessage?.msgId == message.msgId) {
+                // 是最后一条消息，更新会话显示
+                conversationRepository.updateLastMessage(
+                    chatId = message.sender.chatId,
+                    chatType = message.sender.chatType,
+                    lastMessage = getMessagePreview(message),
+                    lastMessageTime = message.sendTime,
+                    unreadCount = null // 不改变未读数
+                )
+                
+                Log.d(tag, "Updated conversation for edited last message: ${message.msgId}")
+            }
+            
+        } catch (e: Exception) {
+            Log.e(tag, "Error checking and updating conversation for edited message", e)
+        }
+    }
+    
+    /**
+     * 获取消息预览文本
+     */
+    private fun getMessagePreview(message: ChatMessage): String {
+        return when {
+            !message.content.text.isNullOrEmpty() -> message.content.text
+            !message.content.imageUrl.isNullOrEmpty() -> "[图片]"
+            !message.content.fileUrl.isNullOrEmpty() -> {
+                if (!message.content.fileName.isNullOrEmpty()) {
+                    "[文件]${message.content.fileName}"
+                } else {
+                    "[文件]"
+                }
+            }
+            !message.content.audioUrl.isNullOrEmpty() -> "[语音]"
+            !message.content.videoUrl.isNullOrEmpty() -> "[视频]"
+            !message.content.stickerUrl.isNullOrEmpty() -> "[表情]"
+            !message.content.postTitle.isNullOrEmpty() -> "[文章]${message.content.postTitle}"
+            else -> "[消息]"
+        }
+    }
+    
+    /**
+     * 销毁管理器
+     */
+    fun destroy() {
+        stopListening()
+        webSocketService.destroy()
+    }
 }

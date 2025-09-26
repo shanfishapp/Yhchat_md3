@@ -186,6 +186,7 @@ fun SearchScreen(
                                             AsyncImage(
                                                 model = ImageRequest.Builder(context)
                                                     .data(searchItem.avatarUrl)
+                                                    .addHeader("Referer", "https://myapp.jwznb.com")
                                                     .crossfade(true)
                                                     .placeholder(R.drawable.ic_launcher_foreground)
                                                     .error(R.drawable.ic_launcher_foreground)
@@ -206,6 +207,19 @@ fun SearchScreen(
                                                     text = searchItem.nickname,
                                                     style = MaterialTheme.typography.titleMedium,
                                                     fontWeight = FontWeight.Medium
+                                                )
+                                                
+                                                // 显示对应的ID
+                                                val idLabel = when (searchItem.friendType) {
+                                                    1 -> "用户ID"
+                                                    2 -> "群ID"
+                                                    3 -> "机器人ID"
+                                                    else -> "ID"
+                                                }
+                                                Text(
+                                                    text = "$idLabel: ${searchItem.friendId}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
                                                 
                                                 if (searchItem.name?.isNotEmpty() == true) {

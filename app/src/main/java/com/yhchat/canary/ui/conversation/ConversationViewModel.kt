@@ -7,6 +7,7 @@ import com.yhchat.canary.data.repository.ConversationRepository
 import com.yhchat.canary.data.repository.TokenRepository
 import com.yhchat.canary.data.repository.CacheRepository
 import com.yhchat.canary.data.websocket.WebSocketManager
+import com.yhchat.canary.data.websocket.MessageEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -18,14 +19,11 @@ import javax.inject.Inject
 @HiltViewModel
 class ConversationViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
-    private val cacheRepository: CacheRepository
+    private val cacheRepository: CacheRepository,
+    private val webSocketManager: WebSocketManager
 ) : ViewModel() {
 
-    private val webSocketManager = WebSocketManager.getInstance()
-
     init {
-        // 启动WebSocket观察
-        observeWebSocketConversations()
         observeWebSocketMessages()
         
         // 立即加载缓存数据
@@ -114,36 +112,18 @@ class ConversationViewModel @Inject constructor(
     /**
      * 观察WebSocket会话更新
      */
-    private fun observeWebSocketConversations() {
-        viewModelScope.launch {
-            webSocketManager.conversations.collect { updatedConversations ->
-                if (updatedConversations.isNotEmpty()) {
-                    _conversations.value = updatedConversations
-                }
-            }
-        }
-    }
-    
-    /**
-     * 观察WebSocket消息
-     */
     private fun observeWebSocketMessages() {
         viewModelScope.launch {
-            webSocketManager.messages.collect { message ->
-                when (message.cmd) {
-                    "push_message" -> {
-                        // 新消息到达，更新会话列表
-                        val msg = message.data?.get("message") as? com.yhchat.canary.data.model.ChatMessage
-                        if (msg != null) {
-                            updateConversationWithNewMessage(msg)
-                        }
+            webSocketManager.getMessageEvents().collect { event ->
+                when (event) {
+                    is MessageEvent.NewMessage -> {
+                        updateConversationWithNewMessage(event.message)
                     }
-                    "edit_message" -> {
-                        // 消息被编辑，更新会话列表
-                        val msg = message.data?.get("message") as? com.yhchat.canary.data.model.ChatMessage
-                        if (msg != null) {
-                            updateConversationWithEditedMessage(msg)
-                        }
+                    is MessageEvent.MessageEdited -> {
+                        updateConversationWithEditedMessage(event.message)
+                    }
+                    else -> {
+                        // ignore other events
                     }
                 }
             }
@@ -155,9 +135,6 @@ class ConversationViewModel @Inject constructor(
      */
     private fun updateConversationWithNewMessage(message: com.yhchat.canary.data.model.ChatMessage) {
         viewModelScope.launch {
-            // 缓存消息到数据库
-            cacheRepository.cacheMessage(message)
-            
             val currentConversations = _conversations.value.toMutableList()
             val conversationIndex = currentConversations.indexOfFirst { it.chatId == message.sender.chatId }
             
@@ -228,8 +205,10 @@ class ConversationViewModel @Inject constructor(
     /**
      * 启动WebSocket连接
      */
-    fun startWebSocket(token: String, userId: String) {
-        webSocketManager.connect(token, userId)
+    fun startWebSocket(userId: String) {
+        viewModelScope.launch {
+            webSocketManager.connect(userId)
+        }
     }
     
     /**

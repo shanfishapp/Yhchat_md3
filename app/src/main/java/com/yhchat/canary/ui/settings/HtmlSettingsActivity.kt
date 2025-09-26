@@ -37,9 +37,14 @@ class HtmlSettingsActivity : ComponentActivity() {
         
         setContent {
             YhchatCanaryTheme {
-                HtmlSettingsScreen(
-                    onBackClick = { finish() }
-                )
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    HtmlSettingsScreen(
+                        onBackClick = { finish() }
+                    )
+                }
             }
         }
     }

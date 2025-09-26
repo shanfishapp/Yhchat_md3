@@ -21,6 +21,9 @@ interface CachedMessageDao {
     @Query("SELECT * FROM cached_messages WHERE msgId = :msgId")
     suspend fun getMessage(msgId: String): CachedMessage?
     
+    @Query("SELECT * FROM cached_messages WHERE msgId = :msgId")
+    suspend fun getMessageById(msgId: String): CachedMessage?
+    
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: CachedMessage)
     
@@ -33,6 +36,9 @@ interface CachedMessageDao {
     @Delete
     suspend fun deleteMessage(message: CachedMessage)
     
+    @Query("DELETE FROM cached_messages WHERE msgId = :msgId")
+    suspend fun deleteMessage(msgId: String)
+    
     @Query("DELETE FROM cached_messages WHERE chatId = :chatId")
     suspend fun clearChatMessages(chatId: String)
     
@@ -44,4 +50,7 @@ interface CachedMessageDao {
     
     @Query("DELETE FROM cached_messages WHERE localInsertTime < :timestamp")
     suspend fun deleteOldMessages(timestamp: Long)
+    
+    @Query("SELECT * FROM cached_messages WHERE chatId = :chatId AND chatType = :chatType ORDER BY sendTime DESC LIMIT 1")
+    suspend fun getLastMessage(chatId: String, chatType: Int): CachedMessage?
 }

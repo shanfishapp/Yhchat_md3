@@ -1,94 +1,125 @@
 package com.yhchat.canary.data.websocket
 
+import android.util.Log
 import com.yhchat.canary.data.model.ChatMessage
 import com.yhchat.canary.data.model.MessageContent
 import com.yhchat.canary.data.model.MessageSender
 import com.yhchat.canary.data.model.MessageTag
 import com.yhchat.canary.data.model.MessageCmd
-import com.yhchat.canary.data.model.WebSocketMessage
+import com.yhchat.canary.proto.chat_ws_go.WsMsg
 import com.yhchat.canary.proto.chat_ws_go.heartbeat_ack
 import com.yhchat.canary.proto.chat_ws_go.push_message
 import com.yhchat.canary.proto.chat_ws_go.edit_message
 import com.yhchat.canary.proto.chat_ws_go.draft_input
+import com.yhchat.canary.proto.chat_ws_go.file_send_message
 import com.yhchat.canary.proto.chat_ws_go.bot_board_message
-import com.yhchat.canary.proto.chat_ws_go.WsMsg
 
 /**
- * WebSocket消息解析器
+ * WebSocket消息解析器 - 参考yh_user_sdk/core/ws.py的decode方法
  */
 object WebSocketMessageParser {
     
+    private const val TAG = "WebSocketMessageParser"
+    
     /**
-     * 解析WebSocket二进制消息
+     * 解析WebSocket二进制消息 - 参考yh_user_sdk/core/ws.py
      */
-    fun parseWebSocketMessage(bytes: ByteArray): WebSocketMessage? {
+    fun parseWebSocketMessage(bytes: ByteArray): ParsedMessage? {
         return try {
-            // 先尝试解析为heartbeat_ack获取命令类型
+            // 先尝试解析为heartbeat_ack获取命令类型和seq，参考yh_user_sdk
             val tempMsg = heartbeat_ack.parseFrom(bytes)
             val cmd = tempMsg.info.cmd
             val seq = tempMsg.info.seq
 
+            Log.d(TAG, "Parsing message - cmd: $cmd, seq: $seq")
+
             when (cmd) {
                 "heartbeat_ack" -> {
-                    WebSocketMessage(
-                        cmd = cmd,
-                        data = null,
-                        seq = seq
-                    )
+                    ParsedMessage.HeartbeatAck(seq)
                 }
+                
                 "push_message" -> {
                     val pushMessage = push_message.parseFrom(bytes)
                     if (pushMessage.hasData() && pushMessage.data.hasMsg()) {
                         val message = convertProtoToMessage(pushMessage.data.msg)
-                        WebSocketMessage(
-                            cmd = "push_message",
-                            data = mapOf("message" to message),
-                            seq = seq
-                        )
-                    } else null
+                        ParsedMessage.NewMessage(message, seq)
+                    } else {
+                        Log.w(TAG, "push_message has no data or msg")
+                        null
+                    }
                 }
+                
                 "edit_message" -> {
                     val editMessage = edit_message.parseFrom(bytes)
                     if (editMessage.hasData() && editMessage.data.hasMsg()) {
                         val message = convertProtoToMessage(editMessage.data.msg)
-                        WebSocketMessage(
-                            cmd = "edit_message",
-                            data = mapOf("message" to message),
-                            seq = seq
-                        )
-                    } else null
+                        ParsedMessage.EditedMessage(message, seq)
+                    } else {
+                        Log.w(TAG, "edit_message has no data or msg")
+                        null
+                    }
                 }
+                
                 "draft_input" -> {
                     val draftInput = draft_input.parseFrom(bytes)
-                    WebSocketMessage(
-                        cmd = "draft_input",
-                        data = mapOf(
-                            "chatId" to draftInput.data.draft.chatId,
-                            "content" to draftInput.data.draft.input
-                        ),
-                        seq = seq
-                    )
+                    if (draftInput.hasData() && draftInput.data.hasDraft()) {
+                        val draft = draftInput.data.draft
+                        ParsedMessage.DraftInput(
+                            chatId = draft.chatId,
+                            input = draft.input,
+                            seq = seq
+                        )
+                    } else {
+                        Log.w(TAG, "draft_input has no data or draft")
+                        null
+                    }
                 }
+                
+                "file_send_message" -> {
+                    val fileSendMessage = file_send_message.parseFrom(bytes)
+                    if (fileSendMessage.hasData() && fileSendMessage.data.hasSender()) {
+                        val sender = fileSendMessage.data.sender
+                        ParsedMessage.FileSendMessage(
+                            sendUserId = sender.sendUserId,
+                            userId = sender.userId,
+                            sendType = sender.sendType,
+                            data = sender.data,
+                            sendDeviceId = sender.sendDeviceId,
+                            seq = seq
+                        )
+                    } else {
+                        Log.w(TAG, "file_send_message has no data or sender")
+                        null
+                    }
+                }
+                
                 "bot_board_message" -> {
                     val botBoardMessage = bot_board_message.parseFrom(bytes)
-                    WebSocketMessage(
-                        cmd = "bot_board_message",
-                        data = mapOf(
-                            "botId" to botBoardMessage.data.board.botId,
-                            "content" to botBoardMessage.data.board.content
-                        ),
-                        seq = seq
-                    )
+                    if (botBoardMessage.hasData() && botBoardMessage.data.hasBoard()) {
+                        val board = botBoardMessage.data.board
+                        ParsedMessage.BotBoardMessage(
+                            botId = board.botId,
+                            chatId = board.chatId,
+                            chatType = board.chatType,
+                            content = board.content,
+                            contentType = board.contentType,
+                            lastUpdateTime = board.lastUpdateTime,
+                            botName = board.botName,
+                            seq = seq
+                        )
+                    } else {
+                        Log.w(TAG, "bot_board_message has no data or board")
+                        null
+                    }
                 }
+                
                 else -> {
-                    WebSocketMessage(
-                        cmd = cmd,
-                        data = null,
-                        seq = seq
-                    )
+                    Log.w(TAG, "Unknown command: $cmd")
+                    ParsedMessage.Unknown(cmd, seq)
                 }
             }
         } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse WebSocket message", e)
             null
         }
     }
@@ -141,7 +172,7 @@ object WebSocketMessageParser {
         val cmd = if (protoMsg.hasCmd()) {
             MessageCmd(
                 name = protoMsg.cmd.name,
-                type = protoMsg.cmd.id.toInt() // WebSocket Cmd uses 'id' for type
+                type = protoMsg.cmd.id.toInt()
             )
         } else null
 
@@ -151,7 +182,7 @@ object WebSocketMessageParser {
             direction = "left", // WebSocket消息通常是接收的消息
             contentType = protoMsg.contentType,
             content = content,
-            sendTime = protoMsg.timestamp, // WebSocket uses 'timestamp'
+            sendTime = protoMsg.timestamp,
             cmd = cmd,
             msgDeleteTime = if (protoMsg.deleteTime > 0) protoMsg.deleteTime else null,
             quoteMsgId = if (protoMsg.quoteMsgId.isNotEmpty()) protoMsg.quoteMsgId else null,
@@ -159,4 +190,52 @@ object WebSocketMessageParser {
             editTime = if (protoMsg.editTime > 0) protoMsg.editTime else null
         )
     }
+}
+
+/**
+ * 解析后的消息类型
+ */
+sealed class ParsedMessage {
+    data class HeartbeatAck(val seq: String) : ParsedMessage()
+    
+    data class NewMessage(
+        val message: ChatMessage,
+        val seq: String
+    ) : ParsedMessage()
+    
+    data class EditedMessage(
+        val message: ChatMessage,
+        val seq: String
+    ) : ParsedMessage()
+    
+    data class DraftInput(
+        val chatId: String,
+        val input: String,
+        val seq: String
+    ) : ParsedMessage()
+    
+    data class FileSendMessage(
+        val sendUserId: String,
+        val userId: String,
+        val sendType: String,
+        val data: String,
+        val sendDeviceId: String,
+        val seq: String
+    ) : ParsedMessage()
+    
+    data class BotBoardMessage(
+        val botId: String,
+        val chatId: String,
+        val chatType: Int,
+        val content: String,
+        val contentType: Int,
+        val lastUpdateTime: Long,
+        val botName: String,
+        val seq: String
+    ) : ParsedMessage()
+    
+    data class Unknown(
+        val cmd: String,
+        val seq: String
+    ) : ParsedMessage()
 }

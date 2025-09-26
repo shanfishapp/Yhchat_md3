@@ -1,5 +1,6 @@
 package com.yhchat.canary.ui.conversation
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VolumeOff
@@ -34,6 +36,7 @@ import androidx.compose.ui.res.painterResource
 import com.yhchat.canary.data.model.Conversation
 import com.yhchat.canary.data.model.ChatType
 import com.yhchat.canary.data.repository.TokenRepository
+import com.yhchat.canary.ui.search.ComprehensiveSearchActivity
 import com.yhchat.canary.ui.sticky.StickyConversations
 import java.text.SimpleDateFormat
 import java.util.*
@@ -67,6 +70,7 @@ fun ConversationScreen(
 
     // 下拉刷新状态
     val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = refreshing)
+    val context = LocalContext.current
     
     // 协程作用域
     val coroutineScope = rememberCoroutineScope()
@@ -87,7 +91,7 @@ fun ConversationScreen(
     // 启动WebSocket连接（只在第一次或token/userId变化时执行）
     LaunchedEffect(token, userId) {
         if (token.isNotEmpty() && userId.isNotEmpty()) {
-            viewModel.startWebSocket(token, userId)
+            viewModel.startWebSocket(userId)
         }
     }
     
@@ -114,6 +118,16 @@ fun ConversationScreen(
                 )
             },
             actions = {
+                IconButton(onClick = {
+                    // 跳转到综合搜索页面
+                    val intent = Intent(context, ComprehensiveSearchActivity::class.java)
+                    context.startActivity(intent)
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "添加"
+                    )
+                }
                 IconButton(onClick = onSearchClick) {
                     Icon(
                         imageVector = Icons.Default.Search,

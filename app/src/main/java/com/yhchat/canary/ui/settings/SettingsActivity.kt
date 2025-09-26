@@ -76,14 +76,19 @@ class SettingsActivity : ComponentActivity() {
         
         setContent {
             YhchatCanaryTheme {
-                SettingsScreen(
-                    navigationRepository = navigationRepository,
-                    tokenRepository = tokenRepository,
-                    onLogout = {
-                        performLogout(this@SettingsActivity)
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    SettingsScreen(
+                        navigationRepository = navigationRepository,
+                        tokenRepository = tokenRepository,
+                        onLogout = {
+                            performLogout(this@SettingsActivity)
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
     }

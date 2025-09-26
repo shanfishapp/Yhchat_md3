@@ -46,10 +46,15 @@ class NavigationSettingsActivity : ComponentActivity() {
         
         setContent {
             YhchatCanaryTheme {
-                NavigationSettingsScreen(
-                    navigationRepository = navigationRepository,
-                    onBackClick = { finish() }
-                )
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    NavigationSettingsScreen(
+                        navigationRepository = navigationRepository,
+                        onBackClick = { finish() }
+                    )
+                }
             }
         }
     }

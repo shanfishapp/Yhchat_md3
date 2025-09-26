@@ -127,9 +127,13 @@ fun PostDetailScreen(
         }
     }
     
-    Column(
-        modifier = modifier.fillMaxSize()
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
     ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
         // 顶部应用栏
         TopAppBar(
             title = {
@@ -322,6 +326,7 @@ fun PostDetailScreen(
                 }
             )
         }
+    }
     }
 }
 

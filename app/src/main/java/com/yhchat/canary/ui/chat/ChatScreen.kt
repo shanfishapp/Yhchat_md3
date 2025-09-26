@@ -1,5 +1,6 @@
 package com.yhchat.canary.ui.chat
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -37,6 +38,7 @@ import coil.request.ImageRequest
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import com.yhchat.canary.ui.bot.BotInfoActivity
 import com.yhchat.canary.ui.components.MarkdownText
 import com.yhchat.canary.ui.components.HtmlWebView
 import com.yhchat.canary.ui.components.ChatInputBar
@@ -68,7 +70,7 @@ fun ChatScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ChatViewModel = viewModel(),
-    onAvatarClick: (String, String) -> Unit = { _, _ -> }
+    onAvatarClick: (String, String, Int) -> Unit = { _, _, _ -> }
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -96,9 +98,13 @@ fun ChatScreen(
         onRefresh = { viewModel.loadMoreMessages() }
     )
     
-    Column(
-        modifier = modifier.fillMaxSize()
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
     ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
         // 顶部应用栏
         TopAppBar(
             title = {
@@ -185,7 +191,19 @@ fun ChatScreen(
                                 currentImageUrl = imageUrl
                                 showImageViewer = true
                             },
-                            onAvatarClick = onAvatarClick
+                            onAvatarClick = { chatId, name, chatType ->
+                                // 处理头像点击事件
+                                if (chatType == 3) { // 机器人
+                                    val intent = Intent(context, BotInfoActivity::class.java).apply {
+                                        putExtra(BotInfoActivity.EXTRA_BOT_ID, chatId)
+                                        putExtra(BotInfoActivity.EXTRA_BOT_NAME, name)
+                                    }
+                                    context.startActivity(intent)
+                                } else {
+                                    // 用户头像点击，传递给外部处理（UserProfileActivity）
+                                    onAvatarClick(chatId, name, chatType)
+                                }
+                            }
                         )
                     }
 
@@ -279,6 +297,7 @@ fun ChatScreen(
             )
         }
     }
+    }
     
     // 图片预览器
     if (showImageViewer && currentImageUrl.isNotEmpty()) {
@@ -301,7 +320,7 @@ private fun MessageItem(
     isMyMessage: Boolean,
     modifier: Modifier = Modifier,
     onImageClick: (String) -> Unit = {},
-    onAvatarClick: (String, String) -> Unit = { _, _ -> }
+    onAvatarClick: (String, String, Int) -> Unit = { _, _, _ -> }
 ) {
     // 检查是否为撤回消息
     if (message.msgDeleteTime != null) {
@@ -333,7 +352,7 @@ private fun MessageItem(
                     .size(40.dp)
                     .clip(CircleShape)
                     .clickable {
-                        onAvatarClick(message.sender.chatId, message.sender.name)
+                        onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType)
                     },
                 contentScale = ContentScale.Crop
             )
@@ -351,12 +370,32 @@ private fun MessageItem(
         ) {
             // 发送者姓名（非自己的消息）
             if (!isMyMessage) {
-                Text(
-                    text = message.sender.name,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = message.sender.name,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    // 机器人标签
+                    if (message.sender.chatType == 3) {
+                        Surface(
+                            modifier = Modifier,
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = "机器人",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
             }
 
             // 消息气泡
@@ -412,7 +451,7 @@ private fun MessageItem(
                     .size(40.dp)
                     .clip(CircleShape)
                     .clickable {
-                        onAvatarClick(message.sender.chatId, message.sender.name)
+                        onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType)
                     },
                 contentScale = ContentScale.Crop
             )

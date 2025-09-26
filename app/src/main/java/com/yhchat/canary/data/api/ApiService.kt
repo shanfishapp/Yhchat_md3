@@ -270,6 +270,7 @@ interface ApiService {
         @Header("token") token: String,
         @Body request: AddFriendRequest
     ): Response<ApiStatus>
+    
 }
 
 /**

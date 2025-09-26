@@ -1,15 +1,18 @@
 package com.yhchat.canary.data.repository
 
 import com.yhchat.canary.data.api.ApiService
-import com.yhchat.canary.data.model.*
+import com.yhchat.canary.data.model.Conversation
+import com.yhchat.canary.data.model.DismissNotificationRequest
 import com.yhchat.canary.data.protobuf.ConversationProtoParser
+import android.util.Log
 import javax.inject.Inject
 
 /**
  * 会话数据仓库
  */
 class ConversationRepository @Inject constructor(
-    private val apiService: ApiService
+    private val apiService: ApiService,
+    private val cacheRepository: CacheRepository
 ) {
 
     private var tokenRepository: TokenRepository? = null
@@ -65,6 +68,26 @@ class ConversationRepository @Inject constructor(
             }
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+    
+    // ========== WebSocket相关的本地会话更新方法 ==========
+    
+    /**
+     * 更新会话的最后消息信息
+     */
+    suspend fun updateLastMessage(
+        chatId: String,
+        chatType: Int,
+        lastMessage: String,
+        lastMessageTime: Long,
+        unreadCount: Int?
+    ) {
+        try {
+            cacheRepository.updateConversationLastMessage(chatId, lastMessage, lastMessageTime)
+        } catch (e: Exception) {
+            // 日志记录错误，但不抛出异常
+            Log.e("ConversationRepository", "Error updating last message", e)
         }
     }
 }

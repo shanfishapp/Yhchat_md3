@@ -15,7 +15,8 @@ import javax.inject.Singleton
 @Singleton
 class MessageRepository @Inject constructor(
     private val apiService: ApiService,
-    private val tokenRepository: TokenRepository
+    private val tokenRepository: TokenRepository,
+    private val cacheRepository: CacheRepository
 ) {
     private val tag = "MessageRepository"
     
@@ -265,5 +266,69 @@ class MessageRepository @Inject constructor(
             msgSeq = protoMsg.msgSeq,
             editTime = if (protoMsg.editTime > 0) protoMsg.editTime else null
         )
+    }
+    
+    // ========== WebSocket相关的本地存储方法 ==========
+    
+    /**
+     * 通过消息ID获取消息
+     */
+    suspend fun getMessageById(msgId: String): ChatMessage? {
+        return try {
+            cacheRepository.getMessageById(msgId)
+        } catch (e: Exception) {
+            Log.e(tag, "Error getting message by id: $msgId", e)
+            null
+        }
+    }
+    
+    /**
+     * 插入新消息到本地缓存
+     */
+    suspend fun insertMessage(message: ChatMessage) {
+        try {
+            cacheRepository.cacheMessages(listOf(message))
+            Log.d(tag, "Inserted message: ${message.msgId}")
+        } catch (e: Exception) {
+            Log.e(tag, "Error inserting message: ${message.msgId}", e)
+        }
+    }
+    
+    /**
+     * 更新本地消息
+     */
+    suspend fun updateMessage(message: ChatMessage) {
+        try {
+            // 先删除旧消息，再插入新消息
+            cacheRepository.deleteMessage(message.msgId)
+            cacheRepository.cacheMessages(listOf(message))
+            Log.d(tag, "Updated message: ${message.msgId}")
+        } catch (e: Exception) {
+            Log.e(tag, "Error updating message: ${message.msgId}", e)
+        }
+    }
+    
+    /**
+     * 删除本地消息
+     */
+    suspend fun deleteMessage(msgId: String) {
+        try {
+            cacheRepository.deleteMessage(msgId)
+            Log.d(tag, "Deleted message: $msgId")
+        } catch (e: Exception) {
+            Log.e(tag, "Error deleting message: $msgId", e)
+        }
+    }
+    
+    /**
+     * 获取会话的最后一条消息
+     */
+    suspend fun getLastMessage(chatId: String, chatType: Int): ChatMessage? {
+        return try {
+            cacheRepository.getLastMessage(chatId, chatType)
+        } catch (e: Exception) {
+            Log.e(tag, "Error getting last message for chat: $chatId", e)
+            null
+        }
     }
 }

@@ -150,7 +150,7 @@ class MainActivity : ComponentActivity() {
                                 onBackClick = {
                                     currentScreen = "conversation"
                                 },
-                                onAvatarClick = { userId, userName ->
+                                onAvatarClick = { userId, userName, chatType ->
                                     UserProfileActivity.start(this@MainActivity, userId, userName)
                                 },
                                 modifier = Modifier.fillMaxSize()
@@ -277,7 +277,7 @@ class MainActivity : ComponentActivity() {
                                     onBackClick = {
                                         currentScreen = "conversation"
                                     },
-                                    onAvatarClick = { userId, userName ->
+                                    onAvatarClick = { userId, userName, _ ->
                                         UserProfileActivity.start(this@MainActivity, userId, userName)
                                     },
                                     modifier = Modifier.fillMaxSize()

@@ -96,9 +96,13 @@ fun BoardDetailScreen(
         }
     }
     
-    Box(
-        modifier = modifier.fillMaxSize()
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
     ) {
+        Box(
+            modifier = Modifier.fillMaxSize()
+        ) {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
@@ -275,6 +279,7 @@ fun BoardDetailScreen(
             )
         }
     }
+    }
 }
 
 /**
@@ -297,7 +302,7 @@ fun BoardInfoCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             AsyncImage(
-                model = ImageUtils.createImageRequest(
+                model = ImageUtils.createBoardImageRequest(
                     context = LocalContext.current,
                     url = board.avatar
                 ),
@@ -432,7 +437,7 @@ fun PostListItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AsyncImage(
-                    model = ImageUtils.createAvatarImageRequest(
+                    model = ImageUtils.createBoardImageRequest(
                         context = LocalContext.current,
                         url = post.senderAvatar
                     ),

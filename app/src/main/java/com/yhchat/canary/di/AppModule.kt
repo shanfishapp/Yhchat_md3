@@ -6,7 +6,6 @@ import com.yhchat.canary.data.api.ApiService
 import com.yhchat.canary.data.api.WebApiService
 import com.yhchat.canary.data.local.AppDatabase
 import com.yhchat.canary.data.local.UserTokenDao
-import com.yhchat.canary.data.repository.CacheRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

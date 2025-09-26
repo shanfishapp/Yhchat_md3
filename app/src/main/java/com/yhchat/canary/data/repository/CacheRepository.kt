@@ -102,6 +102,9 @@ class CacheRepository @Inject constructor(
     }
     
     /**
+     * 增加未读数量
+     */
+    /**
      * 标记会话为已读
      */
     suspend fun markConversationAsRead(chatId: String) {
@@ -240,6 +243,77 @@ class CacheRepository @Inject constructor(
     suspend fun cleanOldMessages() {
         val thirtyDaysAgo = System.currentTimeMillis() - (30 * 24 * 60 * 60 * 1000L)
         messageDao.deleteOldMessages(thirtyDaysAgo)
+    }
+    
+    /**
+     * 通过消息ID获取消息
+     */
+    suspend fun getMessageById(msgId: String): ChatMessage? {
+        val cachedMessage = messageDao.getMessageById(msgId) ?: return null
+        
+        return ChatMessage(
+            msgId = cachedMessage.msgId,
+            sender = MessageSender(
+                chatId = cachedMessage.senderChatId,
+                chatType = cachedMessage.chatType,
+                name = cachedMessage.senderName,
+                avatarUrl = cachedMessage.senderAvatarUrl
+            ),
+            direction = cachedMessage.direction,
+            contentType = cachedMessage.contentType,
+            content = MessageContent(
+                text = cachedMessage.contentText,
+                imageUrl = cachedMessage.contentImageUrl,
+                fileName = cachedMessage.contentFileName,
+                fileUrl = cachedMessage.contentFileUrl,
+                quoteMsgText = cachedMessage.quoteMsgText,
+                quoteImageUrl = cachedMessage.quoteImageUrl
+            ),
+            sendTime = cachedMessage.sendTime,
+            msgSeq = cachedMessage.msgSeq,
+            editTime = cachedMessage.editTime,
+            msgDeleteTime = cachedMessage.msgDeleteTime,
+            quoteMsgId = cachedMessage.quoteMsgId
+        )
+    }
+    
+    /**
+     * 删除指定消息
+     */
+    suspend fun deleteMessage(msgId: String) {
+        messageDao.deleteMessage(msgId)
+    }
+    
+    /**
+     * 获取会话的最后一条消息
+     */
+    suspend fun getLastMessage(chatId: String, chatType: Int): ChatMessage? {
+        val cachedMessage = messageDao.getLastMessage(chatId, chatType) ?: return null
+        
+        return ChatMessage(
+            msgId = cachedMessage.msgId,
+            sender = MessageSender(
+                chatId = cachedMessage.senderChatId,
+                chatType = cachedMessage.chatType,
+                name = cachedMessage.senderName,
+                avatarUrl = cachedMessage.senderAvatarUrl
+            ),
+            direction = cachedMessage.direction,
+            contentType = cachedMessage.contentType,
+            content = MessageContent(
+                text = cachedMessage.contentText,
+                imageUrl = cachedMessage.contentImageUrl,
+                fileName = cachedMessage.contentFileName,
+                fileUrl = cachedMessage.contentFileUrl,
+                quoteMsgText = cachedMessage.quoteMsgText,
+                quoteImageUrl = cachedMessage.quoteImageUrl
+            ),
+            sendTime = cachedMessage.sendTime,
+            msgSeq = cachedMessage.msgSeq,
+            editTime = cachedMessage.editTime,
+            msgDeleteTime = cachedMessage.msgDeleteTime,
+            quoteMsgId = cachedMessage.quoteMsgId
+        )
     }
     
     /**

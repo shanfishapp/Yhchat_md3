@@ -44,25 +44,30 @@ class GroupListActivity : ComponentActivity() {
         
         setContent {
             YhchatCanaryTheme {
-                val viewModel: GroupListViewModel = viewModel {
-                    val conversationRepository = RepositoryFactory.getConversationRepository(this@GroupListActivity)
-                    val tokenRepository = RepositoryFactory.getTokenRepository(this@GroupListActivity)
-                    conversationRepository.setTokenRepository(tokenRepository)
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    val viewModel: GroupListViewModel = viewModel {
+                        val conversationRepository = RepositoryFactory.getConversationRepository(this@GroupListActivity)
+                        val tokenRepository = RepositoryFactory.getTokenRepository(this@GroupListActivity)
+                        conversationRepository.setTokenRepository(tokenRepository)
+                        
+                        GroupListViewModel(
+                            communityRepository = RepositoryFactory.getCommunityRepository(this@GroupListActivity),
+                            friendRepository = RepositoryFactory.getFriendRepository(this@GroupListActivity),
+                            conversationRepository = conversationRepository
+                        )
+                    }
                     
-                    GroupListViewModel(
-                        communityRepository = RepositoryFactory.getCommunityRepository(this@GroupListActivity),
-                        friendRepository = RepositoryFactory.getFriendRepository(this@GroupListActivity),
-                        conversationRepository = conversationRepository
+                    GroupListScreen(
+                        boardId = boardId,
+                        boardName = boardName,
+                        token = token,
+                        viewModel = viewModel,
+                        onBackClick = { finish() }
                     )
                 }
-                
-                GroupListScreen(
-                    boardId = boardId,
-                    boardName = boardName,
-                    token = token,
-                    viewModel = viewModel,
-                    onBackClick = { finish() }
-                )
             }
         }
     }
