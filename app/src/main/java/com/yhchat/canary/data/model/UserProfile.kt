@@ -52,22 +52,4 @@ data class UserProfile(
     val invitationCode: String? = null
 )
 
-/**
- * 用户主页API响应
- */
-data class UserHomepageResponse(
-    @SerializedName("code")
-    val code: Int,
-    @SerializedName("data")
-    val data: UserHomepageData,
-    @SerializedName("msg")
-    val msg: String
-)
 
-/**
- * 用户主页数据
- */
-data class UserHomepageData(
-    @SerializedName("user")
-    val user: UserProfile
-)

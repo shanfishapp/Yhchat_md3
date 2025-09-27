@@ -1,8 +1,10 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
 package com.yhchat.canary.ui.community
 
 import android.content.Intent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,7 +12,12 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.Comment
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshotFlow
@@ -26,6 +33,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import com.yhchat.canary.data.model.CommunityBoard
 import com.yhchat.canary.data.model.CommunityPost
+import com.yhchat.canary.ui.components.ScrollBehavior
+import com.yhchat.canary.ui.components.HandleScrollBehavior
+import androidx.compose.foundation.lazy.rememberLazyListState
+import com.google.accompanist.swiperefresh.SwipeRefresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 
 /**
  * 社区标签页界面
@@ -35,6 +47,7 @@ import com.yhchat.canary.data.model.CommunityPost
 fun CommunityTabScreen(
     token: String,
     modifier: Modifier = Modifier,
+    scrollBehavior: ScrollBehavior? = null,
     viewModel: CommunityViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -150,56 +163,82 @@ fun CommunityTabScreen(
             when (page) {
                 0 -> {
                     // 分区列表
-                    BoardListContent(
-                        boards = boardListState.boards,
-                        isLoading = boardListState.isLoading,
-                        error = boardListState.error,
-                        onBoardClick = { board ->
-                            val intent = Intent(context, BoardDetailActivity::class.java).apply {
-                                putExtra("board_id", board.id)
-                                putExtra("board_name", board.name)
-                                putExtra("token", token)
+                    val swipeRefreshState = rememberSwipeRefreshState(boardListState.isRefreshing)
+                    SwipeRefresh(
+                        state = swipeRefreshState,
+                        onRefresh = { viewModel.refreshBoardList(token) }
+                    ) {
+                        BoardListContent(
+                            boards = boardListState.boards,
+                            isLoading = boardListState.isLoading,
+                            error = boardListState.error,
+                            scrollBehavior = scrollBehavior,
+                            onBoardClick = { board ->
+                                val intent = Intent(context, BoardDetailActivity::class.java).apply {
+                                    putExtra("board_id", board.id)
+                                    putExtra("board_name", board.name)
+                                    putExtra("token", token)
+                                }
+                                context.startActivity(intent)
                             }
-                            context.startActivity(intent)
-                        }
-                    )
+                        )
+                    }
                 }
                 1 -> {
                     // 关注分区
-                    BoardListContent(
-                        boards = followingBoardListState.boards,
-                        isLoading = followingBoardListState.isLoading,
-                        error = followingBoardListState.error,
-                        onBoardClick = { board ->
-                            val intent = Intent(context, BoardDetailActivity::class.java).apply {
-                                putExtra("board_id", board.id)
-                                putExtra("board_name", board.name)
-                                putExtra("token", token)
+                    val swipeRefreshState = rememberSwipeRefreshState(followingBoardListState.isRefreshing)
+                    SwipeRefresh(
+                        state = swipeRefreshState,
+                        onRefresh = { viewModel.refreshFollowingBoardList(token) }
+                    ) {
+                        BoardListContent(
+                            boards = followingBoardListState.boards,
+                            isLoading = followingBoardListState.isLoading,
+                            error = followingBoardListState.error,
+                            scrollBehavior = scrollBehavior,
+                            onBoardClick = { board ->
+                                val intent = Intent(context, BoardDetailActivity::class.java).apply {
+                                    putExtra("board_id", board.id)
+                                    putExtra("board_name", board.name)
+                                    putExtra("token", token)
+                                }
+                                context.startActivity(intent)
                             }
-                            context.startActivity(intent)
-                        }
-                    )
+                        )
+                    }
                 }
                 2 -> {
                     // 我的文章
-                    MyPostListContent(
-                        posts = myPostListState.posts,
-                        isLoading = myPostListState.isLoading,
-                        error = myPostListState.error,
-                        hasMore = myPostListState.hasMore,
-                        onPostClick = { post ->
-                            // 跳转到文章详情
-                            val intent = Intent(context, PostDetailActivity::class.java).apply {
-                                putExtra("post_id", post.id)
-                                putExtra("post_title", post.title)
-                                putExtra("token", token)
-                            }
-                            context.startActivity(intent)
-                        },
-                        onLoadMore = {
-                            viewModel.loadMoreMyPosts(token)
-                        }
-                    )
+                    val swipeRefreshState = rememberSwipeRefreshState(myPostListState.isRefreshing)
+                    SwipeRefresh(
+                        state = swipeRefreshState,
+                        onRefresh = { viewModel.refreshMyPostList(token) }
+                    ) {
+                        MyPostListContent(
+                            posts = myPostListState.posts,
+                            isLoading = myPostListState.isLoading,
+                            error = myPostListState.error,
+                            hasMore = myPostListState.hasMore,
+                            scrollBehavior = scrollBehavior,
+                            onPostClick = { post ->
+                                // 跳转到文章详情
+                                val intent = Intent(context, PostDetailActivity::class.java).apply {
+                                    putExtra("post_id", post.id)
+                                    putExtra("post_title", post.title)
+                                    putExtra("token", token)
+                                }
+                                context.startActivity(intent)
+                            },
+                            onLoadMore = {
+                                viewModel.loadMoreMyPosts(token)
+                            },
+                            onDeletePost = { postId ->
+                                viewModel.deletePost(token, postId)
+                            },
+                            context = context,
+                            token = token
+                        )
+                    }
                 }
             }
         }
@@ -215,8 +254,12 @@ fun BoardListContent(
     isLoading: Boolean,
     error: String?,
     onBoardClick: (CommunityBoard) -> Unit,
+    scrollBehavior: ScrollBehavior? = null,
     modifier: Modifier = Modifier
 ) {
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    
     Column(
         modifier = modifier.fillMaxSize()
     ) {
@@ -241,6 +284,7 @@ fun BoardListContent(
         
         // 分区列表
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -298,8 +342,15 @@ fun MyPostListContent(
     hasMore: Boolean,
     onPostClick: (CommunityPost) -> Unit,
     onLoadMore: () -> Unit,
+    onDeletePost: (Int) -> Unit,
+    context: android.content.Context,
+    token: String,
+    scrollBehavior: ScrollBehavior? = null,
     modifier: Modifier = Modifier
 ) {
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    
     Column(
         modifier = modifier.fillMaxSize()
     ) {
@@ -324,15 +375,31 @@ fun MyPostListContent(
         
         // 文章列表
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(posts) { post ->
-                MyPostItem(
-                    post = post,
-                    onClick = { onPostClick(post) }
-                )
+                            MyPostItem(
+                                post = post,
+                                onClick = { onPostClick(post) },
+                                onEdit = { 
+                                    // 跳转到编辑文章Activity
+                                    val intent = Intent(
+                                        context, EditPostActivity::class.java).apply {
+                                        putExtra("post_id", post.id)
+                                        putExtra("token", token)
+                                        putExtra("original_title", post.title)
+                                        putExtra("original_content", post.content)
+                                        putExtra("content_type", post.contentType)
+                                    }
+                                    context.startActivity(intent)
+                                },
+                                onDelete = {
+                                    onDeletePost(post.id)
+                                }
+                            )
             }
             
             // 加载更多按钮
@@ -395,16 +462,24 @@ fun MyPostListContent(
 /**
  * 我的文章项
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MyPostItem(
     post: CommunityPost,
     onClick: () -> Unit,
+    onEdit: () -> Unit = {},
+    onDelete: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    var showContextMenu by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onClick() },
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = { showContextMenu = true }
+            ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
@@ -451,23 +526,161 @@ fun MyPostItem(
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(
-                        text = "👍 ${post.likeNum}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "💬 ${post.commentNum}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "⭐ ${post.collectNum}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ThumbUp,
+                            contentDescription = "点赞",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${post.likeNum}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Comment,
+                            contentDescription = "评论",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${post.commentNum}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = "收藏",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${post.collectNum}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
+        
+        // 上下文菜单
+        if (showContextMenu) {
+            PostContextMenu(
+                onDismiss = { showContextMenu = false },
+                onEdit = {
+                    showContextMenu = false
+                    onEdit()
+                },
+                onDelete = {
+                    showContextMenu = false
+                    showDeleteDialog = true
+                }
+            )
+        }
+        
+        // 删除确认对话框
+        if (showDeleteDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("删除文章") },
+                text = { Text("确定要删除这篇文章吗？删除后无法恢复。") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showDeleteDialog = false
+                            onDelete()
+                        }
+                    ) {
+                        Text("删除", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteDialog = false }) {
+                        Text("取消")
+                    }
+                }
+            )
+        }
     }
+}
+
+/**
+ * 文章上下文菜单
+ */
+@Composable
+fun PostContextMenu(
+    onDismiss: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("操作选项")
+        },
+        text = {
+            Column {
+                TextButton(
+                    onClick = onEdit,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Start,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "编辑"
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("编辑文章")
+                    }
+                }
+                
+                TextButton(
+                    onClick = onDelete,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Start,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "删除",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "删除文章",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }

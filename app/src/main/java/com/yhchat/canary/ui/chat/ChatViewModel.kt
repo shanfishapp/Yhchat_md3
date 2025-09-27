@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.yhchat.canary.data.model.ChatMessage
 import com.yhchat.canary.data.repository.MessageRepository
 import com.yhchat.canary.data.repository.TokenRepository
+import com.yhchat.canary.data.websocket.WebSocketManager
+import com.yhchat.canary.data.websocket.MessageEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +26,8 @@ data class ChatUiState(
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val messageRepository: MessageRepository,
-    private val tokenRepository: TokenRepository
+    private val tokenRepository: TokenRepository,
+    private val webSocketManager: WebSocketManager
 ) : ViewModel() {
 
     private var currentChatId: String = ""
@@ -58,8 +61,82 @@ class ChatViewModel @Inject constructor(
         oldestMsgSeq = 0
         oldestMsgId = null
         
+        // 开始监听WebSocket消息
+        startListeningToWebSocketMessages()
+        
         // 加载初始消息
         loadMessages()
+    }
+    
+    /**
+     * 开始监听WebSocket实时消息
+     */
+    private fun startListeningToWebSocketMessages() {
+        viewModelScope.launch {
+            webSocketManager.getMessageEvents().collect { event ->
+                when (event) {
+                    is MessageEvent.NewMessage -> {
+                        handleNewMessage(event.message)
+                    }
+                    is MessageEvent.MessageEdited -> {
+                        handleEditedMessage(event.message)
+                    }
+                    is MessageEvent.MessageDeleted -> {
+                        handleDeletedMessage(event.msgId)
+                    }
+                    else -> {
+                        // 忽略其他事件类型
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * 处理新消息
+     */
+    private fun handleNewMessage(message: ChatMessage) {
+        // 判断消息是否属于当前聊天
+        val isPrivateChat = message.chatId == message.recvId
+        val targetChatId = if (isPrivateChat) message.sender.chatId else message.chatId
+        
+        if (targetChatId == currentChatId) {
+            // 检查消息是否已存在，避免重复添加
+            val existingIndex = _messages.indexOfFirst { it.msgId == message.msgId }
+            if (existingIndex == -1) {
+                // 按时间排序插入新消息
+                val insertIndex = _messages.indexOfLast { it.sendTime <= message.sendTime } + 1
+                _messages.add(insertIndex, message)
+                Log.d(tag, "Inserted new real-time message at index $insertIndex: ${message.msgId}")
+            }
+        }
+    }
+    
+    /**
+     * 处理编辑的消息
+     */
+    private fun handleEditedMessage(message: ChatMessage) {
+        val isPrivateChat = message.chatId == message.recvId
+        val targetChatId = if (isPrivateChat) message.sender.chatId else message.chatId
+        
+        if (targetChatId == currentChatId) {
+            val existingIndex = _messages.indexOfFirst { it.msgId == message.msgId }
+            if (existingIndex != -1) {
+                _messages[existingIndex] = message
+                Log.d(tag, "Updated edited message: ${message.msgId}")
+            }
+        }
+    }
+    
+    /**
+     * 处理删除的消息
+     */
+    private fun handleDeletedMessage(messageId: String) {
+        val existingIndex = _messages.indexOfFirst { it.msgId == messageId }
+        if (existingIndex != -1) {
+            _messages.removeAt(existingIndex)
+            Log.d(tag, "Removed deleted message: $messageId")
+        }
     }
 
     /**
@@ -204,6 +281,22 @@ class ChatViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     error = e.message ?: "发送消息失败"
                 )
+            }
+        }
+    }
+    
+    /**
+     * 发送草稿输入（输入框内容变化时调用）
+     */
+    fun sendDraftInput(inputText: String) {
+        if (currentChatId.isNotEmpty()) {
+            viewModelScope.launch {
+                try {
+                    webSocketManager.sendDraftInput(currentChatId, inputText)
+                    Log.d(tag, "Sent draft input for chat: $currentChatId")
+                } catch (e: Exception) {
+                    Log.e(tag, "Failed to send draft input", e)
+                }
             }
         }
     }

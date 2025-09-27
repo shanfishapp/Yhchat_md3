@@ -6,6 +6,7 @@ import com.yhchat.canary.data.model.Conversation
 import com.yhchat.canary.data.repository.ConversationRepository
 import com.yhchat.canary.data.repository.TokenRepository
 import com.yhchat.canary.data.repository.CacheRepository
+import com.yhchat.canary.data.repository.UserRepository
 import com.yhchat.canary.data.websocket.WebSocketManager
 import com.yhchat.canary.data.websocket.MessageEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,10 +18,16 @@ import javax.inject.Inject
  * 会话列表ViewModel
  */
 @HiltViewModel
+
+
+
+
+
 class ConversationViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
     private val cacheRepository: CacheRepository,
-    private val webSocketManager: WebSocketManager
+    private val webSocketManager: WebSocketManager,
+    private val userRepository: UserRepository
 ) : ViewModel() {
 
     init {
@@ -226,12 +233,55 @@ class ConversationViewModel @Inject constructor(
     }
     
     /**
-     * 刷新会话列表
+     * 删除会话
      */
-    fun refreshConversations(token: String) {
-        loadConversations(token)
+    fun deleteConversation(chatId: String) {
+        viewModelScope.launch {
+            conversationRepository.removeConversation(chatId)
+                .onSuccess {
+                    // 从本地列表中移除会话
+                    _conversations.value = _conversations.value.filter { it.chatId != chatId }
+                }
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(error = error.message)
+                }
+        }
     }
-}
+    
+    /**
+     * 置顶会话
+     */
+    fun toggleStickyConversation(conversation: Conversation) {
+        viewModelScope.launch {
+            // 检查是否已经置顶在StickyViewModel中实现，这里只调用UserRepository
+            userRepository.getStickyList()
+                .onSuccess { stickyData ->
+                    val isSticky = stickyData.sticky?.any { it.chatId == conversation.chatId } == true
+                    if (isSticky) {
+                        // 取消置顶
+                        userRepository.deleteSticky(conversation.chatId, conversation.chatType)
+                    } else {
+                        // 添加置顶
+                        userRepository.addSticky(conversation.chatId, conversation.chatType)
+                    }
+                }
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(error = error.message)
+                }
+        }
+    }
+    
+    /**
+     * 检查会话是否已置顶
+     */
+    suspend fun isConversationSticky(chatId: String): Boolean {
+        return try {
+            userRepository.getStickyList()
+                .getOrNull()?.sticky?.any { it.chatId == chatId } == true
+        } catch (e: Exception) {
+            false
+        }
+    }
 
 /**
  * 会话UI状态
@@ -240,3 +290,5 @@ data class ConversationUiState(
     val isLoading: Boolean = false,
     val error: String? = null
 )
+
+}

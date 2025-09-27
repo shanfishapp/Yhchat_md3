@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.runtime.*
@@ -38,6 +39,8 @@ import coil.request.ImageRequest
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import com.yhchat.canary.ui.bot.BotInfoActivity
 import com.yhchat.canary.ui.components.MarkdownText
 import com.yhchat.canary.ui.components.HtmlWebView
@@ -56,6 +59,9 @@ import android.content.Context
 import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import androidx.compose.runtime.rememberCoroutineScope
 
 /**
  * 聊天界面
@@ -82,9 +88,21 @@ fun ChatScreen(
     var showImageViewer by remember { mutableStateOf(false) }
     var currentImageUrl by remember { mutableStateOf("") }
     
+    // 滚动到底部按钮状态
+    var showScrollToBottomButton by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    
     // 初始化聊天
     LaunchedEffect(chatId, chatType, userId) {
         viewModel.initChat(chatId, chatType, userId)
+    }
+    
+    // 监听滚动状态，当不在底部时显示"回到最新消息"按钮
+    LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) {
+        // 当用户滚动查看历史消息时（不在最新消息位置），显示回到底部按钮
+        // 因为是 reverseLayout，第一个可见项目的索引大于0表示不在最新消息位置
+        showScrollToBottomButton = listState.firstVisibleItemIndex > 0 || 
+                                   (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset > 100)
     }
 
     // 处理系统返回键/手势返回
@@ -256,12 +274,33 @@ fun ChatScreen(
                 state = pullRefreshState,
                 modifier = Modifier.align(Alignment.TopCenter)
             )
-            // 下拉刷新指示器
-            PullRefreshIndicator(
-                refreshing = uiState.isRefreshing,
-                state = pullRefreshState,
-                modifier = Modifier.align(Alignment.TopCenter)
-            )
+            
+            // "回到最新消息"浮动按钮
+            androidx.compose.animation.AnimatedVisibility(
+                visible = showScrollToBottomButton,
+                enter = slideInVertically { it } + fadeIn(),
+                exit = slideOutVertically { it } + fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+            ) {
+                FloatingActionButton(
+                    onClick = {
+                        coroutineScope.launch {
+                            // 滚动到最新消息（索引0，因为是 reverseLayout）
+                            listState.animateScrollToItem(0)
+                        }
+                    },
+                    modifier = Modifier.size(48.dp),
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "回到最新消息"
+                    )
+                }
+            }
         }
 
         // 底部输入栏
@@ -284,6 +323,9 @@ fun ChatScreen(
                 },
                 onFileClick = {
                     // TODO: 实现文件选择功能
+                },
+                onDraftChange = { draftText ->
+                    viewModel.sendDraftInput(draftText)
                 },
                 onCameraClick = {
                     // TODO: 实现相机拍照功能

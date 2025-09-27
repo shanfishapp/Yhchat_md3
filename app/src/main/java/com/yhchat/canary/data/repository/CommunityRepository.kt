@@ -375,6 +375,55 @@ class CommunityRepository @Inject constructor(
     }
     
     /**
+     * 编辑文章
+     */
+    suspend fun editPost(
+        token: String,
+        postId: Int,
+        title: String,
+        content: String,
+        contentType: Int
+    ): EditPostResponse {
+        val request = EditPostRequest(
+            postId = postId,
+            title = title,
+            content = content,
+            contentType = contentType
+        )
+        return apiService.editPost(token, request).body() ?: EditPostResponse(
+            code = 0,
+            data = EditPostData(postId = 0),
+            msg = "网络错误"
+        )
+    }
+    
+    /**
+     * 删除文章
+     */
+    suspend fun deletePost(
+        token: String,
+        postId: Int
+    ): Result<ApiStatus> {
+        return try {
+            val request = DeletePostRequest(postId = postId)
+            val response = apiService.deletePost(token, request)
+            
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null && body.code == 1) {
+                    Result.success(body)
+                } else {
+                    Result.failure(Exception("API返回错误: ${body?.message ?: "未知错误"}"))
+                }
+            } else {
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
      * 搜索社区内容
      */
     suspend fun searchCommunity(

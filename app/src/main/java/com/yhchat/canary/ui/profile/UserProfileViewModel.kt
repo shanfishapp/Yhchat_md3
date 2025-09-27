@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yhchat.canary.data.api.ApiService
 import com.yhchat.canary.data.api.WebApiService
-import com.yhchat.canary.data.api.AddFriendRequest
-import com.yhchat.canary.data.model.UserHomepageResponse
+import com.yhchat.canary.data.model.AddFriendRequest
+import com.yhchat.canary.data.model.UserHomepageInfo
 import com.yhchat.canary.data.model.UserProfile
 import com.yhchat.canary.data.repository.TokenRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -30,8 +30,8 @@ class UserProfileViewModel @Inject constructor(
     val uiState: StateFlow<UserProfileUiState> = _uiState.asStateFlow()
 
     // 用户资料
-    private val _userProfile = MutableStateFlow<UserProfile?>(null)
-    val userProfile: StateFlow<UserProfile?> = _userProfile.asStateFlow()
+    private val _userProfile = MutableStateFlow<UserHomepageInfo?>(null)
+    val userProfile: StateFlow<UserHomepageInfo?> = _userProfile.asStateFlow()
 
     /**
      * 加载用户资料

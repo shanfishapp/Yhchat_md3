@@ -107,3 +107,11 @@ data class DismissNotificationResponse(
     @SerializedName("msg")
     val message: String
 )
+
+/**
+ * 删除会话请求
+ */
+data class RemoveConversationRequest(
+    @SerializedName("chatId")
+    val chatId: String
+)

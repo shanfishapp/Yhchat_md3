@@ -3,6 +3,7 @@ package com.yhchat.canary.data.repository
 import com.yhchat.canary.data.api.ApiService
 import com.yhchat.canary.data.model.Conversation
 import com.yhchat.canary.data.model.DismissNotificationRequest
+import com.yhchat.canary.data.model.RemoveConversationRequest
 import com.yhchat.canary.data.protobuf.ConversationProtoParser
 import android.util.Log
 import javax.inject.Inject
@@ -71,7 +72,34 @@ class ConversationRepository @Inject constructor(
         }
     }
     
-    // ========== WebSocket相关的本地会话更新方法 ==========
+    /**
+     * 删除会话
+     */
+    suspend fun removeConversation(chatId: String): Result<Boolean> {
+        return try {
+            val token = getToken() ?: return Result.failure(Exception("未登录"))
+            val request = RemoveConversationRequest(chatId = chatId)
+            val response = apiService.removeConversation(token, request)
+            if (response.isSuccessful) {
+                val removeResponse = response.body()
+                if (removeResponse?.code == 1) {
+                    // 从缓存中删除会话
+                    try {
+                        cacheRepository.deleteConversationFromCache(chatId)
+                    } catch (e: Exception) {
+                        Log.w("ConversationRepository", "Failed to delete conversation from cache", e)
+                    }
+                    Result.success(true)
+                } else {
+                    Result.failure(Exception(removeResponse?.message ?: "删除会话失败"))
+                }
+            } else {
+                Result.failure(Exception("删除会话失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
     
     /**
      * 更新会话的最后消息信息

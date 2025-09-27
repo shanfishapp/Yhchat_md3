@@ -352,7 +352,7 @@ private fun BotInfoContent(
                         )
                         StatisticItem(
                             title = "可见性",
-                            value = when (botInfo.private) {
+                            value = when (botInfo.isPrivate) {
                                 1 -> "私有"
                                 0 -> "公开"
                                 else -> "未知"
@@ -389,20 +389,12 @@ private fun BotInfoContent(
                     
                     InfoRow(
                         label = "状态",
-                        value = when (botInfo.isStop) {
-                            0 -> "正常运行"
-                            1 -> "已停用"
-                            else -> "未知"
-                        }
+                        value = "正常运行" // BotInfo数据类中没有isStop字段
                     )
                     
                     InfoRow(
                         label = "自动加群",
-                        value = when (botInfo.alwaysAgree) {
-                            1 -> "已启用"
-                            0 -> "未启用"
-                            else -> "未知"
-                        }
+                        value = "未知" // BotInfo数据类中没有alwaysAgree字段
                     )
                 }
             }

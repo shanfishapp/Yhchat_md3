@@ -26,16 +26,24 @@ class ComprehensiveSearchViewModel(application: Application) : AndroidViewModel(
             try {
                 val response = webApiService.getGroupInfo(mapOf("groupId" to groupId))
                 
-                if (response.code == 1) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        groupResult = response.data.group,
-                        error = null
-                    )
+                if (response.code() == 1) {
+                    val responseBody = response.body()
+                    if (responseBody != null) {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            groupResult = responseBody.data.group,
+                            error = null
+                        )
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = "响应数据为空"
+                        )
+                    }
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = response.msg.ifEmpty { "获取群聊信息失败" }
+                        error = response.body()?.msg ?: "获取群聊信息失败"
                     )
                 }
             } catch (e: Exception) {
@@ -94,38 +102,39 @@ class ComprehensiveSearchViewModel(application: Application) : AndroidViewModel(
             try {
                 val response = webApiService.getBotInfo(mapOf("botId" to botId))
                 
-                if (response.code == 1) {
-                    val botData = response.data.bot
-                    val botInfo = BotInfo(
-                        id = botData.id,
-                        botId = botData.botId,
-                        nickname = botData.nickname,
-                        nicknameId = botData.nicknameId,
-                        avatarId = botData.avatarId,
-                        avatarUrl = botData.avatarUrl,
-                        token = botData.token,
-                        link = botData.link,
-                        introduction = botData.introduction,
-                        createBy = botData.createBy,
-                        createTime = botData.createTime,
-                        headcount = botData.headcount,
-                        private = botData.private,
-                        isStop = null,
-                        alwaysAgree = null,
-                        doNotDisturb = null,
-                        top = null,
-                        groupLimit = null
-                    )
-                    
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        botResult = botInfo,
-                        error = null
-                    )
+                if (response.isSuccessful) {
+                    val responseBody = response.body()
+                    if (responseBody?.code == 1) {
+                        val botData = responseBody.data.bot
+                        val botInfo = BotInfo(
+                            id = botData.id,
+                            botId = botData.botId,
+                            nickname = botData.nickname,
+                            nicknameId = botData.nicknameId,
+                            avatarId = botData.avatarId,
+                            avatarUrl = botData.avatarUrl,
+                            introduction = botData.introduction,
+                            createBy = botData.createBy,
+                            createTime = botData.createTime,
+                            headcount = botData.headcount,
+                            isPrivate = botData.isPrivate ?: 0
+                        )
+                        
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            botResult = botInfo,
+                            error = null
+                        )
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = responseBody?.msg ?: "获取机器人信息失败"
+                        )
+                    }
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = response.msg.ifEmpty { "获取机器人信息失败" }
+                        error = response.body()?.msg ?: "获取机器人信息失败"
                     )
                 }
             } catch (e: Exception) {

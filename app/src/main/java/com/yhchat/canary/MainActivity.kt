@@ -22,6 +22,8 @@ import com.yhchat.canary.ui.discover.DiscoverScreen
 import com.yhchat.canary.ui.profile.ProfileScreen
 import com.yhchat.canary.ui.search.SearchScreen
 import com.yhchat.canary.ui.components.BottomNavigationBar
+import com.yhchat.canary.ui.components.ScrollBehavior
+import com.yhchat.canary.ui.components.rememberScrollBehavior
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import coil.ImageLoader
 import coil.Coil
@@ -33,6 +35,8 @@ import com.yhchat.canary.ui.conversation.ConversationViewModel
 import com.yhchat.canary.ui.profile.UserProfileActivity
 import com.yhchat.canary.data.di.RepositoryFactory
 import com.yhchat.canary.data.model.NavigationItem
+import com.yhchat.canary.ui.chat.ChatAddActivity
+import com.yhchat.canary.utils.ChatAddLinkHandler
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
@@ -40,6 +44,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // 处理 Deep Link
+        handleDeepLink()
         
         // 配置Coil ImageLoader，为chat-img.jwznb.com添加Referer，支持GIF和WebP
         val imageLoader = ImageLoader.Builder(this)
@@ -161,6 +168,7 @@ class MainActivity : ComponentActivity() {
                         // 主界面，包含底部导航栏和HorizontalPager
                         val coroutineScope = rememberCoroutineScope()
                         val pagerState = rememberPagerState { visibleNavItems.size }
+                        val scrollBehavior = rememberScrollBehavior()
                         
                         // 获取当前页面对应的导航项ID
                         val currentPageItem = if (visibleNavItems.isNotEmpty() && pagerState.currentPage < visibleNavItems.size) {
@@ -199,7 +207,8 @@ class MainActivity : ComponentActivity() {
                                             }
                                         }
                                         currentScreen = screen
-                                    }
+                                    },
+                                    isVisible = scrollBehavior.isVisible.value
                                 )
                             }
                         ) { paddingValues ->
@@ -228,12 +237,14 @@ class MainActivity : ComponentActivity() {
                                                 onMenuClick = { },
                                                 tokenRepository = tokenRepository,
                                                 viewModel = conversationViewModel,
+                                                scrollBehavior = scrollBehavior,
                                                 modifier = Modifier.padding(paddingValues)
                                             )
                                         }
                                         "community" -> {
                                             CommunityScreen(
                                                 token = token,
+                                                scrollBehavior = scrollBehavior,
                                                 modifier = Modifier.padding(paddingValues)
                                             )
                                         }
@@ -309,6 +320,20 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+    
+    /**
+     * 处理 Deep Link
+     */
+    private fun handleDeepLink() {
+        intent?.data?.toString()?.let { uriString ->
+            if (ChatAddLinkHandler.isChatAddLink(uriString)) {
+                // 延迟执行，确保 Activity 初始化完成
+                window.decorView.post {
+                    ChatAddActivity.start(this, uriString)
                 }
             }
         }

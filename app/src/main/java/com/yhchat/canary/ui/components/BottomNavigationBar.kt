@@ -1,25 +1,42 @@
 package com.yhchat.canary.ui.components
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.offset
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import com.yhchat.canary.data.model.NavigationItem
+import kotlinx.coroutines.delay
 
 /**
- * 底部导航栏组件
+ * 底部导航栏组件 - 支持滚动时自动隐藏
  */
 @Composable
 fun BottomNavigationBar(
     currentScreen: String,
     visibleItems: List<NavigationItem>,
     onScreenChange: (String) -> Unit,
+    isVisible: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    val density = LocalDensity.current
+    val navigationBarHeight = 80.dp
+    
+    // 动画偏移量
+    val offsetY by animateDpAsState(
+        targetValue = if (isVisible) 0.dp else navigationBarHeight,
+        animationSpec = tween(durationMillis = 300),
+        label = "navigation_bar_offset"
+    )
+    
     NavigationBar(
-        modifier = modifier
+        modifier = modifier.offset(y = offsetY)
     ) {
         visibleItems.forEach { item ->
             NavigationBarItem(
@@ -48,6 +65,7 @@ fun BottomNavigationBar(
 fun BottomNavigationBar(
     currentScreen: String,
     onScreenChange: (String) -> Unit,
+    isVisible: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     // 使用默认的导航项
@@ -93,6 +111,7 @@ fun BottomNavigationBar(
         currentScreen = currentScreen,
         visibleItems = defaultItems,
         onScreenChange = onScreenChange,
+        isVisible = isVisible,
         modifier = modifier
     )
 }

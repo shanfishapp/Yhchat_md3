@@ -157,6 +157,12 @@ interface ApiService {
         @Body request: DismissNotificationRequest
     ): Response<DismissNotificationResponse>
     
+    @POST("v1/conversation/remove")
+    suspend fun removeConversation(
+        @Header("token") token: String,
+        @Body request: RemoveConversationRequest
+    ): Response<ApiStatus>
+    
     // 社区相关API
     @POST("v1/community/ba/following-ba-list")
     suspend fun getBoardList(
@@ -248,6 +254,18 @@ interface ApiService {
         @Body request: CreatePostRequest
     ): Response<com.yhchat.canary.data.model.CreatePostResponse>
     
+    @POST("v1/community/posts/edit")
+    suspend fun editPost(
+        @Header("token") token: String,
+        @Body request: EditPostRequest
+    ): Response<com.yhchat.canary.data.model.EditPostResponse>
+    
+    @POST("v1/community/posts/delete")
+    suspend fun deletePost(
+        @Header("token") token: String,
+        @Body request: DeletePostRequest
+    ): Response<ApiStatus>
+    
     @POST("v1/community/search")
     suspend fun searchCommunity(
         @Header("token") token: String,
@@ -259,6 +277,12 @@ interface ApiService {
         @Header("token") token: String,
         @Body request: GroupListRequest
     ): GroupListResponse
+
+    @POST("v1/user/invite/change-user-invite-code")
+    suspend fun changeInviteCode(
+        @Header("token") token: String,
+        @Body request: ChangeInviteCodeRequest
+    ): Response<Map<String, Any>>
 
     // ========== 好友相关API ==========
 
@@ -554,17 +578,28 @@ data class CreatePostRequest(
 )
 
 /**
- * 添加好友/加入群聊请求
+ * 编辑文章请求
  */
-data class AddFriendRequest(
-    @SerializedName("chatId")
-    val chatId: String,
-    
-    @SerializedName("chatType")
-    val chatType: Int, // 1-用户，2-群聊，3-机器人
-    
-    @SerializedName("remark")
-    val remark: String
+data class EditPostRequest(
+    @SerializedName("postId")
+    val postId: Int,
+
+    @SerializedName("title")
+    val title: String,
+
+    @SerializedName("content")
+    val content: String,
+
+    @SerializedName("contentType")
+    val contentType: Int  // 1-文本，2-markdown
+)
+
+/**
+ * 删除文章请求
+ */
+data class DeletePostRequest(
+    @SerializedName("postId")
+    val postId: Int
 )
 
 /**

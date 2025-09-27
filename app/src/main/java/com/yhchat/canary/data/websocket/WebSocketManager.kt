@@ -184,7 +184,7 @@ class WebSocketManager @Inject constructor(
             
             Log.d(tag, "Inserted new message: ${message.msgId}")
             
-        } catch (e: Exception) {
+                } catch (e: Exception) {
             Log.e(tag, "Error inserting message to local storage", e)
         }
     }
@@ -218,16 +218,48 @@ class WebSocketManager @Inject constructor(
      */
     private suspend fun updateConversationLastMessage(message: ChatMessage) {
         try {
-            // 更新会话列表中的最后消息信息
-            conversationRepository.updateLastMessage(
-                chatId = message.sender.chatId,
-                chatType = message.sender.chatType,
-                lastMessage = getMessagePreview(message),
-                lastMessageTime = message.sendTime,
-                unreadCount = 1 // 新消息，未读数+1
-            )
+            // 判断消息类型：私聊 vs 群聊
+            val isPrivateChat = message.chatId == message.recvId
             
-            Log.d(tag, "Updated conversation last message for: ${message.sender.chatId}")
+            if (isPrivateChat) {
+                // 私聊消息：创建/更新与发送者的私聊会话
+                val targetChatId = message.sender.chatId
+                val targetChatType = message.sender.chatType
+                
+                Log.d(tag, "Updating private conversation:")
+                Log.d(tag, "  - Private chat with: ${message.sender.chatId} (${message.sender.name})")
+                Log.d(tag, "  - Message preview: ${getMessagePreview(message)}")
+                
+                conversationRepository.updateLastMessage(
+                    chatId = targetChatId,
+                    chatType = targetChatType,
+                    lastMessage = getMessagePreview(message),
+                    lastMessageTime = message.sendTime,
+                    unreadCount = 1
+                )
+                
+                Log.d(tag, "Successfully updated private conversation: $targetChatId")
+                
+            } else {
+                // 群聊消息：更新群聊会话，不创建私聊会话
+                val targetChatId = message.chatId!!
+                val targetChatType = message.chatType!!
+                
+                Log.d(tag, "Updating group conversation:")
+                Log.d(tag, "  - Group: $targetChatId (type: $targetChatType)")
+                Log.d(tag, "  - Sender: ${message.sender.chatId} (${message.sender.name})")
+                Log.d(tag, "  - Message preview: ${getMessagePreview(message)}")
+                
+                conversationRepository.updateLastMessage(
+                    chatId = targetChatId,
+                    chatType = targetChatType,
+                    lastMessage = getMessagePreview(message),
+                    lastMessageTime = message.sendTime,
+                    unreadCount = 1
+                )
+                
+                Log.d(tag, "Successfully updated group conversation: $targetChatId")
+            }
             
         } catch (e: Exception) {
             Log.e(tag, "Error updating conversation last message", e)
@@ -239,17 +271,21 @@ class WebSocketManager @Inject constructor(
      */
     private suspend fun updateConversationIfLastMessage(message: ChatMessage) {
         try {
+            // 使用正确的chatId和chatType
+            val targetChatId = message.chatId ?: message.sender.chatId
+            val targetChatType = message.chatType ?: message.sender.chatType
+            
             // 检查是否是会话的最后一条消息
             val lastMessage = messageRepository.getLastMessage(
-                message.sender.chatId, 
-                message.sender.chatType
+                targetChatId, 
+                targetChatType
             )
             
             if (lastMessage?.msgId == message.msgId) {
                 // 是最后一条消息，更新会话显示
                 conversationRepository.updateLastMessage(
-                    chatId = message.sender.chatId,
-                    chatType = message.sender.chatType,
+                    chatId = targetChatId,
+                    chatType = targetChatType,
                     lastMessage = getMessagePreview(message),
                     lastMessageTime = message.sendTime,
                     unreadCount = null // 不改变未读数
@@ -267,7 +303,8 @@ class WebSocketManager @Inject constructor(
      * 获取消息预览文本
      */
     private fun getMessagePreview(message: ChatMessage): String {
-        return when {
+        // 获取消息内容预览
+        val contentPreview = when {
             !message.content.text.isNullOrEmpty() -> message.content.text
             !message.content.imageUrl.isNullOrEmpty() -> "[图片]"
             !message.content.fileUrl.isNullOrEmpty() -> {
@@ -282,6 +319,21 @@ class WebSocketManager @Inject constructor(
             !message.content.stickerUrl.isNullOrEmpty() -> "[表情]"
             !message.content.postTitle.isNullOrEmpty() -> "[文章]${message.content.postTitle}"
             else -> "[消息]"
+        }
+        
+        // 确定目标会话类型
+        val targetChatType = message.chatType ?: message.sender.chatType
+        
+        // 根据会话类型决定显示格式
+        return when (targetChatType) {
+            2, 3 -> {
+                // 群聊(2)或机器人会话(3)：显示"发送者：内容"
+                "${message.sender.name}：$contentPreview"
+            }
+            else -> {
+                // 私聊(1)或其他：只显示内容
+                contentPreview
+            }
         }
     }
     

@@ -43,7 +43,8 @@ fun ChatInputBar(
     placeholder: String = "输入消息...",
     onImageClick: (() -> Unit)? = null,
     onFileClick: (() -> Unit)? = null,
-    onCameraClick: (() -> Unit)? = null
+    onCameraClick: (() -> Unit)? = null,
+    onDraftChange: ((String) -> Unit)? = null
 ) {
     var showAttachMenu by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -115,7 +116,10 @@ fun ChatInputBar(
                 // 输入框
                 OutlinedTextField(
                     value = text,
-                    onValueChange = onTextChange,
+                    onValueChange = { newText ->
+                        onTextChange(newText)
+                        onDraftChange?.invoke(newText)
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 44.dp, max = 120.dp),

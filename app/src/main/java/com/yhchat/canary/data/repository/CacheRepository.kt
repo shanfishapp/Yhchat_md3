@@ -111,6 +111,23 @@ class CacheRepository @Inject constructor(
         conversationDao.markAsRead(chatId)
     }
     
+    /**
+     * 从缓存中删除会话
+     */
+    suspend fun deleteConversationFromCache(chatId: String) {
+        // 先查找会话
+        val conversation = conversationDao.getAllConversationsSync()
+            .find { it.chatId == chatId }
+        
+        if (conversation != null) {
+            // 删除会话
+            conversationDao.deleteConversation(conversation)
+            
+            // 同时删除相关消息
+            messageDao.clearChatMessages(chatId)
+        }
+    }
+    
     // ========== 消息缓存 ==========
     
     /**
@@ -183,10 +200,25 @@ class CacheRepository @Inject constructor(
      * 缓存消息
      */
     suspend fun cacheMessage(message: ChatMessage) {
+        // 判断消息类型并确定存储位置
+        val isPrivateChat = message.chatId == message.recvId
+        val targetChatId: String
+        val targetChatType: Int
+        
+        if (isPrivateChat) {
+            // 私聊消息：存储在与发送者的私聊中
+            targetChatId = message.sender.chatId
+            targetChatType = message.sender.chatType
+        } else {
+            // 群聊消息：存储在群聊中
+            targetChatId = message.chatId!!
+            targetChatType = message.chatType!!
+        }
+        
         val cachedMessage = CachedMessage(
             msgId = message.msgId,
-            chatId = message.sender.chatId,
-            chatType = message.sender.chatType,
+            chatId = targetChatId,
+            chatType = targetChatType,
             senderChatId = message.sender.chatId,
             senderName = message.sender.name,
             senderAvatarUrl = message.sender.avatarUrl,
@@ -212,10 +244,25 @@ class CacheRepository @Inject constructor(
      */
     suspend fun cacheMessages(messages: List<ChatMessage>) {
         val cachedMessages = messages.map { message ->
+            // 判断消息类型并确定存储位置
+            val isPrivateChat = message.chatId == message.recvId
+            val targetChatId: String
+            val targetChatType: Int
+            
+            if (isPrivateChat) {
+                // 私聊消息：存储在与发送者的私聊中
+                targetChatId = message.sender.chatId
+                targetChatType = message.sender.chatType
+            } else {
+                // 群聊消息：存储在群聊中
+                targetChatId = message.chatId!!
+                targetChatType = message.chatType!!
+            }
+            
             CachedMessage(
                 msgId = message.msgId,
-                chatId = message.sender.chatId,
-                chatType = message.sender.chatType,
+                chatId = targetChatId,
+                chatType = targetChatType,
                 senderChatId = message.sender.chatId,
                 senderName = message.sender.name,
                 senderAvatarUrl = message.sender.avatarUrl,

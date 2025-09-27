@@ -63,13 +63,15 @@ class MainViewModel @Inject constructor(
                     _savedToken.value = savedToken
                     _isLoggedIn.value = true
 
+
                     // 获取用户信息
-                    userRepository.getUserInfo().onSuccess { user ->
-                        _userId.value = user.id
+                    userRepository.getUserProfile().onSuccess { user ->
+                        _userId.value = user.userId
                     }.onFailure {
                         // 如果获取用户信息失败，使用token的后8位作为userId
                         _userId.value = "user_${savedToken.takeLast(8)}"
                     }
+
                 }
 
                 _isInitialized.value = true

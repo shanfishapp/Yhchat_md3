@@ -5,6 +5,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -39,6 +45,16 @@ class DraftBoxActivity : ComponentActivity() {
         
         setContent {
             YhchatCanaryTheme {
+                val view = LocalView.current
+                val darkTheme = isSystemInDarkTheme()
+                
+                SideEffect {
+                    val window = (view.context as ComponentActivity).window
+                    window.statusBarColor = Color.Transparent.toArgb()
+                    window.navigationBarColor = Color.Transparent.toArgb()
+                    WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+                    WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !darkTheme
+                }
                 DraftBoxScreen(
                     token = token,
                     onBackClick = { finish() },
@@ -55,7 +71,10 @@ class DraftBoxActivity : ComponentActivity() {
                         }
                         startActivity(intent)
                         finish()
-                    }
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.systemBars)
                 )
             }
         }
@@ -86,9 +105,13 @@ fun DraftBoxScreen(
         isLoading = false
     }
     
-    Column(
-        modifier = modifier.fillMaxSize()
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
     ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
         // 顶部应用栏
         TopAppBar(
             title = {
@@ -105,7 +128,10 @@ fun DraftBoxScreen(
                         contentDescription = "返回"
                     )
                 }
-            }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer
+            )
         )
         
         // 草稿列表
@@ -164,6 +190,7 @@ fun DraftBoxScreen(
             }
         }
     }
+}
 }
 
 /**

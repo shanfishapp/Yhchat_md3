@@ -5,6 +5,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -44,6 +50,16 @@ class CreatePostActivity : ComponentActivity() {
         
         setContent {
             YhchatCanaryTheme {
+                val view = LocalView.current
+                val darkTheme = isSystemInDarkTheme()
+                
+                SideEffect {
+                    val window = (view.context as ComponentActivity).window
+                    window.statusBarColor = Color.Transparent.toArgb()
+                    window.navigationBarColor = Color.Transparent.toArgb()
+                    WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+                    WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !darkTheme
+                }
                 val viewModel: CreatePostViewModel = viewModel {
                     CreatePostViewModel(
                         communityRepository = RepositoryFactory.getCommunityRepository(this@CreatePostActivity),
@@ -67,7 +83,10 @@ class CreatePostActivity : ComponentActivity() {
                     },
                     draftTitle = draftTitle,
                     draftContent = draftContent,
-                    draftMarkdownMode = draftMarkdownMode
+                    draftMarkdownMode = draftMarkdownMode,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.systemBars)
                 )
             }
         }
@@ -120,9 +139,13 @@ fun CreatePostScreen(
         }
     }
     
-    Column(
-        modifier = modifier.fillMaxSize()
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
     ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
         // 顶部应用栏
         TopAppBar(
             title = {
@@ -184,7 +207,10 @@ fun CreatePostScreen(
                         )
                     }
                 }
-            }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer
+            )
         )
         
         // 错误提示
@@ -358,4 +384,5 @@ fun CreatePostScreen(
             }
         )
     }
+}
 }

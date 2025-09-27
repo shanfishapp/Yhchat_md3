@@ -187,7 +187,11 @@ object WebSocketMessageParser {
             msgDeleteTime = if (protoMsg.deleteTime > 0) protoMsg.deleteTime else null,
             quoteMsgId = if (protoMsg.quoteMsgId.isNotEmpty()) protoMsg.quoteMsgId else null,
             msgSeq = protoMsg.msgSeq,
-            editTime = if (protoMsg.editTime > 0) protoMsg.editTime else null
+            editTime = if (protoMsg.editTime > 0) protoMsg.editTime else null,
+            // 关键修复：使用protoMsg的chatId和chatType，而不是sender的
+            chatId = protoMsg.chatId,
+            chatType = protoMsg.chatType,
+            recvId = protoMsg.recvId
         )
     }
 }

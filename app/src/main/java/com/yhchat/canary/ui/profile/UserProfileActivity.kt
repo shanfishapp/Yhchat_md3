@@ -33,8 +33,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.yhchat.canary.data.model.UserMedal
+import com.yhchat.canary.data.model.Medal
 import com.yhchat.canary.data.model.UserProfile
+import com.yhchat.canary.data.model.UserHomepageInfo
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import dagger.hilt.android.AndroidEntryPoint
 import java.text.SimpleDateFormat
@@ -174,8 +175,9 @@ fun UserProfileScreen(
 
                 userProfile != null -> {
                     // 用户资料内容
-                    UserProfileContent(
-                        userProfile = userProfile!!,
+                    val currentUserProfile = userProfile!! // 解决委托属性智能转换问题，确保非空
+                    UserHomepageContent(
+                        userProfile = currentUserProfile,
                         onAddFriendClick = { profile ->
                             viewModel.showAddFriendDialog(profile.userId, profile.nickname)
                         }
@@ -223,12 +225,12 @@ fun UserProfileScreen(
 }
 
 /**
- * 用户资料内容
+ * 用户主页内容
  */
 @Composable
-private fun UserProfileContent(
-    userProfile: UserProfile,
-    onAddFriendClick: (UserProfile) -> Unit
+private fun UserHomepageContent(
+    userProfile: UserHomepageInfo,
+    onAddFriendClick: (UserHomepageInfo) -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -460,7 +462,7 @@ private fun RowScope.StatisticItem(
  */
 @Composable
 private fun MedalItem(
-    medal: UserMedal,
+    medal: Medal,
     modifier: Modifier = Modifier
 ) {
     Column(

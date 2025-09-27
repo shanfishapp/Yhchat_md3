@@ -297,6 +297,14 @@ class WebSocketService @Inject constructor(
                         val protoMsg = pushMessage.data.msg
                         val chatMessage = convertWsMsgToMessage(protoMsg)
                         
+                        // 详细日志用于调试
+                        Log.d(tag, "Push message details:")
+                        Log.d(tag, "  - Message ID: ${chatMessage.msgId}")
+                        Log.d(tag, "  - Sender: ${chatMessage.sender.chatId} (type: ${chatMessage.sender.chatType})")
+                        Log.d(tag, "  - Target Chat: ${chatMessage.chatId} (type: ${chatMessage.chatType})")
+                        Log.d(tag, "  - Receiver: ${chatMessage.recvId}")
+                        Log.d(tag, "  - Content: ${chatMessage.content.text?.take(50) ?: "[非文本消息]"}")
+                        
                         scope.launch {
                             // 发送消息事件供UI更新
                             _messageEvents.emit(MessageEvent.NewMessage(chatMessage))
@@ -370,6 +378,7 @@ class WebSocketService @Inject constructor(
     
     /**
      * 将WebSocket Proto消息转换为应用内消息模型
+     * 注意：消息应该放在protoMsg.chatId对应的会话中，而不是sender.chatId
      */
     private fun convertWsMsgToMessage(protoMsg: WsMsg): ChatMessage {
         val sender = com.yhchat.canary.data.model.MessageSender(
@@ -431,7 +440,11 @@ class WebSocketService @Inject constructor(
             msgDeleteTime = if (protoMsg.deleteTime > 0) protoMsg.deleteTime else null,
             quoteMsgId = if (protoMsg.quoteMsgId.isNotEmpty()) protoMsg.quoteMsgId else null,
             msgSeq = protoMsg.msgSeq,
-            editTime = if (protoMsg.editTime > 0) protoMsg.editTime else null
+            editTime = if (protoMsg.editTime > 0) protoMsg.editTime else null,
+            // 关键修复：使用protoMsg的chatId和chatType，而不是sender的
+            chatId = protoMsg.chatId,
+            chatType = protoMsg.chatType,
+            recvId = protoMsg.recvId
         )
     }
     
@@ -459,24 +472,28 @@ class WebSocketService @Inject constructor(
                 else -> "[消息]"
             }
             
+            // 使用正确的chatId和chatType来确定会话
+            val targetChatId = message.chatId ?: message.sender.chatId
+            val targetChatType = message.chatType ?: message.sender.chatType
+            
             // 确定会话名称
-            val conversationTitle = when (message.sender.chatType) {
+            val conversationTitle = when (targetChatType) {
                 1 -> senderName // 私聊直接用发送者名称
-                2 -> "群聊" // 群聊
+                2 -> "群聊" // 群聊 - 这里可以从本地缓存获取群名称
                 3 -> "机器人" // 机器人
                 else -> "会话"
             }
             
-            // 点击通知的Intent
+            // 点击通知的Intent - 跳转到正确的会话
             val intent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                putExtra("chat_id", message.sender.chatId)
-                putExtra("chat_type", message.sender.chatType)
+                putExtra("chat_id", targetChatId)
+                putExtra("chat_type", targetChatType)
             }
             
             val pendingIntent = PendingIntent.getActivity(
                 context, 
-                message.sender.chatId.hashCode(),
+                targetChatId.hashCode(),
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
@@ -491,9 +508,9 @@ class WebSocketService @Inject constructor(
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .build()
             
-            // 显示通知，使用chatId的哈希作为通知ID
+            // 显示通知，使用正确的chatId的哈希作为通知ID
             notificationManager.notify(
-                NOTIFICATION_ID_BASE + message.sender.chatId.hashCode(),
+                NOTIFICATION_ID_BASE + targetChatId.hashCode(),
                 notification
             )
             

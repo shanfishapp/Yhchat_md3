@@ -1,6 +1,6 @@
 package com.yhchat.canary.data.repository
 
-import com.yhchat.canary.data.api.AddFriendRequest
+import com.yhchat.canary.data.model.AddFriendRequest
 import com.yhchat.canary.data.api.ApiService
 import com.yhchat.canary.data.model.*
 import javax.inject.Inject

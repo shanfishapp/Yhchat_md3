@@ -11,6 +11,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import com.yhchat.canary.ui.webview.WebViewActivity
+import com.yhchat.canary.utils.ChatAddLinkHandler
 import java.util.regex.Pattern
 
 /**
@@ -24,9 +25,9 @@ fun LinkText(
 ) {
     val context = LocalContext.current
     
-    // 简化的链接正则表达式 - 只识别http开头的链接，遇到中文停止
+    // 扩展的链接正则表达式 - 支持http和yunhu协议
     val urlPattern = Pattern.compile(
-        "https?://[^\\s\\u4e00-\\u9fff]+",
+        "(https?://[^\\s\\u4e00-\\u9fff]+|yunhu://[^\\s\\u4e00-\\u9fff]*)",
         Pattern.CASE_INSENSITIVE
     )
     
@@ -73,8 +74,13 @@ fun LinkText(
                 annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
                 .firstOrNull()?.let { annotation ->
                     val url = annotation.item
-                    // 启动 WebView Activity（URL已经包含http前缀）
-                    WebViewActivity.start(context, url)
+                    if (url.startsWith("yunhu://")) {
+                        // 处理yunhu协议链接
+                        ChatAddLinkHandler.handleLink(context, url)
+                    } else {
+                        // 启动 WebView Activity（HTTP链接）
+                        WebViewActivity.start(context, url)
+                    }
                 }
         }
     )
@@ -85,7 +91,7 @@ fun LinkText(
  */
 object LinkDetector {
     private val urlPattern = Pattern.compile(
-        "https?://[^\\s\\u4e00-\\u9fff]+",
+        "(https?://[^\\s\\u4e00-\\u9fff]+|yunhu://[^\\s\\u4e00-\\u9fff]*)",
         Pattern.CASE_INSENSITIVE
     )
     
@@ -105,7 +111,6 @@ object LinkDetector {
         
         while (matcher.find()) {
             val url = matcher.group()
-            // URL已经包含http前缀，直接添加
             links.add(url)
         }
         

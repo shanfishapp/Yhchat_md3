@@ -69,9 +69,19 @@
         <!-- 文章详情Activity -->
         <activity
             android:name=".ui.community.PostDetailActivity"
-            android:exported="false"
+            android:exported="true"
             android:label="文章详情"
-            android:theme="@style/Theme.YhchatCanary" />
+            android:theme="@style/Theme.YhchatCanary">
+            
+            <!-- 处理yunhu://深度链接 -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="yunhu" 
+                      android:host="post-detail" />
+            </intent-filter>
+        </activity>
             
         <!-- WebView Activity -->
         <activity
@@ -115,15 +125,28 @@
             android:label="群聊列表"
             android:theme="@style/Theme.YhchatCanary" />
             
+        <!-- 聊天添加 Activity -->
+        <activity
+            android:name=".ui.chat.ChatAddActivity"
+            android:exported="true"
+            android:label="添加聊天"
+            android:theme="@style/Theme.YhchatCanary">
+            
+            <!-- 处理yunhu://chat-add深度链接 -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="yunhu" 
+                      android:host="chat-add" />
+            </intent-filter>
+        </activity>
+            
         <!-- 搜索 Activity -->
         <activity
             android:name=".ui.community.SearchActivity"
             android:exported="false"
             android:label="搜索"
-
-
-
-
             android:theme="@style/Theme.YhchatCanary" />
         <activity
             android:name=".ui.settings.ChangePasswordActivity"
@@ -139,12 +162,21 @@
             android:theme="@style/Theme.YhchatCanary" />
             
         <!-- 综合搜索 Activity -->
+
+
         <activity
             android:name=".ui.search.ComprehensiveSearchActivity"
             android:exported="false"
             android:label="综合搜索"
             android:theme="@style/Theme.YhchatCanary" />
-            
+
+        <activity
+            android:name=".ui.community.EditPostActivity"
+            android:exported="false"
+            android:label="编辑文章
+
+"
+            android:theme="@style/Theme.YhchatCanary" />
         <!-- 语音播放服务 -->
         <service
             android:name=".service.AudioPlayerService"

@@ -19,12 +19,15 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.MonetizationOn
 import androidx.compose.material.icons.outlined.ThumbUp
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,16 +43,23 @@ import com.yhchat.canary.data.di.RepositoryFactory
 import com.yhchat.canary.data.model.CommunityPost
 import com.yhchat.canary.data.model.CommunityComment
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
+import com.yhchat.canary.ui.profile.UserProfileActivity
+import com.yhchat.canary.util.YunhuLinkHandler
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalContext
 import android.widget.TextView
 import android.content.Context
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.widget.Toast
 import io.noties.markwon.Markwon
 import io.noties.markwon.html.HtmlPlugin
 import io.noties.markwon.image.coil.CoilImagesPlugin
 import io.noties.markwon.linkify.LinkifyPlugin
 import io.noties.markwon.ext.strikethrough.StrikethroughPlugin
 import io.noties.markwon.ext.tables.TablePlugin
+import com.google.accompanist.swiperefresh.SwipeRefresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 
 /**
  * 文章详情Activity
@@ -59,9 +69,20 @@ class PostDetailActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
-        val postId = intent.getIntExtra("post_id", 0)
-        val postTitle = intent.getStringExtra("post_title") ?: "文章详情"
-        val token = intent.getStringExtra("token") ?: ""
+        // 首先尝试处理深度链接
+        var postId = intent.getIntExtra("post_id", 0)
+        var postTitle = intent.getStringExtra("post_title") ?: "文章详情"
+        var token = intent.getStringExtra("token") ?: ""
+        
+        // 处理深度链接
+        if (postId == 0 && intent.data != null) {
+            val deepLinkPostId = YunhuLinkHandler.extractPostIdFromLink(intent.data.toString())
+            if (deepLinkPostId != null) {
+                postId = deepLinkPostId
+                postTitle = "文章详情"
+                // 可能需要从其他地方获取token，这里先留空
+            }
+        }
         
         setContent {
             YhchatCanaryTheme {
@@ -75,258 +96,11 @@ class PostDetailActivity : ComponentActivity() {
                 PostDetailScreen(
                     postId = postId,
                     postTitle = postTitle,
-                    token = token,
                     viewModel = viewModel,
                     onBackClick = { finish() }
                 )
             }
         }
-    }
-}
-
-/**
- * 文章详情界面
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun PostDetailScreen(
-    postId: Int,
-    postTitle: String,
-    token: String,
-    viewModel: PostDetailViewModel,
-    onBackClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    // 获取状态
-    val postDetailState by viewModel.postDetailState.collectAsState()
-    val commentListState by viewModel.commentListState.collectAsState()
-    
-    // 评论输入状态
-    var commentText by remember { mutableStateOf("") }
-    var showCommentInput by remember { mutableStateOf(false) }
-    
-    // 打赏对话框状态
-    var showRewardDialog by remember { mutableStateOf(false) }
-    
-    // 加载数据
-    LaunchedEffect(postId, token) {
-        if (token.isNotEmpty() && postId > 0) {
-            viewModel.loadPostDetail(token, postId)
-        }
-    }
-    
-    // 错误处理
-    LaunchedEffect(postDetailState.error, commentListState.error) {
-        postDetailState.error?.let { error ->
-            // 可以在这里显示Snackbar或其他错误提示
-            viewModel.clearError()
-        }
-        commentListState.error?.let { error ->
-            // 可以在这里显示Snackbar或其他错误提示
-            viewModel.clearError()
-        }
-    }
-    
-    Surface(
-        modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-        // 顶部应用栏
-        TopAppBar(
-            title = {
-                Text(
-                    text = postDetailState.post?.title ?: postTitle,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = onBackClick) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "返回"
-                    )
-                }
-            }
-        )
-        
-        // 错误提示
-        postDetailState.error?.let { error ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer
-                )
-            ) {
-                Text(
-                    text = error,
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-        }
-        
-        // 加载状态
-        if (postDetailState.isLoading && postDetailState.post == null) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        } else {
-            postDetailState.post?.let { post ->
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // 文章内容
-                    item {
-                        PostContentCard(
-                            post = post,
-                            onLikeClick = {
-                                viewModel.likePost(token, postId)
-                            },
-                            onCollectClick = {
-                                viewModel.collectPost(token, postId)
-                            },
-                            onCommentClick = {
-                                showCommentInput = !showCommentInput
-                            },
-                            onRewardClick = {
-                                showRewardDialog = true
-                            }
-                        )
-                    }
-                    
-                    // 评论标题
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "评论 (${commentListState.comments.size})",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            
-                            TextButton(
-                                onClick = { showCommentInput = !showCommentInput }
-                            ) {
-                                Text("写评论")
-                            }
-                        }
-                    }
-                    
-                    // 评论列表
-                    items(commentListState.comments) { comment ->
-                        CommentItem(
-                            comment = comment,
-                            onLikeClick = { commentId ->
-                                viewModel.likeComment(token, postId, commentId)
-                            },
-                            onReplyClick = { commentId ->
-                                // TODO: 实现回复功能
-                                showCommentInput = true
-                            }
-                        )
-                    }
-                    
-                    // 加载更多评论
-                    if (commentListState.hasMore) {
-                        item {
-                            Button(
-                                onClick = { viewModel.loadMoreComments(token, postId) },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = !commentListState.isLoading
-                            ) {
-                                if (commentListState.isLoading) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        strokeWidth = 2.dp
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                }
-                                Text(if (commentListState.isLoading) "加载中..." else "加载更多评论")
-                            }
-                        }
-                    }
-                }
-                
-                // 评论输入框
-                if (showCommentInput) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.Bottom
-                        ) {
-                            OutlinedTextField(
-                                value = commentText,
-                                onValueChange = { commentText = it },
-                                modifier = Modifier.weight(1f),
-                                placeholder = { Text("写下你的评论...") },
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                                keyboardActions = KeyboardActions(
-                                    onSend = {
-                                        if (commentText.isNotBlank()) {
-                                            viewModel.commentPost(token, postId, commentText.trim())
-                                            commentText = ""
-                                            showCommentInput = false
-                                        }
-                                    }
-                                )
-                            )
-                            
-                            Spacer(modifier = Modifier.width(8.dp))
-                            
-                            IconButton(
-                                onClick = {
-                                    if (commentText.isNotBlank()) {
-                                        viewModel.commentPost(token, postId, commentText.trim())
-                                        commentText = ""
-                                        showCommentInput = false
-                                    }
-                                },
-                                enabled = commentText.isNotBlank()
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Send,
-                                    contentDescription = "发送评论"
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        // 打赏对话框
-        if (showRewardDialog) {
-            RewardDialog(
-                onDismiss = { showRewardDialog = false },
-                onReward = { amount ->
-                    viewModel.rewardPost(token, postId, amount)
-                    showRewardDialog = false
-                }
-            )
-        }
-    }
     }
 }
 
@@ -342,11 +116,12 @@ fun PostContentCard(
     onRewardClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // 作者信息
         Row(
@@ -355,7 +130,11 @@ fun PostContentCard(
             AsyncImage(
                 model = post.senderAvatar,
                 contentDescription = post.senderNickname,
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier
+                    .size(48.dp)
+                    .clickable {
+                        UserProfileActivity.start(context, post.senderId, post.senderNickname)
+                    },
                 contentScale = ContentScale.Crop
             )
             
@@ -396,8 +175,9 @@ fun PostContentCard(
         // 文章标题
         Text(
             text = post.title,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.fillMaxWidth()
         )
         
         Spacer(modifier = Modifier.height(12.dp))
@@ -414,11 +194,48 @@ fun PostContentCard(
             Text(
                 text = post.content,
                 style = MaterialTheme.typography.bodyMedium,
-                lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.3
+                lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.3,
+                modifier = Modifier.fillMaxWidth()
             )
         }
         
         Spacer(modifier = Modifier.height(16.dp))
+        
+        // 群聊来源信息
+        post.group?.let { group ->
+            if (!group.groupId.isNullOrEmpty() && group.groupId != "0") {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AsyncImage(
+                            model = group.avatarUrl,
+                            contentDescription = group.name,
+                            modifier = Modifier.size(32.dp),
+                            contentScale = ContentScale.Crop
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Text(
+                            text = "来自 ${group.name}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
         
         // 操作按钮 - 使用MD3图标
         Card(
@@ -523,6 +340,7 @@ fun CommentItem(
     onReplyClick: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Card(
         modifier = modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
@@ -537,7 +355,11 @@ fun CommentItem(
                 AsyncImage(
                     model = comment.senderAvatar,
                     contentDescription = comment.senderNickname,
-                    modifier = Modifier.size(32.dp),
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clickable {
+                            UserProfileActivity.start(context, comment.senderId, comment.senderNickname)
+                        },
                     contentScale = ContentScale.Crop
                 )
                 
@@ -667,6 +489,7 @@ fun CommentReplyItem(
     reply: CommunityComment,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -676,7 +499,11 @@ fun CommentReplyItem(
         AsyncImage(
             model = reply.senderAvatar,
             contentDescription = reply.senderNickname,
-            modifier = Modifier.size(24.dp),
+            modifier = Modifier
+                .size(24.dp)
+                .clickable {
+                    UserProfileActivity.start(context, reply.senderId, reply.senderNickname)
+                },
             contentScale = ContentScale.Crop
         )
         
@@ -728,29 +555,28 @@ fun MarkdownContent(
     modifier: Modifier = Modifier
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
     
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
             TextView(ctx).apply {
-                // 创建Markwon实例
                 val markwon = Markwon.builder(ctx)
-                    .usePlugin(HtmlPlugin.create()) // HTML支持
-                    .usePlugin(CoilImagesPlugin.create(ctx)) // 图片支持
-                    .usePlugin(LinkifyPlugin.create()) // 链接支持
-                    .usePlugin(StrikethroughPlugin.create()) // 删除线支持
-                    .usePlugin(TablePlugin.create(ctx)) // 表格支持
+                    .usePlugin(HtmlPlugin.create())
+                    .usePlugin(CoilImagesPlugin.create(ctx))
+                    .usePlugin(LinkifyPlugin.create())
+                    .usePlugin(StrikethroughPlugin.create())
+                    .usePlugin(TablePlugin.create(ctx))
                     .build()
                 
-                // 设置文本样式
                 textSize = 16f
                 setPadding(0, 0, 0, 0)
-                
-                // 渲染Markdown
+                setTextColor(textColor)
                 markwon.setMarkdown(this, markdown)
             }
         },
         update = { textView ->
+            textView.setTextColor(textColor)
             val markwon = Markwon.builder(context)
                 .usePlugin(HtmlPlugin.create())
                 .usePlugin(CoilImagesPlugin.create(context))
@@ -794,7 +620,6 @@ fun RewardDialog(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 
-                // 预设金额按钮
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -823,11 +648,9 @@ fun RewardDialog(
                     }
                 }
                 
-                // 自定义金额输入
                 OutlinedTextField(
                     value = rewardAmount,
                     onValueChange = { 
-                        // 只允许输入数字和小数点
                         if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d*$"))) {
                             rewardAmount = it
                         }
@@ -859,4 +682,396 @@ fun RewardDialog(
             }
         }
     )
+}
+
+/**
+ * 分享对话框
+ */
+@Composable
+fun ShareDialog(
+    postId: Int,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val webLink = "www.yhchat.com/c/p/$postId"
+    val deepLink = "yunhu://post-detail?id=$postId"
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "分享文章",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "选择分享方式：",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        Text(
+                            text = "网页链接",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = webLink,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                val clip = ClipData.newPlainText("文章链接", webLink)
+                                clipboard.setPrimaryClip(clip)
+                                Toast.makeText(context, "网页链接已复制", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "复制",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("复制链接")
+                        }
+                    }
+                }
+                
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        Text(
+                            text = "应用内链接",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = deepLink,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                val clip = ClipData.newPlainText("文章链接", deepLink)
+                                clipboard.setPrimaryClip(clip)
+                                Toast.makeText(context, "应用内链接已复制", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "复制",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("复制链接")
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("关闭")
+            }
+        }
+    )
+}
+
+/**
+ * 文章详情界面
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PostDetailScreen(
+    postId: Int,
+    postTitle: String,
+    viewModel: PostDetailViewModel,
+    onBackClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // 获取状态
+    val postDetailState by viewModel.postDetailState.collectAsState()
+    val commentListState by viewModel.commentListState.collectAsState()
+    
+    // 评论输入状态
+    var commentText by remember { mutableStateOf("") }
+    var showCommentInput by remember { mutableStateOf(false) }
+    
+    // 打赏对话框状态
+    var showRewardDialog by remember { mutableStateOf(false) }
+    
+    // 分享对话框状态
+    var showShareDialog by remember { mutableStateOf(false) }
+    
+    // 加载数据
+    LaunchedEffect(postId) {
+        if (postId > 0) {
+            viewModel.loadPostDetailWithToken(postId)
+        }
+    }
+    
+    // 错误处理
+    LaunchedEffect(postDetailState.error, commentListState.error) {
+        postDetailState.error?.let { error ->
+            // 可以在这里显示Snackbar或其他错误提示
+            viewModel.clearError()
+        }
+        commentListState.error?.let { error ->
+            // 可以在这里显示Snackbar或其他错误提示
+            viewModel.clearError()
+        }
+    }
+    
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // 顶部应用栏
+            TopAppBar(
+                title = {
+                    Text(
+                        text = postDetailState.post?.title ?: postTitle,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "返回"
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showShareDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "分享"
+                        )
+                    }
+                }
+            )
+            
+            // 错误提示
+            postDetailState.error?.let { error ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Text(
+                        text = error,
+                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+            
+            // 加载状态
+            if (postDetailState.isLoading && postDetailState.post == null) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                postDetailState.post?.let { post ->
+                    val swipeRefreshState = rememberSwipeRefreshState(postDetailState.isRefreshing)
+                    SwipeRefresh(
+                        state = swipeRefreshState,
+                        onRefresh = { viewModel.refreshPostDetailWithToken(postId) }
+                    ) {
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            // 文章内容
+                            item {
+                                PostContentCard(
+                                    post = post,
+                                    onLikeClick = {
+                                        viewModel.likePostWithToken(postId)
+                                    },
+                                    onCollectClick = {
+                                        viewModel.collectPostWithToken(postId)
+                                    },
+                                    onCommentClick = {
+                                        showCommentInput = !showCommentInput
+                                    },
+                                    onRewardClick = {
+                                        showRewardDialog = true
+                                    }
+                                )
+                            }
+                            
+                            // 评论标题
+                            item {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "评论 (${commentListState.comments.size})",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    
+                                    TextButton(
+                                        onClick = { showCommentInput = !showCommentInput }
+                                    ) {
+                                        Text("写评论")
+                                    }
+                                }
+                            }
+                            
+                            // 评论列表
+                            items(commentListState.comments) { comment ->
+                                CommentItem(
+                                    comment = comment,
+                                    onLikeClick = { commentId ->
+                                        viewModel.likeCommentWithToken(postId, commentId)
+                                    },
+                                    onReplyClick = { commentId ->
+                                        // TODO: 实现回复功能
+                                        showCommentInput = true
+                                    }
+                                )
+                            }
+                            
+                            // 加载更多评论
+                            if (commentListState.hasMore) {
+                                item {
+                                    Button(
+                                        onClick = { viewModel.loadMoreCommentsWithToken(postId) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        enabled = !commentListState.isLoading
+                                    ) {
+                                        if (commentListState.isLoading) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                strokeWidth = 2.dp
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                        }
+                                        Text(if (commentListState.isLoading) "加载中..." else "加载更多评论")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 评论输入框
+                    if (showCommentInput) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                OutlinedTextField(
+                                    value = commentText,
+                                    onValueChange = { commentText = it },
+                                    modifier = Modifier.weight(1f),
+                                    placeholder = { Text("写下你的评论...") },
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                                    keyboardActions = KeyboardActions(
+                                        onSend = {
+                                            if (commentText.isNotBlank()) {
+                                                viewModel.commentPostWithToken(postId, commentText.trim())
+                                                commentText = ""
+                                                showCommentInput = false
+                                            }
+                                        }
+                                    )
+                                )
+                                
+                                Spacer(modifier = Modifier.width(8.dp))
+                                
+                                IconButton(
+                                    onClick = {
+                                        if (commentText.isNotBlank()) {
+                                            viewModel.commentPostWithToken(postId, commentText.trim())
+                                            commentText = ""
+                                            showCommentInput = false
+                                        }
+                                    },
+                                    enabled = commentText.isNotBlank()
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Send,
+                                        contentDescription = "发送评论"
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 打赏对话框
+            if (showRewardDialog) {
+                RewardDialog(
+                    onDismiss = { showRewardDialog = false },
+                    onReward = { amount ->
+                        viewModel.rewardPostWithToken(postId, amount)
+                        showRewardDialog = false
+                    }
+                )
+            }
+            
+            // 分享对话框
+            if (showShareDialog) {
+                ShareDialog(
+                    postId = postId,
+                    onDismiss = { showShareDialog = false }
+                )
+            }
+        }
+    }
 }

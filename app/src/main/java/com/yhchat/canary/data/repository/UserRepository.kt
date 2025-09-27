@@ -23,6 +23,9 @@ class UserRepository @Inject constructor(
     private val apiService: ApiService,
     private var tokenRepository: TokenRepository? = null
 ) {
+    
+    // Web API 服务，用于获取用户、群聊和机器人信息
+    private val webApiService = com.yhchat.canary.data.api.ApiClient.webApiService
 
     fun setTokenRepository(tokenRepository: TokenRepository?) {
         this.tokenRepository = tokenRepository
@@ -330,6 +333,121 @@ class UserRepository @Inject constructor(
         }
     }
     
+    /**
+     * 修改邀请码
+     */
+    suspend fun changeInviteCode(code: String): Result<Boolean> {
+        return try {
+            val token = getToken() ?: return Result.failure(Exception("未登录"))
+            val request = ChangeInviteCodeRequest(code = code)
+            val response = apiService.changeInviteCode(token, request)
+            if (response.isSuccessful) {
+                val changeInviteCodeResponse = response.body()
+                if (changeInviteCodeResponse?.get("code") == 1) {
+                    Result.success(true)
+                } else {
+                    Result.failure(Exception(changeInviteCodeResponse?.get("msg")?.toString() ?: "修改邀请码失败"))
+                }
+            } else {
+                Result.failure(Exception("修改邀请码失败: ${response.code()} - ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * 获取用户主页信息
+     */
+    suspend fun getUserHomepage(userId: String): Result<UserHomepageInfo> {
+        return try {
+            val response = webApiService.getUserHomepage(userId)
+            if (response.isSuccessful) {
+                val userHomepageResponse = response.body()
+                if (userHomepageResponse?.code == 1) {
+                    Result.success(userHomepageResponse.data.user)
+                } else {
+                    Result.failure(Exception(userHomepageResponse?.msg ?: "获取用户信息失败"))
+                }
+            } else {
+                Result.failure(Exception("获取用户信息失败: ${response.code()} - ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 获取群聊信息
+     */
+    suspend fun getGroupInfo(groupId: String): Result<GroupInfo> {
+        return try {
+            val request = mapOf("groupId" to groupId)
+            val response = webApiService.getGroupInfo(request)
+            if (response.isSuccessful) {
+                val groupInfoResponse = response.body()
+                if (groupInfoResponse?.code == 1) {
+                    Result.success(groupInfoResponse.data.group)
+                } else {
+                    Result.failure(Exception(groupInfoResponse?.msg ?: "获取群聊信息失败"))
+                }
+            } else {
+                Result.failure(Exception("获取群聊信息失败: ${response.code()} - ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 获取机器人信息
+     */
+    suspend fun getBotInfo(botId: String): Result<BotInfo> {
+        return try {
+            val request = mapOf("botId" to botId)
+            val response = webApiService.getBotInfo(request)
+            if (response.isSuccessful) {
+                val botInfoResponse = response.body()
+                if (botInfoResponse?.code == 1) {
+                    Result.success(botInfoResponse.data.bot)
+                } else {
+                    Result.failure(Exception(botInfoResponse?.msg ?: "获取机器人信息失败"))
+                }
+            } else {
+                Result.failure(Exception("获取机器人信息失败: ${response.code()} - ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * 添加好友/群聊/机器人
+     */
+    suspend fun addFriend(chatId: String, chatType: Int, remark: String = ""): Result<Boolean> {
+        return try {
+            val token = getToken() ?: return Result.failure(Exception("未登录"))
+            val request = AddFriendRequest(
+                chatId = chatId,
+                chatType = chatType,
+                remark = remark
+            )
+            val response = apiService.addFriend(token, request)
+            if (response.isSuccessful) {
+                val addFriendResponse = response.body()
+                if (addFriendResponse?.code == 1) {
+                    Result.success(true)
+                } else {
+                    Result.failure(Exception(addFriendResponse?.message ?: "添加失败"))
+                }
+            } else {
+                Result.failure(Exception("添加失败: ${response.code()} - ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     /**
      * 验证码登录
      */

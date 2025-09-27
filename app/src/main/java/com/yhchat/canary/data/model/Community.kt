@@ -383,6 +383,25 @@ data class CreatePostData(
 )
 
 /**
+ * 编辑文章响应
+ */
+data class EditPostResponse(
+    @SerializedName("code")
+    val code: Int,
+    
+    @SerializedName("data")
+    val data: EditPostData,
+    
+    @SerializedName("msg")
+    val msg: String
+)
+
+data class EditPostData(
+    @SerializedName("id")
+    val postId: Int
+)
+
+/**
  * 我的文章列表响应
  */
 data class MyPostListResponse(

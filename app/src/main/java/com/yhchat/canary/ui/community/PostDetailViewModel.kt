@@ -28,11 +28,41 @@ class PostDetailViewModel @Inject constructor(
     val commentListState: StateFlow<CommentListState> = _commentListState.asStateFlow()
     
     /**
+     * 使用TokenRepository获取token并加载文章详情
+     */
+    fun loadPostDetailWithToken(postId: Int, isRefresh: Boolean = false) {
+        viewModelScope.launch {
+            try {
+                val token = tokenRepository.getTokenSync()
+                if (token != null && postId > 0) {
+                    loadPostDetail(token, postId, isRefresh)
+                } else {
+                    _postDetailState.value = _postDetailState.value.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        error = if (token == null) "未登录" else "无效的文章ID"
+                    )
+                }
+            } catch (e: Exception) {
+                _postDetailState.value = _postDetailState.value.copy(
+                    isLoading = false,
+                    isRefreshing = false,
+                    error = "获取登录信息失败: ${e.message}"
+                )
+            }
+        }
+    }
+
+    /**
      * 加载文章详情
      */
-    fun loadPostDetail(token: String, postId: Int) {
+    fun loadPostDetail(token: String, postId: Int, isRefresh: Boolean = false) {
         viewModelScope.launch {
-            _postDetailState.value = _postDetailState.value.copy(isLoading = true, error = null)
+            if (isRefresh) {
+                _postDetailState.value = _postDetailState.value.copy(isRefreshing = true, error = null)
+            } else {
+                _postDetailState.value = _postDetailState.value.copy(isLoading = true, error = null)
+            }
             
             communityRepository.getPostDetail(token, postId)
                 .onSuccess { response ->
@@ -41,21 +71,43 @@ class PostDetailViewModel @Inject constructor(
                         board = response.data.board,
                         isAdmin = response.data.isAdmin,
                         isLoading = false,
+                        isRefreshing = false,
                         error = null
                     )
                     
-                    // 同时加载评论列表
-                    loadCommentList(token, postId)
+                    // 同时加载评论列表(仅在初次加载或非刷新时)
+                    if (!isRefresh || _commentListState.value.comments.isEmpty()) {
+                        loadCommentListWithToken(postId)
+                    }
                 }
                 .onFailure { error ->
                     _postDetailState.value = _postDetailState.value.copy(
                         isLoading = false,
+                        isRefreshing = false,
                         error = error.message
                     )
                 }
         }
     }
     
+    /**
+     * 使用TokenRepository加载评论列表
+     */
+    fun loadCommentListWithToken(postId: Int, page: Int = 1) {
+        viewModelScope.launch {
+            try {
+                val token = tokenRepository.getTokenSync()
+                if (token != null) {
+                    loadCommentList(token, postId, page)
+                } else {
+                    _commentListState.value = _commentListState.value.copy(error = "未登录")
+                }
+            } catch (e: Exception) {
+                _commentListState.value = _commentListState.value.copy(error = "获取登录信息失败: ${e.message}")
+            }
+        }
+    }
+
     /**
      * 加载评论列表
      */
@@ -92,6 +144,106 @@ class PostDetailViewModel @Inject constructor(
         }
     }
     
+    /**
+     * 使用TokenRepository点赞文章
+     */
+    fun likePostWithToken(postId: Int) {
+        viewModelScope.launch {
+            try {
+                val token = tokenRepository.getTokenSync()
+                if (token != null) {
+                    likePost(token, postId)
+                } else {
+                    _postDetailState.value = _postDetailState.value.copy(error = "未登录")
+                }
+            } catch (e: Exception) {
+                _postDetailState.value = _postDetailState.value.copy(error = "获取登录信息失败: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * 使用TokenRepository收藏文章
+     */
+    fun collectPostWithToken(postId: Int) {
+        viewModelScope.launch {
+            try {
+                val token = tokenRepository.getTokenSync()
+                if (token != null) {
+                    collectPost(token, postId)
+                } else {
+                    _postDetailState.value = _postDetailState.value.copy(error = "未登录")
+                }
+            } catch (e: Exception) {
+                _postDetailState.value = _postDetailState.value.copy(error = "获取登录信息失败: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * 使用TokenRepository打赏文章
+     */
+    fun rewardPostWithToken(postId: Int, amount: Double) {
+        viewModelScope.launch {
+            try {
+                val token = tokenRepository.getTokenSync()
+                if (token != null) {
+                    rewardPost(token, postId, amount)
+                } else {
+                    _postDetailState.value = _postDetailState.value.copy(error = "未登录")
+                }
+            } catch (e: Exception) {
+                _postDetailState.value = _postDetailState.value.copy(error = "获取登录信息失败: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * 使用TokenRepository评论文章
+     */
+    fun commentPostWithToken(postId: Int, content: String, commentId: Int = 0) {
+        viewModelScope.launch {
+            try {
+                val token = tokenRepository.getTokenSync()
+                if (token != null) {
+                    commentPost(token, postId, content, commentId)
+                } else {
+                    _commentListState.value = _commentListState.value.copy(error = "未登录")
+                }
+            } catch (e: Exception) {
+                _commentListState.value = _commentListState.value.copy(error = "获取登录信息失败: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * 使用TokenRepository加载更多评论
+     */
+    fun loadMoreCommentsWithToken(postId: Int) {
+        val currentPage = _commentListState.value.currentPage
+        if (_commentListState.value.hasMore && !_commentListState.value.isLoading) {
+            loadCommentListWithToken(postId, currentPage + 1)
+        }
+    }
+
+    /**
+     * 使用TokenRepository点赞评论
+     */
+    fun likeCommentWithToken(postId: Int, commentId: Int) {
+        viewModelScope.launch {
+            try {
+                val token = tokenRepository.getTokenSync()
+                if (token != null) {
+                    likeComment(token, postId, commentId)
+                } else {
+                    _commentListState.value = _commentListState.value.copy(error = "未登录")
+                }
+            } catch (e: Exception) {
+                _commentListState.value = _commentListState.value.copy(error = "获取登录信息失败: ${e.message}")
+            }
+        }
+    }
+
     /**
      * 点赞文章
      */
@@ -183,6 +335,20 @@ class PostDetailViewModel @Inject constructor(
     }
     
     /**
+     * 使用TokenRepository刷新文章详情
+     */
+    fun refreshPostDetailWithToken(postId: Int) {
+        loadPostDetailWithToken(postId, isRefresh = true)
+    }
+
+    /**
+     * 刷新文章详情
+     */
+    fun refreshPostDetail(token: String, postId: Int) {
+        loadPostDetail(token, postId, isRefresh = true)
+    }
+    
+    /**
      * 清除错误信息
      */
     fun clearError() {
@@ -199,6 +365,7 @@ data class PostDetailState(
     val board: CommunityBoard? = null,
     val isAdmin: Int = 0,
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val error: String? = null
 )
 

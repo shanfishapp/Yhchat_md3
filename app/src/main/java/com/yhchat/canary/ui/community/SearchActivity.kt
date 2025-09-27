@@ -5,6 +5,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -47,6 +53,19 @@ class SearchActivity : ComponentActivity() {
         
         setContent {
             YhchatCanaryTheme {
+                val view = LocalView.current
+                val darkTheme = isSystemInDarkTheme()
+                
+                SideEffect {
+                    val window = (view.context as ComponentActivity).window
+                    window.
+
+                    statusBarColor = Color.Transparent.toArgb()
+                    window.navigationBarColor = Color.Transparent.toArgb()
+                    WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+                    WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !darkTheme
+                }
+                
                 val viewModel: SearchViewModel = viewModel {
                     SearchViewModel(
                         communityRepository = RepositoryFactory.getCommunityRepository(this@SearchActivity)
@@ -87,198 +106,206 @@ fun SearchScreen(
         focusRequester.requestFocus()
     }
     
-    Column(
-        modifier = modifier.fillMaxSize()
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
     ) {
-        // 搜索栏
-        TopAppBar(
-            title = {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("搜索文章和分区...") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(
-                        onSearch = {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // 搜索栏
+            TopAppBar(
+                title = {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("搜索文章和分区...") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(
+                            onSearch = {
+                                if (searchQuery.isNotBlank()) {
+                                    viewModel.search(token, searchQuery.trim())
+                                    keyboardController?.hide()
+                                }
+                            }
+                        ),
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "清空"
+                                    )
+                                }
+                            }
+                        }
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "返回"
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = {
                             if (searchQuery.isNotBlank()) {
                                 viewModel.search(token, searchQuery.trim())
                                 keyboardController?.hide()
                             }
                         }
-                    ),
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
-                                Icon(
-                                    imageVector = Icons.Default.Clear,
-                                    contentDescription = "清空"
-                                )
-                            }
-                        }
-                    }
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = onBackClick) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "返回"
-                    )
-                }
-            },
-            actions = {
-                IconButton(
-                    onClick = {
-                        if (searchQuery.isNotBlank()) {
-                            viewModel.search(token, searchQuery.trim())
-                            keyboardController?.hide()
-                        }
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "搜索"
-                    )
-                }
-            }
-        )
-        
-        // 错误提示
-        searchState.error?.let { error ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer
-                )
-            ) {
-                Text(
-                    text = error,
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-        }
-        
-        // 搜索结果
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // 分区结果
-            if (searchState.boards.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "分区 (${searchState.boards.size})",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                }
-                
-                items(searchState.boards) { board ->
-                    SearchBoardItem(
-                        board = board,
-                        onClick = {
-                            // 跳转到分区详情
-                            val intent = Intent(context, BoardDetailActivity::class.java).apply {
-                                putExtra("board_id", board.id)
-                                putExtra("board_name", board.name)
-                                putExtra("token", token)
-                            }
-                            context.startActivity(intent)
-                        }
-                    )
-                }
-                
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-            }
-            
-            // 文章结果
-            if (searchState.posts.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "文章 (${searchState.posts.size})",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                }
-                
-                items(searchState.posts) { post ->
-                    SearchPostItem(
-                        post = post,
-                        onClick = {
-                            // 跳转到文章详情
-                            val intent = Intent(context, PostDetailActivity::class.java).apply {
-                                putExtra("post_id", post.id)
-                                putExtra("post_title", post.title)
-                                putExtra("token", token)
-                            }
-                            context.startActivity(intent)
-                        }
-                    )
-                }
-            }
-            
-            // 空状态
-            if (!searchState.isLoading && searchState.boards.isEmpty() && searchState.posts.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "搜索"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                )
+            )
+            
+            // 错误提示
+            searchState.error?.let { error ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Text(
+                        text = error,
+                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+            
+            // 搜索结果
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // 分区结果
+                if (searchState.boards.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "分区 (${searchState.boards.size})",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                    
+                    items(searchState.boards) { board ->
+                        SearchBoardItem(
+                            board = board,
+                            onClick = {
+                                // 跳转到分区详情
+                                val intent = Intent(context, BoardDetailActivity::class.java).apply {
+                                    putExtra("board_id", board.id)
+                                    putExtra("board_name", board.name)
+                                    putExtra("token", token)
+                                }
+                                context.startActivity(intent)
+                            }
+                        )
+                    }
+                    
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
+                
+                // 文章结果
+                if (searchState.posts.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "文章 (${searchState.posts.size})",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                    
+                    items(searchState.posts) { post ->
+                        SearchPostItem(
+                            post = post,
+                            onClick = {
+                                // 跳转到文章详情
+                                val intent = Intent(context, PostDetailActivity::class.java).apply {
+                                    putExtra("post_id", post.id)
+                                    putExtra("post_title", post.title)
+                                    putExtra("token", token)
+                                }
+                                context.startActivity(intent)
+                            }
+                        )
+                    }
+                }
+                
+                // 空状态
+                if (!searchState.isLoading && searchState.boards.isEmpty() && searchState.posts.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = if (searchQuery.isEmpty()) "输入关键词开始搜索" else "没有找到相关内容",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            if (searchQuery.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(8.dp))
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
                                 Text(
-                                    text = "尝试使用其他关键词",
+                                    text = if (searchQuery.isEmpty()) "输入关键词开始搜索" else "没有找到相关内容",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (searchQuery.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "尝试使用其他关键词",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // 加载状态
+                if (searchState.isLoading) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                CircularProgressIndicator()
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "搜索中...",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                        }
-                    }
-                }
-            }
-            
-            // 加载状态
-            if (searchState.isLoading) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            CircularProgressIndicator()
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "搜索中...",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
                     }
                 }

@@ -2,6 +2,7 @@ package com.yhchat.canary.ui.components
 
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.net.Uri
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
@@ -11,7 +12,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.viewinterop.AndroidView
+import com.yhchat.canary.utils.ChatAddLinkHandler
 
 /**
  * HTML WebView渲染组件
@@ -22,10 +25,17 @@ fun HtmlWebView(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val isDarkTheme = isSystemInDarkTheme()
     val backgroundColor = MaterialTheme.colorScheme.surface.toArgb()
     val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
+    val linkColor = MaterialTheme.colorScheme.primary.toArgb()
+    val codeBackgroundColor = if (isDarkTheme) {
+        MaterialTheme.colorScheme.surfaceVariant.toArgb()
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.toArgb()
+    }
     
-    val styledHtml = remember(htmlContent, backgroundColor, textColor) {
+    val styledHtml = remember(htmlContent, backgroundColor, textColor, linkColor, codeBackgroundColor, isDarkTheme) {
         """
         <!DOCTYPE html>
         <html>
@@ -53,17 +63,24 @@ fun HtmlWebView(
                     height: auto;
                 }
                 a {
-                    color: #2196F3;
+                    color: ${String.format("#%06X", linkColor and 0xFFFFFF)} !important;
                     text-decoration: none;
                 }
                 a:hover {
                     text-decoration: underline;
                 }
                 pre, code {
-                    background-color: rgba(128, 128, 128, 0.2);
+                    background-color: ${String.format("#%06X", codeBackgroundColor and 0xFFFFFF)} !important;
+                    color: ${String.format("#%06X", textColor and 0xFFFFFF)} !important;
                     padding: 4px 8px;
                     border-radius: 4px;
                     font-family: 'Courier New', monospace;
+                }
+                blockquote {
+                    border-left: 4px solid ${String.format("#%06X", linkColor and 0xFFFFFF)};
+                    margin: 8px 0;
+                    padding-left: 12px;
+                    color: ${String.format("#%06X", textColor and 0xFFFFFF)} !important;
                 }
                 table {
                     border-collapse: collapse;
@@ -75,7 +92,11 @@ fun HtmlWebView(
                     text-align: left;
                 }
                 th {
-                    background-color: rgba(128, 128, 128, 0.1);
+                    background-color: ${String.format("#%06X", codeBackgroundColor and 0xFFFFFF)} !important;
+                    color: ${String.format("#%06X", textColor and 0xFFFFFF)} !important;
+                }
+                td {
+                    color: ${String.format("#%06X", textColor and 0xFFFFFF)} !important;
                 }
             </style>
         </head>
@@ -90,22 +111,32 @@ fun HtmlWebView(
         modifier = modifier
             .fillMaxWidth()
             .height(200.dp), // 默认高度，可以根据需要调整
-        factory = { ctx ->
+        factory = { ctx: android.content.Context ->
             WebView(ctx).apply {
-                webViewClient = WebViewClient()
+                webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                        url?.let {
+                            if (it.startsWith("yunhu://")) {
+                                ChatAddLinkHandler.handleLink(ctx, it)
+                                return true
+                            }
+                        }
+                        return false
+                    }
+                }
                 settings.apply {
-                    javaScriptEnabled = false // 出于安全考虑，禁用JavaScript
-                    domStorageEnabled = false
+                    javaScriptEnabled = true // HTML消息可能需要JS
+                    domStorageEnabled = true
                     allowFileAccess = false
                     allowContentAccess = false
-                    setSupportZoom(false)
+                    setSupportZoom(true)
                     builtInZoomControls = false
                     displayZoomControls = false
                 }
                 setBackgroundColor(backgroundColor)
             }
         },
-        update = { webView ->
+        update = { webView: WebView ->
             webView.loadDataWithBaseURL(
                 null,
                 styledHtml,

@@ -7,6 +7,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.Comment
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.MonetizationOn
+import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -253,23 +258,23 @@ fun PostItem(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     StatItem(
-                        icon = "👍",
+                        icon = if (post.isLiked == "1") Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp,
                         count = post.likeNum,
                         isActive = post.isLiked == "1"
                     )
                     StatItem(
-                        icon = "💬",
+                        icon = Icons.Default.Comment,
                         count = post.commentNum,
                         isActive = false
                     )
                     StatItem(
-                        icon = "⭐",
+                        icon = Icons.Default.Star,
                         count = post.collectNum,
                         isActive = post.isCollected == 1
                     )
                     if (post.amountNum > 0) {
                         StatItem(
-                            icon = "💰",
+                            icon = Icons.Default.MonetizationOn,
                             count = post.amountNum.toInt(),
                             isActive = post.isReward == 1
                         )
@@ -304,7 +309,7 @@ fun PostItem(
  */
 @Composable
 private fun StatItem(
-    icon: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     count: Int,
     isActive: Boolean,
     modifier: Modifier = Modifier
@@ -313,13 +318,14 @@ private fun StatItem(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
     ) {
-        Text(
-            text = icon,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (isActive) 
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (isActive) 
                 MaterialTheme.colorScheme.primary 
             else 
-                MaterialTheme.colorScheme.onSurfaceVariant
+                MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp)
         )
         Spacer(modifier = Modifier.width(4.dp))
         Text(

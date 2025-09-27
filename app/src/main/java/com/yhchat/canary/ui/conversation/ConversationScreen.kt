@@ -36,10 +36,16 @@ import androidx.compose.ui.res.painterResource
 import com.yhchat.canary.data.model.Conversation
 import com.yhchat.canary.data.model.ChatType
 import com.yhchat.canary.data.repository.TokenRepository
+import com.yhchat.canary.ui.components.ScrollBehavior
+import com.yhchat.canary.ui.components.HandleScrollBehavior
 import com.yhchat.canary.ui.search.ComprehensiveSearchActivity
 import com.yhchat.canary.ui.sticky.StickyConversations
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.animation.*
+import androidx.compose.ui.input.pointer.pointerInput
 import java.text.SimpleDateFormat
 import java.util.*
+import com.yhchat.canary.ui.components.ConversationMenuDialog
 
 /**
  * 会话列表界面
@@ -54,6 +60,7 @@ fun ConversationScreen(
     onMenuClick: () -> Unit,
     tokenRepository: TokenRepository? = null,
     viewModel: ConversationViewModel = viewModel(),
+    scrollBehavior: ScrollBehavior? = null,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -69,11 +76,17 @@ fun ConversationScreen(
     var refreshing by remember(key1 = "refreshing") { mutableStateOf(false) }
 
     // 下拉刷新状态
-    val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = refreshing)
+    val swipeRefreshState =
+        rememberSwipeRefreshState(isRefreshing = refreshing)
     val context = LocalContext.current
     
     // 协程作用域
     val coroutineScope = rememberCoroutineScope()
+    
+    // 长按菜单状态
+    var showConversationMenu by remember { mutableStateOf(false) }
+    var selectedConversation by remember { mutableStateOf<Conversation?>(null) }
+    var isSelectedConversationSticky by remember { mutableStateOf(false) }
 
     // 监听列表滚动位置，控制置顶栏显示
     LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) {
@@ -171,7 +184,7 @@ fun ConversationScreen(
             onRefresh = {
                 // 只有用户主动下拉刷新时才重新加载数据
                 refreshing = true
-                viewModel.refreshConversations(token)
+                viewModel.loadConversations(token)
                 // 延迟一下再关闭刷新状态，让用户感知到刷新动作
                 coroutineScope.launch {
                     kotlinx.coroutines.delay(500)
@@ -199,7 +212,13 @@ fun ConversationScreen(
                                 onConversationClick(conversation.chatId, conversation.chatType, conversation.name)
                             },
                             onLongClick = {
-                                // 长按处理
+                                // 长按处理 - 显示菜单
+                                selectedConversation = conversation
+                                // 检查是否置顶（简化实现，实际应该从状态中获取）
+                                coroutineScope.launch {
+                                    isSelectedConversationSticky = viewModel.isConversationSticky(conversation.chatId)
+                                    showConversationMenu = true
+                                }
                             }
                         )
                     }
@@ -223,6 +242,28 @@ fun ConversationScreen(
                 }
             }
         }
+    }
+    
+    // 长按菜单弹窗
+    if (showConversationMenu && selectedConversation != null) {
+        ConversationMenuDialog(
+            conversation = selectedConversation!!,
+            isSticky = isSelectedConversationSticky,
+            onDismiss = { 
+                showConversationMenu = false
+                selectedConversation = null
+            },
+            onToggleSticky = {
+                selectedConversation?.let { conversation ->
+                    viewModel.toggleStickyConversation(conversation)
+                }
+            },
+            onDelete = {
+                selectedConversation?.let { conversation ->
+                    viewModel.deleteConversation(conversation.chatId)
+                }
+            }
+        )
     }
 }
 
@@ -248,7 +289,12 @@ fun ConversationItem(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clickable { onClick() },
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { onClick() },
+                    onLongPress = { onLongClick() }
+                )
+            },
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(

@@ -111,9 +111,13 @@ class CommunityViewModel @Inject constructor(
     /**
      * 加载我的文章列表
      */
-    fun loadMyPostList(token: String, page: Int = 1) {
+    fun loadMyPostList(token: String, page: Int = 1, isRefresh: Boolean = false) {
         viewModelScope.launch {
-            _myPostListState.value = _myPostListState.value.copy(isLoading = true, error = null)
+            if (isRefresh) {
+                _myPostListState.value = _myPostListState.value.copy(isRefreshing = true, error = null)
+            } else {
+                _myPostListState.value = _myPostListState.value.copy(isLoading = true, error = null)
+            }
             
             communityRepository.getMyPostList(
                 token = token,
@@ -123,6 +127,7 @@ class CommunityViewModel @Inject constructor(
                 onSuccess = { response ->
                     _myPostListState.value = _myPostListState.value.copy(
                         isLoading = false,
+                        isRefreshing = false,
                         posts = response.data.posts,
                         total = response.data.total,
                         currentPage = page,
@@ -132,6 +137,7 @@ class CommunityViewModel @Inject constructor(
                 onFailure = { error ->
                     _myPostListState.value = _myPostListState.value.copy(
                         isLoading = false,
+                        isRefreshing = false,
                         error = error.message ?: "加载我的文章列表失败"
                     )
                 }
@@ -345,6 +351,101 @@ class CommunityViewModel @Inject constructor(
     }
     
     /**
+     * 删除文章
+     */
+    fun deletePost(token: String, postId: Int) {
+        viewModelScope.launch {
+            communityRepository.deletePost(token, postId).fold(
+                onSuccess = {
+                    // 删除成功，从列表中移除该文章
+                    val currentPosts = _myPostListState.value.posts
+                    val updatedPosts = currentPosts.filter { it.id != postId }
+                    _myPostListState.value = _myPostListState.value.copy(
+                        posts = updatedPosts,
+                        total = _myPostListState.value.total - 1
+                    )
+                },
+                onFailure = { error ->
+                    _myPostListState.value = _myPostListState.value.copy(
+                        error = error.message ?: "删除文章失败"
+                    )
+                }
+            )
+        }
+    }
+    
+    /**
+     * 刷新我的文章列表
+     */
+    fun refreshMyPostList(token: String) {
+        loadMyPostList(token, page = 1, isRefresh = true)
+    }
+    
+    /**
+     * 刷新分区列表
+     */
+    fun refreshBoardList(token: String) {
+        viewModelScope.launch {
+            _boardListState.value = _boardListState.value.copy(isRefreshing = true, error = null)
+            
+            communityRepository.getBoardList(
+                token = token,
+                typ = 2,
+                size = 1000,
+                page = 1
+            ).fold(
+                onSuccess = { response ->
+                    _boardListState.value = _boardListState.value.copy(
+                        isRefreshing = false,
+                        boards = response.data.boards,
+                        total = response.data.total,
+                        currentPage = 1,
+                        hasMore = false
+                    )
+                },
+                onFailure = { error ->
+                    _boardListState.value = _boardListState.value.copy(
+                        isRefreshing = false,
+                        error = error.message ?: "刷新分区列表失败"
+                    )
+                }
+            )
+        }
+    }
+    
+    /**
+     * 刷新关注分区列表
+     */
+    fun refreshFollowingBoardList(token: String) {
+        viewModelScope.launch {
+            _followingBoardListState.value = _followingBoardListState.value.copy(isRefreshing = true, error = null)
+            
+            communityRepository.getFollowingBoardList(
+                token = token,
+                typ = 1,
+                size = 1000,
+                page = 1
+            ).fold(
+                onSuccess = { response ->
+                    _followingBoardListState.value = _followingBoardListState.value.copy(
+                        isRefreshing = false,
+                        boards = response.data.boards,
+                        total = response.data.total,
+                        currentPage = 1,
+                        hasMore = false
+                    )
+                },
+                onFailure = { error ->
+                    _followingBoardListState.value = _followingBoardListState.value.copy(
+                        isRefreshing = false,
+                        error = error.message ?: "刷新关注分区列表失败"
+                    )
+                }
+            )
+        }
+    }
+    
+    /**
      * 关注/取消关注分区
      */
     fun followBoard(token: String, boardId: Int) {
@@ -381,6 +482,7 @@ class CommunityViewModel @Inject constructor(
  */
 data class BoardListState(
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val boards: List<CommunityBoard> = emptyList(),
     val total: Int = 0,
     val currentPage: Int = 1,
@@ -406,6 +508,7 @@ data class CommunityPostListState(
  */
 data class MyPostListState(
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val posts: List<CommunityPost> = emptyList(),
     val total: Int = 0,
     val currentPage: Int = 1,

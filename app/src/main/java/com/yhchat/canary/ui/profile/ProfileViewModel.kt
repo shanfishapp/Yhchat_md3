@@ -21,6 +21,10 @@ class ProfileViewModel(
 
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
+    
+    // 修改邀请码状态
+    private val _changeInviteCodeState = MutableStateFlow(ChangeInviteCodeState())
+    val changeInviteCodeState: StateFlow<ChangeInviteCodeState> = _changeInviteCodeState.asStateFlow()
 
     /**
      * 加载用户个人资料
@@ -54,6 +58,45 @@ class ProfileViewModel(
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
+    
+    /**
+     * 修改邀请码
+     */
+    fun changeInviteCode(code: String) {
+        viewModelScope.launch {
+            _changeInviteCodeState.value = _changeInviteCodeState.value.copy(
+                isLoading = true, 
+                error = null,
+                isSuccess = false
+            )
+            
+            userRepository.changeInviteCode(code).fold(
+                onSuccess = {
+                    _changeInviteCodeState.value = _changeInviteCodeState.value.copy(
+                        isLoading = false,
+                        isSuccess = true,
+                        error = null
+                    )
+                    // 修改成功后重新加载用户资料
+                    loadUserProfile()
+                },
+                onFailure = { exception ->
+                    Log.e("ProfileViewModel", "修改邀请码失败", exception)
+                    _changeInviteCodeState.value = _changeInviteCodeState.value.copy(
+                        isLoading = false,
+                        error = exception.message ?: "修改邀请码失败"
+                    )
+                }
+            )
+        }
+    }
+    
+    /**
+     * 重置修改邀请码状态
+     */
+    fun resetChangeInviteCodeState() {
+        _changeInviteCodeState.value = ChangeInviteCodeState()
+    }
 }
 
 /**
@@ -62,5 +105,14 @@ class ProfileViewModel(
 data class ProfileUiState(
     val isLoading: Boolean = false,
     val userProfile: UserProfile? = null,
+    val error: String? = null
+)
+
+/**
+ * 修改邀请码状态
+ */
+data class ChangeInviteCodeState(
+    val isLoading: Boolean = false,
+    val isSuccess: Boolean = false,
     val error: String? = null
 )

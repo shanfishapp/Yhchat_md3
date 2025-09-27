@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
@@ -54,6 +55,10 @@ fun ProfileScreen(
         ProfileViewModel(repo)
     }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val changeInviteCodeState by viewModel.changeInviteCodeState.collectAsStateWithLifecycle()
+    
+    // 修改邀请码弹窗状态
+    var showChangeInviteCodeDialog by remember { mutableStateOf(false) }
     
     // 在界面显示时加载用户资料
     LaunchedEffect(Unit) {
@@ -139,6 +144,8 @@ fun ProfileScreen(
                         userProfile = userProfile,
                         navigationRepository = navigationRepository,
                         tokenRepository = tokenRepository,
+                        viewModel = viewModel,
+                        onShowChangeInviteCodeDialog = { showChangeInviteCodeDialog = true },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -155,12 +162,29 @@ fun ProfileScreen(
         }
     }
     }
+    
+    // 修改邀请码弹窗
+    if (showChangeInviteCodeDialog) {
+        ChangeInviteCodeDialog(
+            currentInviteCode = uiState.userProfile?.invitationCode ?: "",
+            changeInviteCodeState = changeInviteCodeState,
+            onConfirm = { newCode ->
+                viewModel.changeInviteCode(newCode)
+            },
+            onDismiss = {
+                showChangeInviteCodeDialog = false
+                viewModel.resetChangeInviteCodeState()
+            }
+        )
+    }
 }
 @Composable
 private fun UserProfileContent(
     userProfile: com.yhchat.canary.data.model.UserProfile,
     navigationRepository: NavigationRepository? = null,
     tokenRepository: com.yhchat.canary.data.repository.TokenRepository? = null,
+    viewModel: ProfileViewModel? = null,
+    onShowChangeInviteCodeDialog: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -305,10 +329,12 @@ private fun UserProfileContent(
 
                 // 邀请码
                 if (!TextUtils.isEmpty(userProfile.invitationCode)) {
-                    ProfileInfoItem(
+                    ProfileInfoItemWithButton(
                         icon = Icons.Default.Person,
                         label = "邀请码",
-                        value = userProfile.invitationCode!!
+                        value = userProfile.invitationCode!!,
+                        buttonText = "修改邀请码",
+                        onButtonClick = onShowChangeInviteCodeDialog
                     )
                 }
             }
@@ -413,4 +439,161 @@ private fun ProfileSettingItem(
         }
     }
 }
- 
+
+@Composable
+private fun ProfileInfoItemWithButton(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    buttonText: String,
+    onButtonClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        
+        Spacer(modifier = Modifier.width(12.dp))
+        
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        
+        OutlinedButton(
+            onClick = onButtonClick,
+            modifier = Modifier.padding(start = 8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = buttonText,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = buttonText,
+                style = MaterialTheme.typography.labelMedium
+            )
+        }
+    }
+}
+
+/**
+ * 修改邀请码弹窗
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChangeInviteCodeDialog(
+    currentInviteCode: String,
+    changeInviteCodeState: ChangeInviteCodeState,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var newInviteCode by remember { mutableStateOf(currentInviteCode) }
+    
+    // 成功后自动关闭弹窗
+    LaunchedEffect(changeInviteCodeState.isSuccess) {
+        if (changeInviteCodeState.isSuccess) {
+            kotlinx.coroutines.delay(1500) // 显示成功提示1.5秒
+            onDismiss()
+        }
+    }
+    
+    AlertDialog(
+        onDismissRequest = { if (!changeInviteCodeState.isLoading) onDismiss() },
+        title = {
+            Text(
+                text = "修改邀请码",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "请输入新的邀请码：",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                
+                OutlinedTextField(
+                    value = newInviteCode,
+                    onValueChange = { newInviteCode = it },
+                    label = { Text("邀请码") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !changeInviteCodeState.isLoading,
+                    singleLine = true,
+                    isError = changeInviteCodeState.error != null
+                )
+                
+                // 错误提示
+                changeInviteCodeState.error?.let { error ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                
+                // 成功提示
+                if (changeInviteCodeState.isSuccess) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "修改成功！",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(newInviteCode) },
+                enabled = !changeInviteCodeState.isLoading && newInviteCode.isNotBlank() && !changeInviteCodeState.isSuccess
+            ) {
+                if (changeInviteCodeState.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(
+                    text = when {
+                        changeInviteCodeState.isLoading -> "修改中..."
+                        changeInviteCodeState.isSuccess -> "已修改"
+                        else -> "确定"
+                    }
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !changeInviteCodeState.isLoading
+            ) {
+                Text("取消")
+            }
+        }
+    )
+}
