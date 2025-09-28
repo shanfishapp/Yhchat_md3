@@ -218,11 +218,12 @@ class WebSocketManager @Inject constructor(
      */
     private suspend fun updateConversationLastMessage(message: ChatMessage) {
         try {
-            // 判断消息类型：私聊 vs 群聊
+            // 根据文档说明，只有当recvId和chatId相等时，才创建/更新与发送者的私聊会话
+            // 否则，应该更新chatId对应的群聊会话
             val isPrivateChat = message.chatId == message.recvId
             
             if (isPrivateChat) {
-                // 私聊消息：创建/更新与发送者的私聊会话
+                // 私聊消息或机器人对话：创建/更新与发送者的私聊会话
                 val targetChatId = message.sender.chatId
                 val targetChatType = message.sender.chatType
                 

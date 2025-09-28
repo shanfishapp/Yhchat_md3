@@ -88,11 +88,6 @@ dependencies {
     implementation(libs.coil.gif)
     implementation("io.coil-kt:coil-svg:2.5.0") // SVG支持
     
-    // 图片预览器 - 使用兼容SDK21的PhotoView
-    implementation("com.github.chrisbanes:PhotoView:2.3.0")
-    // AppCompat 支持 (PhotoView 需要)
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    
     // 权限处理
     implementation("com.google.accompanist:accompanist-permissions:0.32.0")
     

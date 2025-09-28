@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -34,12 +35,13 @@ import coil.request.ImageRequest
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import com.yhchat.canary.data.model.Conversation
+import com.yhchat.canary.data.model.StickyData
+import com.yhchat.canary.data.model.StickyItem
 import com.yhchat.canary.data.model.ChatType
 import com.yhchat.canary.data.repository.TokenRepository
 import com.yhchat.canary.ui.components.ScrollBehavior
 import com.yhchat.canary.ui.components.HandleScrollBehavior
 import com.yhchat.canary.ui.search.ComprehensiveSearchActivity
-import com.yhchat.canary.ui.sticky.StickyConversations
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.animation.*
 import androidx.compose.ui.input.pointer.pointerInput
@@ -65,6 +67,8 @@ fun ConversationScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val conversations by viewModel.conversations.collectAsState()
+    val stickyData by viewModel.stickyData.collectAsState()
+    val stickyLoading by viewModel.stickyLoading.collectAsState()
 
     // 列表状态
     val listState = rememberLazyListState()
@@ -112,6 +116,8 @@ fun ConversationScreen(
     LaunchedEffect(token) {
         if (token.isNotEmpty()) {
             viewModel.loadConversations(token)
+            // 加载置顶会话（独立加载，不影响普通会话）
+            viewModel.loadStickyConversations()
         }
     }
     
@@ -168,13 +174,13 @@ fun ConversationScreen(
         
         // 置顶会话（根据滚动状态显示/隐藏，带动画效果）
         AnimatedVisibility(
-            visible = showStickyBar,
-            enter = slideInVertically() + fadeIn(),
-            exit = slideOutVertically() + fadeOut()
+            visible = showStickyBar && !stickyData?.sticky.isNullOrEmpty(),
+            enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
         ) {
-            StickyConversations(
-                onConversationClick = onConversationClick,
-                tokenRepository = tokenRepository
+            IntegratedStickyConversations(
+                stickyData = stickyData,
+                onConversationClick = onConversationClick
             )
         }
 
@@ -200,21 +206,28 @@ fun ConversationScreen(
                     CircularProgressIndicator()
                 }
             } else {
+                val pagedConversations by viewModel.pagedConversations.collectAsState()
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
-                    items(conversations) { conversation ->
+                    items(pagedConversations) { conversation ->
                         ConversationItem(
                             conversation = conversation,
                             onClick = {
-                                onConversationClick(conversation.chatId, conversation.chatType, conversation.name)
+                                // 跳转到聊天界面并加转场动画
+                                val intent = Intent(context, com.yhchat.canary.ui.chat.ChatActivity::class.java)
+                                intent.putExtra("chatId", conversation.chatId)
+                                intent.putExtra("chatType", conversation.chatType)
+                                intent.putExtra("chatName", conversation.name)
+                                context.startActivity(intent)
+                                if (context is android.app.Activity) {
+                                    context.overridePendingTransition(android.R.anim.slide_in_left, android.R.anim.slide_out_right)
+                                }
                             },
                             onLongClick = {
-                                // 长按处理 - 显示菜单
                                 selectedConversation = conversation
-                                // 检查是否置顶（简化实现，实际应该从状态中获取）
                                 coroutineScope.launch {
                                     isSelectedConversationSticky = viewModel.isConversationSticky(conversation.chatId)
                                     showConversationMenu = true
@@ -222,8 +235,7 @@ fun ConversationScreen(
                             }
                         )
                     }
-
-                    if (conversations.isEmpty()) {
+                    if (pagedConversations.isEmpty()) {
                         item {
                             Box(
                                 modifier = Modifier
@@ -239,6 +251,26 @@ fun ConversationScreen(
                             }
                         }
                     }
+                    // 加载更多提示
+                    if (uiState.isLoading && pagedConversations.isNotEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            }
+                        }
+                    }
+                }
+                // 触底自动加载更多
+                LaunchedEffect(pagedConversations, listState) {
+                    snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+                        .collect { lastIndex ->
+                            if (lastIndex == pagedConversations.lastIndex && !uiState.isLoading) {
+                                viewModel.loadMoreConversations()
+                            }
+                        }
                 }
             }
         }
@@ -468,4 +500,136 @@ fun ChatTypeIcon(chatType: Int) {
         text = icon,
         fontSize = 20.sp
     )
+}
+
+/**
+ * 集成的置顶会话组件
+ */
+@Composable
+fun IntegratedStickyConversations(
+    stickyData: com.yhchat.canary.data.model.StickyData?,
+    onConversationClick: (String, Int, String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // 如果没有置顶会话，不显示组件
+    if (stickyData?.sticky.isNullOrEmpty()) {
+        return
+    }
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = Color.Transparent,
+        tonalElevation = 0.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 8.dp)
+        ) {
+            // 置顶会话标题
+            Text(
+                text = "置顶会话",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            // 置顶会话横向列表
+            androidx.compose.foundation.lazy.LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                stickyData.sticky?.let { stickyList ->
+                    items(stickyList) { stickyItem ->
+                        IntegratedStickyItem(
+                            stickyItem = stickyItem,
+                            onClick = {
+                                onConversationClick(
+                                    stickyItem.chatId,
+                                    stickyItem.chatType,
+                                    stickyItem.chatName
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 集成的置顶会话项
+ */
+@Composable
+fun IntegratedStickyItem(
+    stickyItem: com.yhchat.canary.data.model.StickyItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .width(64.dp)
+            .clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        // 头像
+        Box {
+            AsyncImage(
+                model = coil.request.ImageRequest.Builder(LocalContext.current)
+                    .data(stickyItem.avatarUrl)
+                    .addHeader("Referer", "https://myapp.jwznb.com")
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "头像",
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop,
+                error = androidx.compose.ui.res.painterResource(id = com.yhchat.canary.R.drawable.ic_person)
+            )
+
+            // 认证标识
+            if (stickyItem.certificationLevel > 0) {
+                Box(
+                    modifier = Modifier
+                        .size(14.dp)
+                        .background(
+                            when (stickyItem.certificationLevel) {
+                                1 -> Color(0xFF4CAF50) // 官方 - 绿色
+                                2 -> Color(0xFF2196F3) // 地区 - 蓝色
+                                else -> Color.Gray
+                            },
+                            CircleShape
+                        )
+                        .align(Alignment.BottomEnd),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = when (stickyItem.certificationLevel) {
+                            1 -> "官"
+                            2 -> "地"
+                            else -> "认"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        fontSize = 8.sp
+                    )
+                }
+            }
+        }
+
+        // 会话名称
+        Text(
+            text = stickyItem.chatName,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.width(58.dp),
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
 }

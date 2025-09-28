@@ -1,8 +1,11 @@
+
 package com.yhchat.canary.ui.conversation
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yhchat.canary.data.model.Conversation
+import com.yhchat.canary.data.model.StickyData
 import com.yhchat.canary.data.repository.ConversationRepository
 import com.yhchat.canary.data.repository.TokenRepository
 import com.yhchat.canary.data.repository.CacheRepository
@@ -15,7 +18,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * 会话列表ViewModel
+ * 会话列表ViewModel - 集成置顶会话功能
  */
 @HiltViewModel
 
@@ -30,6 +33,14 @@ class ConversationViewModel @Inject constructor(
     private val userRepository: UserRepository
 ) : ViewModel() {
 
+    // 分页参数
+    private val pageSize = 20
+    private var currentPage = 1
+    private var hasMore = true
+    private val _pagedConversations = MutableStateFlow<List<Conversation>>(emptyList())
+    val pagedConversations: StateFlow<List<Conversation>> = _pagedConversations.asStateFlow()
+    private var allLoadedConversations: List<Conversation> = emptyList()
+
     init {
         observeWebSocketMessages()
         
@@ -39,6 +50,7 @@ class ConversationViewModel @Inject constructor(
 
     fun setTokenRepository(tokenRepository: TokenRepository) {
         conversationRepository.setTokenRepository(tokenRepository)
+        userRepository.setTokenRepository(tokenRepository)
     }
 
     // UI状态
@@ -48,6 +60,14 @@ class ConversationViewModel @Inject constructor(
     // 会话列表
     private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
     val conversations: StateFlow<List<Conversation>> = _conversations.asStateFlow()
+    
+    // 置顶会话数据
+    private val _stickyData = MutableStateFlow<StickyData?>(null)
+    val stickyData: StateFlow<StickyData?> = _stickyData.asStateFlow()
+    
+    // 置顶会话加载状态（独立于普通会话）
+    private val _stickyLoading = MutableStateFlow(false)
+    val stickyLoading: StateFlow<Boolean> = _stickyLoading.asStateFlow()
     
     /**
      * 立即加载缓存数据
@@ -69,20 +89,25 @@ class ConversationViewModel @Inject constructor(
     fun loadConversations(token: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            
+            currentPage = 1
+            hasMore = true
             conversationRepository.getConversations()
                 .onSuccess { conversationList ->
                     _conversations.value = conversationList
+                    allLoadedConversations = conversationList
+                    _pagedConversations.value = conversationList.take(pageSize)
+                    hasMore = conversationList.size > pageSize
                     _uiState.value = _uiState.value.copy(isLoading = false)
-                    
                     // 缓存到本地数据库
                     cacheRepository.cacheConversations(conversationList)
                 }
                 .onFailure { error ->
-                    // 网络失败时，尝试使用缓存数据
                     val cachedConversations = cacheRepository.getCachedConversationsSync()
                     if (cachedConversations.isNotEmpty()) {
                         _conversations.value = cachedConversations
+                        allLoadedConversations = cachedConversations
+                        _pagedConversations.value = cachedConversations.take(pageSize)
+                        hasMore = cachedConversations.size > pageSize
                         _uiState.value = _uiState.value.copy(isLoading = false)
                     } else {
                         _uiState.value = _uiState.value.copy(
@@ -91,6 +116,25 @@ class ConversationViewModel @Inject constructor(
                         )
                     }
                 }
+        }
+    }
+
+    fun loadMoreConversations() {
+        if (!hasMore || _uiState.value.isLoading) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            val nextPage = currentPage + 1
+            val from = (nextPage - 1) * pageSize
+            val to = (nextPage * pageSize).coerceAtMost(allLoadedConversations.size)
+            if (from < to) {
+                val more = allLoadedConversations.subList(0, to)
+                _pagedConversations.value = more
+                currentPage = nextPage
+                hasMore = to < allLoadedConversations.size
+            } else {
+                hasMore = false
+            }
+            _uiState.value = _uiState.value.copy(isLoading = false)
         }
     }
     
@@ -143,13 +187,20 @@ class ConversationViewModel @Inject constructor(
     private fun updateConversationWithNewMessage(message: com.yhchat.canary.data.model.ChatMessage) {
         viewModelScope.launch {
             val currentConversations = _conversations.value.toMutableList()
-            val conversationIndex = currentConversations.indexOfFirst { it.chatId == message.sender.chatId }
+            
+            // 根据文档说明，只有当recvId和chatId相等时，才创建/更新与发送者的私聊会话
+            // 否则，应该更新chatId对应的群聊会话
+            val isPrivateChat = message.chatId == message.recvId
+            val targetChatId = if (isPrivateChat) message.sender.chatId else message.chatId ?: ""
+            val targetChatType = if (isPrivateChat) message.sender.chatType else message.chatType ?: 0
+            
+            val conversationIndex = currentConversations.indexOfFirst { it.chatId == targetChatId }
             
             if (conversationIndex >= 0) {
                 // 更新现有会话
                 val conversation = currentConversations[conversationIndex]
                 val updatedConversation = conversation.copy(
-                    chatContent = message.content.text ?: "",
+                    chatContent = getMessagePreview(message) ?: "[消息]",
                     timestampMs = message.sendTime,
                     // 如果开启免打扰，不增加未读计数
                     unreadMessage = if (conversation.doNotDisturb == 1) {
@@ -162,27 +213,33 @@ class ConversationViewModel @Inject constructor(
                 
                 // 更新缓存中的会话
                 cacheRepository.updateConversationLastMessage(
-                    message.sender.chatId, 
-                    message.content.text ?: "", 
+                    targetChatId, 
+                    getMessagePreview(message) ?: "[消息]", 
                     message.sendTime
                 )
             } else {
-                // 创建新会话
-                val newConversation = Conversation(
-                    chatId = message.sender.chatId,
-                    chatType = message.sender.chatType,
-                    name = message.sender.name,
-                    chatContent = message.content.text ?: "",
-                    timestampMs = message.sendTime,
-                    unreadMessage = 1,
-                    at = 0,
-                    avatarUrl = message.sender.avatarUrl,
-                    timestamp = message.sendTime / 1000
-                )
-                currentConversations.add(0, newConversation)
-                
-                // 缓存新会话
-                cacheRepository.cacheConversations(listOf(newConversation))
+                // 创建新会话 - 只有在私聊或机器人对话时才创建
+                if (isPrivateChat) {
+                    val newConversation = Conversation(
+                        chatId = message.sender.chatId,
+                        chatType = message.sender.chatType,
+                        name = message.sender.name,
+                        chatContent = getMessagePreview(message) ?: "[消息]",
+                        timestampMs = message.sendTime,
+                        unreadMessage = 1,
+                        at = 0,
+                        avatarUrl = message.sender.avatarUrl,
+                        timestamp = message.sendTime / 1000
+                    )
+                    currentConversations.add(0, newConversation)
+                    
+                    // 缓存新会话
+                    cacheRepository.cacheConversations(listOf(newConversation))
+                } else {
+                    // 对于群聊消息，如果会话不存在，我们不创建新会话
+                    // 群聊会话应该通过API获取，而不是通过WebSocket消息创建
+                    Log.d("ConversationViewModel", "Group conversation not found, skipping creation for chatId: ${message.chatId}")
+                }
             }
             
             // 按时间排序
@@ -201,11 +258,53 @@ class ConversationViewModel @Inject constructor(
         if (conversationIndex >= 0) {
             val conversation = currentConversations[conversationIndex]
             val updatedConversation = conversation.copy(
-                chatContent = message.content.text ?: "",
+                chatContent = message.content.text ?: "[消息]",
                 timestampMs = message.sendTime
             )
             currentConversations[conversationIndex] = updatedConversation
             _conversations.value = currentConversations
+        }
+    }
+    
+    /**
+     * 获取消息预览文本
+     */
+    private fun getMessagePreview(message: com.yhchat.canary.data.model.ChatMessage): String {
+        // 获取消息内容预览
+        val contentPreview = when {
+            !message.content.text.isNullOrEmpty() -> message.content.text
+            !message.content.imageUrl.isNullOrEmpty() -> "[图片]"
+            !message.content.fileUrl.isNullOrEmpty() -> {
+                if (!message.content.fileName.isNullOrEmpty()) {
+                    "[文件]${message.content.fileName}"
+                } else {
+                    "[文件]"
+                }
+            }
+            !message.content.audioUrl.isNullOrEmpty() -> "语音消息"
+            !message.content.videoUrl.isNullOrEmpty() -> "视频消息"
+            !message.content.stickerUrl.isNullOrEmpty() -> "表情消息"
+            !message.content.postTitle.isNullOrEmpty() -> "文章消息${message.content.postTitle}"
+            else -> "[消息]"
+        }
+        
+        // 确定目标会话类型
+        val isPrivateChat = message.chatId == message.recvId
+        val targetChatType = if (isPrivateChat) message.sender.chatType else message.chatType ?: return contentPreview ?: "[消息]"
+        
+        // 确保返回非空字符串
+        val nonNullContentPreview = contentPreview ?: "[消息]"
+        
+        // 根据会话类型决定显示格式
+        return when (targetChatType) {
+            2, 3 -> {
+                // 群聊(2)或机器人会话(3)：显示"发送者：内容"
+                "${message.sender.name} : $nonNullContentPreview"
+            }
+            else -> {
+                // 私聊(1)或其他：只显示内容
+                nonNullContentPreview
+            }
         }
     }
     
@@ -233,6 +332,32 @@ class ConversationViewModel @Inject constructor(
     }
     
     /**
+     * 加载置顶会话列表（独立加载，不影响普通会话）
+     */
+    fun loadStickyConversations() {
+        viewModelScope.launch {
+            _stickyLoading.value = true
+            
+            try {
+                userRepository.getStickyList()
+                    .onSuccess { stickyData ->
+                        _stickyData.value = stickyData
+                        _stickyLoading.value = false
+                    }
+                    .onFailure { error ->
+                        // 置顶会话加载失败不影响普通会话
+                        _stickyData.value = null
+                        _stickyLoading.value = false
+                        // 不设置错误状态，静默失败
+                    }
+            } catch (e: Exception) {
+                _stickyData.value = null
+                _stickyLoading.value = false
+            }
+        }
+    }
+    
+    /**
      * 删除会话
      */
     fun deleteConversation(chatId: String) {
@@ -253,16 +378,24 @@ class ConversationViewModel @Inject constructor(
      */
     fun toggleStickyConversation(conversation: Conversation) {
         viewModelScope.launch {
-            // 检查是否已经置顶在StickyViewModel中实现，这里只调用UserRepository
+            // 检查是否已经置顶
             userRepository.getStickyList()
                 .onSuccess { stickyData ->
                     val isSticky = stickyData.sticky?.any { it.chatId == conversation.chatId } == true
                     if (isSticky) {
                         // 取消置顶
                         userRepository.deleteSticky(conversation.chatId, conversation.chatType)
+                            .onSuccess {
+                                // 重新加载置顶列表
+                                loadStickyConversations()
+                            }
                     } else {
                         // 添加置顶
                         userRepository.addSticky(conversation.chatId, conversation.chatType)
+                            .onSuccess {
+                                // 重新加载置顶列表
+                                loadStickyConversations()
+                            }
                     }
                 }
                 .onFailure { error ->

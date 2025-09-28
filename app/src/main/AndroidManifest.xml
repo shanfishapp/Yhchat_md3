@@ -33,6 +33,12 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.YhchatCanary">
+        <!-- 聊天界面 Activity -->
+        <activity
+            android:name=".ui.chat.ChatActivity"
+            android:exported="false"
+            android:label="聊天"
+            android:theme="@style/Theme.YhchatCanary" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

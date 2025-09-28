@@ -107,10 +107,9 @@ fun HtmlWebView(
         """.trimIndent()
     }
     
+    // 自动高度：根据内容动态调整 WebView 高度
     AndroidView(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(200.dp), // 默认高度，可以根据需要调整
+        modifier = modifier.fillMaxWidth(),
         factory = { ctx: android.content.Context ->
             WebView(ctx).apply {
                 webViewClient = object : WebViewClient() {
@@ -144,6 +143,22 @@ fun HtmlWebView(
                 "UTF-8",
                 null
             )
+            // 自动高度适配：注入JS获取内容高度并设置WebView高度
+            webView.post {
+                webView.evaluateJavascript(
+                    """
+                    (function() {
+                        var body = document.body,
+                            html = document.documentElement;
+                        var height = Math.max(body.scrollHeight, body.offsetHeight,
+                            html.clientHeight, html.scrollHeight, html.offsetHeight);
+                        window.AndroidInterface && window.AndroidInterface.setHeight && window.AndroidInterface.setHeight(height);
+                        return height;
+                    })();
+                    """.trimIndent(),
+                    null
+                )
+            }
         }
     )
 }

@@ -27,10 +27,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.yhchat.canary.data.di.RepositoryFactory
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import androidx.compose.ui.res.painterResource
 import com.yhchat.canary.R
 import com.yhchat.canary.data.repository.TokenRepository
-import kotlinx.coroutines.delay
 
 /**
  * 搜索界面
@@ -55,38 +53,14 @@ fun SearchScreen(
 
     val uiState by viewModel.uiState.collectAsState()
     val searchResult by viewModel.searchResult.collectAsState()
-    val joinRequestState by viewModel.joinRequestState.collectAsState()
     var searchText by remember { mutableStateOf("") }
-    var showGroupDialog by remember { mutableStateOf(false) }
-    var selectedGroupInfo by remember { mutableStateOf<Pair<String, String>?>(null) } // (groupId, groupName)
 
     // 处理系统返回键/手势返回
     BackHandler {
         onBackClick()
     }
     
-    // 监听申请状态变化
-    LaunchedEffect(selectedGroupInfo) {
-        if (selectedGroupInfo != null) {
-            viewModel.joinRequestState.collect { state ->
-                if (state.isInConversations) {
-                    // 已在会话列表中，直接进入聊天
-                    selectedGroupInfo?.let { (groupId, groupName) ->
-                        onItemClick(groupId, 2, groupName)
-                    }
-                    selectedGroupInfo = null
-                    showGroupDialog = false
-                    viewModel.resetJoinRequestState()
-                } else if (state.isSuccess) {
-                    // 申请成功，延迟关闭弹窗
-                    delay(2000)
-                    selectedGroupInfo = null
-                    showGroupDialog = false
-                    viewModel.resetJoinRequestState()
-                }
-            }
-        }
-    }
+
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -197,21 +171,12 @@ fun SearchScreen(
                                             .fillMaxWidth()
                                             .padding(horizontal = 16.dp, vertical = 4.dp)
                                             .clickable { 
-                                                when (searchItem.friendType) {
-                                                    2 -> {
-                                                        // 群组，显示弹窗
-                                                        selectedGroupInfo = Pair(searchItem.friendId, searchItem.nickname)
-                                                        showGroupDialog = true
-                                                    }
-                                                    else -> {
-                                                        // 用户和机器人，直接进入聊天
-                                                        onItemClick(
-                                                            searchItem.friendId,
-                                                            searchItem.friendType,
-                                                            searchItem.nickname
-                                                        )
-                                                    }
-                                                }
+                                                // 所有类型都直接进入聊天
+                                                onItemClick(
+                                                    searchItem.friendId,
+                                                    searchItem.friendType,
+                                                    searchItem.nickname
+                                                )
                                             },
                                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                                     ) {
@@ -330,163 +295,4 @@ fun SearchScreen(
         }
         }
     }
-    
-    // 群聊详情弹窗
-    if (showGroupDialog && selectedGroupInfo != null) {
-        val groupInfo = selectedGroupInfo!!
-        val groupId: String = groupInfo.first
-        val groupName: String = groupInfo.second
-        
-        // 获取token
-        var token by remember { mutableStateOf("") }
-        LaunchedEffect(Unit) {
-            tokenRepository?.getToken()?.collect { userToken ->
-                token = userToken?.token ?: ""
-            }
-        }
-        
-        GroupJoinDialog(
-            groupId = groupId,
-            groupName = groupName,
-            token = token,
-            viewModel = viewModel,
-            onDismiss = { 
-                showGroupDialog = false
-                selectedGroupInfo = null
-                viewModel.resetJoinRequestState()
-            },
-            onJoinRequest = { groupIdParam ->
-                viewModel.handleGroupJoin(token, groupIdParam)
-            }
-        )
-    }
-}
-
-/**
- * 群聊加入弹窗
- */
-@Composable
-fun GroupJoinDialog(
-    groupId: String,
-    groupName: String,
-    token: String,
-    viewModel: SearchViewModel,
-    onDismiss: () -> Unit,
-    onJoinRequest: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val joinRequestState by viewModel.joinRequestState.collectAsState()
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        modifier = modifier,
-        title = {
-            Text(
-                text = "群聊详情",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column {
-                // 群聊基本信息
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // 默认头像（由于搜索结果可能没有头像信息）
-                    Surface(
-                        modifier = Modifier.size(64.dp),
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer
-                    ) {
-                        Box(
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = groupName.take(2),
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.width(16.dp))
-                    
-                    Column {
-                        Text(
-                            text = groupName,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Medium
-                        )
-                        
-                        Spacer(modifier = Modifier.height(4.dp))
-                        
-                        Text(
-                            text = "群ID: $groupId",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // 错误提示
-                joinRequestState.error?.let { error ->
-                    Text(
-                        text = error,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-                
-                // 成功提示
-                if (joinRequestState.isSuccess) {
-                    Text(
-                        text = "申请已发送，请等待管理员审核",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-                
-                if (joinRequestState.isInConversations) {
-                    Text(
-                        text = "即将进入群聊...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onJoinRequest(groupId) },
-                enabled = !joinRequestState.isLoading && !joinRequestState.isSuccess && !joinRequestState.isChecking
-            ) {
-                if (joinRequestState.isLoading || joinRequestState.isChecking) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                Text(
-                    text = when {
-                        joinRequestState.isChecking -> "检查中..."
-                        joinRequestState.isLoading -> "申请中..."
-                        joinRequestState.isSuccess -> "已申请"
-                        joinRequestState.isInConversations -> "进入聊天"
-                        else -> "加入群聊"
-                    }
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("关闭")
-            }
-        }
-    )
 }

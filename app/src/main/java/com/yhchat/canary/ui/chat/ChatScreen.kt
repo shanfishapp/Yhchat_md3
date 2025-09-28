@@ -3,6 +3,7 @@ package com.yhchat.canary.ui.chat
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -62,6 +63,8 @@ import java.util.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.input.pointer.pointerInput
+// pointerInput 相关扩展函数无需单独 import，consume 已废弃
 
 /**
  * 聊天界面
@@ -314,6 +317,7 @@ fun ChatScreen(
                 onTextChange = { inputText = it },
                 onSendMessage = {
                     if (inputText.isNotBlank()) {
+                   
                         viewModel.sendTextMessage(inputText.trim())
                         inputText = ""
                     }
@@ -551,29 +555,30 @@ private fun MessageContentView(
 
     Column(modifier = modifier) {
         when (contentType) {
-            1 -> {
-                // 文本消息
-                content.text?.let { text ->
-                    if (LinkDetector.containsLink(text)) {
-                        // 包含链接的文本
-                        LinkText(
-                            text = text,
-                            style = MaterialTheme.typography.bodyMedium.copy(color = textColor),
-                            linkColor = if (isMyMessage) {
-                                MaterialTheme.colorScheme.primaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.primary
+            8 -> {
+                // HTML消息
+                content.text?.let { htmlContent ->
+                    HtmlWebView(
+                        htmlContent = htmlContent,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 120.dp, max = 400.dp)
+                            .pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        event.changes.forEach { pointerInputChange ->
+                                            // 兼容旧Compose：手动判断down
+                                            if (!pointerInputChange.previousPressed && pointerInputChange.pressed) {
+                                                pointerInputChange.consume()
+                                            }
+                                        }
+                                    }
+                                }
                             }
-                        )
-                    } else {
-                        // 普通文本
-                        Text(
-                            text = text,
-                            color = textColor,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
+                    )
                 }
+
             }
             2 -> {
                 // 图片消息
@@ -679,15 +684,7 @@ private fun MessageContentView(
                         } else {
                             MaterialTheme.colorScheme.onSurface
                         },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-            8 -> {
-                // HTML消息
-                content.text?.let { htmlContent ->
-                    HtmlWebView(
-                        htmlContent = htmlContent,
+                        backgroundColor = Color.Transparent, // 使用透明背景，继承消息气泡背景
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -734,38 +731,6 @@ private fun MessageContentView(
                     }
                 }
             }
-            25 -> {
-                // 兼容旧的表情消息类型 (如果还有使用的话)
-                content.imageUrl?.let { imageUrl ->
-                    AsyncImage(
-                        model = ImageUtils.createStickerImageRequest(
-                            context = LocalContext.current,
-                            url = imageUrl
-                        ),
-                        contentDescription = "表情",
-                        modifier = Modifier
-                            .size(120.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Fit
-                    )
-                }
-            }
-            26 -> {
-                // 兼容旧的表情包消息类型 (如果还有使用的话)
-                content.imageUrl?.let { imageUrl ->
-                    AsyncImage(
-                        model = ImageUtils.createStickerImageRequest(
-                            context = LocalContext.current,
-                            url = imageUrl
-                        ),
-                        contentDescription = "表情包",
-                        modifier = Modifier
-                            .size(120.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Fit
-                    )
-                }
-            }
             19 -> {
                 // 视频消息 - 已移除视频播放功能，显示提示文本
                 content.videoUrl?.let { videoPath ->
@@ -776,7 +741,7 @@ private fun MessageContentView(
                     )
                 }
             }
-                    else -> {
+            else -> {
                 // 其他类型消息，显示文本内容
                 content.text?.let { text ->
                     if (LinkDetector.containsLink(text)) {
@@ -803,7 +768,7 @@ private fun MessageContentView(
         }
 
         // 引用消息
-        content.quoteMsgText?.let { quoteText ->
+        content.quoteMsgText?.let { quoteText: String ->
             Spacer(modifier = Modifier.height(4.dp))
             Surface(
                 modifier = Modifier
@@ -816,7 +781,7 @@ private fun MessageContentView(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // 引用消息的图片（如果有）
-                    content.quoteImageUrl?.let { imageUrl ->
+                    content.quoteImageUrl?.let { imageUrl: String ->
                         AsyncImage(
                             model = ImageUtils.createImageRequest(
                                 context = LocalContext.current,
@@ -831,7 +796,6 @@ private fun MessageContentView(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
-                    
                     // 引用消息文本
                     Text(
                         text = quoteText,

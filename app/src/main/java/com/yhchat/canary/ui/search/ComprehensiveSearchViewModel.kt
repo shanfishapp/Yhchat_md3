@@ -22,28 +22,19 @@ class ComprehensiveSearchViewModel(application: Application) : AndroidViewModel(
     fun searchGroup(groupId: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            
             try {
                 val response = webApiService.getGroupInfo(mapOf("groupId" to groupId))
-                
-                if (response.code() == 1) {
-                    val responseBody = response.body()
-                    if (responseBody != null) {
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            groupResult = responseBody.data.group,
-                            error = null
-                        )
-                    } else {
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            error = "响应数据为空"
-                        )
-                    }
+                val responseBody = response.body()
+                if (responseBody != null) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        groupResult = responseBody.data.group,
+                        error = null
+                    )
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = response.body()?.msg ?: "获取群聊信息失败"
+                        error = "响应数据为空"
                     )
                 }
             } catch (e: Exception) {
