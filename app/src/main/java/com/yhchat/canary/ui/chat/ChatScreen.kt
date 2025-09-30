@@ -417,7 +417,7 @@ private fun MessageItem(
             // 发送者姓名（非自己的消息）
             if (!isMyMessage) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -426,6 +426,7 @@ private fun MessageItem(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+
                     // 机器人标签
                     if (message.sender.chatType == 3) {
                         Surface(

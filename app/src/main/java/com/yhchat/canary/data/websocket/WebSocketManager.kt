@@ -136,6 +136,11 @@ class WebSocketManager @Inject constructor(
                     // 处理机器人公告消息
                     // 可以显示为系统消息或特殊通知
                 }
+                
+                is MessageEvent.StreamMessage -> {
+                    Log.d(tag, "Handling stream message update: msgId=${event.msgId}, chatId=${event.chatId}")
+                    // 流式消息由前台实时渲染，无需写入本地数据库
+                }
             }
         } catch (e: Exception) {
             Log.e(tag, "Error handling message event", e)

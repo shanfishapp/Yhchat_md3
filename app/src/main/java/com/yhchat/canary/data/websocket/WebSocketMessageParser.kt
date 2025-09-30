@@ -13,6 +13,7 @@ import com.yhchat.canary.proto.chat_ws_go.edit_message
 import com.yhchat.canary.proto.chat_ws_go.draft_input
 import com.yhchat.canary.proto.chat_ws_go.file_send_message
 import com.yhchat.canary.proto.chat_ws_go.bot_board_message
+import com.yhchat.canary.proto.chat_ws_go.stream_message
 
 /**
  * WebSocket消息解析器 - 参考yh_user_sdk/core/ws.py的decode方法
@@ -109,6 +110,23 @@ object WebSocketMessageParser {
                         )
                     } else {
                         Log.w(TAG, "bot_board_message has no data or board")
+                        null
+                    }
+                }
+                
+                "stream_message" -> {
+                    val streamMsg = stream_message.parseFrom(bytes)
+                    if (streamMsg.hasData() && streamMsg.data.hasMsg()) {
+                        val msg = streamMsg.data.msg
+                        ParsedMessage.StreamMessage(
+                            msgId = msg.msgId,
+                            recvId = msg.recvId,
+                            chatId = msg.chatId,
+                            content = msg.content,
+                            seq = seq
+                        )
+                    } else {
+                        Log.w(TAG, "stream_message has no data or msg")
                         null
                     }
                 }
@@ -235,6 +253,14 @@ sealed class ParsedMessage {
         val contentType: Int,
         val lastUpdateTime: Long,
         val botName: String,
+        val seq: String
+    ) : ParsedMessage()
+    
+    data class StreamMessage(
+        val msgId: String,
+        val recvId: String,
+        val chatId: String,
+        val content: String,
         val seq: String
     ) : ParsedMessage()
     

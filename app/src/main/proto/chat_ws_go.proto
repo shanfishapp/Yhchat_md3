@@ -160,3 +160,21 @@ message bot_board_message {
         }
     }
 }
+
+// 流式消息
+message stream_message {
+    INFO info = 1;
+    Data data = 2;
+
+    message Data {
+        string any = 1;
+        StreamMsg msg = 2;
+
+        message StreamMsg {
+            string msg_id = 1;
+            string recv_id = 2;
+            string chat_id = 3; // 似乎是会话ID
+            string content = 4; // 消息内容
+        }
+    }
+}

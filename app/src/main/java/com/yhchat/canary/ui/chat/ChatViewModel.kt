@@ -44,6 +44,9 @@ class ChatViewModel @Inject constructor(
 
     private val _messages = mutableStateListOf<ChatMessage>()
     val messages: List<ChatMessage> = _messages
+    
+    // 流式消息缓存：msgId -> 累积的content
+    private val streamingMessages = mutableMapOf<String, String>()
 
     /**
      * 初始化聊天
@@ -83,6 +86,9 @@ class ChatViewModel @Inject constructor(
                     }
                     is MessageEvent.MessageDeleted -> {
                         handleDeletedMessage(event.msgId)
+                    }
+                    is MessageEvent.StreamMessage -> {
+                        handleStreamMessage(event)
                     }
                     else -> {
                         // 忽略其他事件类型
@@ -136,6 +142,67 @@ class ChatViewModel @Inject constructor(
         if (existingIndex != -1) {
             _messages.removeAt(existingIndex)
             Log.d(tag, "Removed deleted message: $messageId")
+        }
+    }
+    
+    /**
+     * 处理流式消息
+     */
+    private fun handleStreamMessage(event: MessageEvent.StreamMessage) {
+        // 判断消息是否属于当前聊天
+        if (event.chatId != currentChatId) {
+            return
+        }
+        
+        Log.d(tag, "Handling stream message: msgId=${event.msgId}, content=${event.content}")
+        
+        // 累积流式消息内容
+        val accumulatedContent = streamingMessages.getOrDefault(event.msgId, "") + event.content
+        streamingMessages[event.msgId] = accumulatedContent
+        
+        // 查找是否已有此消息
+        val existingIndex = _messages.indexOfFirst { it.msgId == event.msgId }
+        
+        if (existingIndex != -1) {
+            // 更新现有消息的内容
+            val existingMessage = _messages[existingIndex]
+            val updatedMessage = existingMessage.copy(
+                content = existingMessage.content.copy(text = accumulatedContent)
+            )
+            _messages[existingIndex] = updatedMessage
+            Log.d(tag, "Updated stream message at index $existingIndex")
+        } else {
+            // 创建新的流式消息
+            val streamMessage = ChatMessage(
+                msgId = event.msgId,
+                sender = com.yhchat.canary.data.model.MessageSender(
+                    chatId = event.chatId,
+                    chatType = 3, // 机器人
+                    name = "机器人",
+                    avatarUrl = "",
+                    tagOld = emptyList(),
+                    tag = emptyList()
+                ),
+                direction = "left",
+                contentType = 1, // 文本消息
+                content = com.yhchat.canary.data.model.MessageContent(
+                    text = accumulatedContent
+                ),
+                sendTime = System.currentTimeMillis(),
+                cmd = null,
+                msgDeleteTime = null,
+                quoteMsgId = null,
+                msgSeq = null,
+                editTime = null,
+                chatId = event.chatId,
+                chatType = 3, // 机器人
+                recvId = event.recvId
+            )
+            
+            // 按时间排序插入
+            val insertIndex = _messages.indexOfLast { it.sendTime <= streamMessage.sendTime } + 1
+            _messages.add(insertIndex, streamMessage)
+            Log.d(tag, "Created new stream message at index $insertIndex")
         }
     }
 
@@ -372,5 +439,20 @@ class ChatViewModel @Inject constructor(
      */
     fun isMyMessage(message: ChatMessage): Boolean {
         return message.direction == "right"
+    }
+    
+    /**
+     * 检查消息是否正在流式接收中
+     */
+    fun isMessageStreaming(msgId: String): Boolean {
+        return streamingMessages.containsKey(msgId)
+    }
+    
+    /**
+     * 清除流式消息缓存（当流式消息完成时调用）
+     */
+    fun clearStreamingMessage(msgId: String) {
+        streamingMessages.remove(msgId)
+        Log.d(tag, "Cleared streaming message: $msgId")
     }
 }

@@ -20,6 +20,7 @@ import com.yhchat.canary.proto.chat_ws_go.push_message
 import com.yhchat.canary.proto.chat_ws_go.edit_message
 import com.yhchat.canary.proto.chat_ws_go.draft_input
 import com.yhchat.canary.proto.chat_ws_go.bot_board_message
+import com.yhchat.canary.proto.chat_ws_go.stream_message
 import com.yhchat.canary.proto.chat_ws_go.WsMsg
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -366,6 +367,24 @@ class WebSocketService @Inject constructor(
                     }
                 }
                 
+                "stream_message" -> {
+                    // 流式消息
+                    val streamMsg = stream_message.parseFrom(bytes)
+                    if (streamMsg.hasData() && streamMsg.data.hasMsg()) {
+                        val msg = streamMsg.data.msg
+                        Log.d(tag, "Received stream message for chat ${msg.chatId}, msgId: ${msg.msgId}, content: ${msg.content}")
+                        
+                        scope.launch {
+                            _messageEvents.emit(MessageEvent.StreamMessage(
+                                msgId = msg.msgId,
+                                recvId = msg.recvId,
+                                chatId = msg.chatId,
+                                content = msg.content
+                            ))
+                        }
+                    }
+                }
+                
                 else -> {
                     Log.d(tag, "Unhandled message command: $cmd")
                 }
@@ -576,6 +595,7 @@ sealed class MessageEvent {
     data class MessageDeleted(val msgId: String) : MessageEvent()
     data class DraftUpdated(val chatId: String, val input: String) : MessageEvent()
     data class BotBoardMessage(val botId: String, val chatId: String, val content: String) : MessageEvent()
+    data class StreamMessage(val msgId: String, val recvId: String, val chatId: String, val content: String) : MessageEvent()
 }
 
 /**
