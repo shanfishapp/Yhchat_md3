@@ -23,11 +23,11 @@ class ChatActivity : ComponentActivity() {
         val userId = "" // 可根据实际需求传递
         setContent {
             YhchatCanaryTheme {
-                val color = MaterialTheme.colorScheme.primary.toArgb()
+                val topBarColor = MaterialTheme.colorScheme.primaryContainer.toArgb()
                 val view = LocalView.current
                 SideEffect {
                     WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
-                    window.statusBarColor = color
+                    window.statusBarColor = topBarColor
                 }
                 Surface(color = MaterialTheme.colorScheme.background) {
                     ChatScreen(
@@ -35,7 +35,12 @@ class ChatActivity : ComponentActivity() {
                         chatType = chatType,
                         chatName = chatName,
                         userId = userId,
-                        onBackClick = { finish() }
+                        onBackClick = { finish() },
+                        onAvatarClick = { userId, userName, chatType ->
+                            if (chatType != 3) {
+                                com.yhchat.canary.ui.profile.UserProfileActivity.start(this@ChatActivity, userId, userName)
+                            }
+                        }
                     )
                 }
             }

@@ -216,15 +216,12 @@ fun ConversationScreen(
                         ConversationItem(
                             conversation = conversation,
                             onClick = {
-                                // 跳转到聊天界面并加转场动画
+                                // 跳转到聊天界面（无动画，交给系统默认）
                                 val intent = Intent(context, com.yhchat.canary.ui.chat.ChatActivity::class.java)
                                 intent.putExtra("chatId", conversation.chatId)
                                 intent.putExtra("chatType", conversation.chatType)
                                 intent.putExtra("chatName", conversation.name)
                                 context.startActivity(intent)
-                                if (context is android.app.Activity) {
-                                    context.overridePendingTransition(android.R.anim.slide_in_left, android.R.anim.slide_out_right)
-                                }
                             },
                             onLongClick = {
                                 selectedConversation = conversation
