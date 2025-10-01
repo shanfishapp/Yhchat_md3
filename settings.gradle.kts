@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Yhchat Canary"
-include(":app")
+include(":app") }
