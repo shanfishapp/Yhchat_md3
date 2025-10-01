@@ -221,6 +221,9 @@ fun ConversationScreen(
                                 intent.putExtra("chatId", conversation.chatId)
                                 intent.putExtra("chatType", conversation.chatType)
                                 intent.putExtra("chatName", conversation.name)
+                                // 使用 FLAG_ACTIVITY_CLEAR_TOP 确保清除栈顶到目标Activity之间的所有Activity
+                                // 配合 FLAG_ACTIVITY_SINGLE_TOP 确保如果已存在则重用并调用 onNewIntent
+                                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                                 context.startActivity(intent)
                             },
                             onLongClick = {
