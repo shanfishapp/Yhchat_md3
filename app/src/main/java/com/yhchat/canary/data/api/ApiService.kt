@@ -716,3 +716,54 @@ data class UnfollowBoardRequest(
     @SerializedName("baId")
     val baId: Int
 )
+
+/**
+ * 编辑群聊信息请求
+ */
+data class EditGroupInfoRequest(
+    @SerializedName("groupId")
+    val groupId: String,
+    
+    @SerializedName("name")
+    val name: String,
+    
+    @SerializedName("introduction")
+    val introduction: String,
+    
+    @SerializedName("avatarUrl")
+    val avatarUrl: String,
+    
+    @SerializedName("directJoin")
+    val directJoin: Int,
+    
+    @SerializedName("historyMsg")
+    val historyMsg: Int,
+    
+    @SerializedName("categoryName")
+    val categoryName: String,
+    
+    @SerializedName("categoryId")
+    val categoryId: Int,
+    
+    @SerializedName("private")
+    val `private`: Int
+)
+
+/**
+ * 编辑群聊信息响应
+ */
+data class EditGroupResponse(
+    @SerializedName("code")
+    val code: Int,
+    
+    @SerializedName("data")
+    val data: EditGroupData?,
+    
+    @SerializedName("msg")
+    val msg: String
+)
+
+data class EditGroupData(
+    @SerializedName("groupId")
+    val groupId: String
+)
