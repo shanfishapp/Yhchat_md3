@@ -22,7 +22,10 @@ data class GroupInfoUiState(
     val isLoadingMembers: Boolean = false,
     val currentPage: Int = 1,
     val hasMoreMembers: Boolean = true,
-    val isLoadingMoreMembers: Boolean = false
+    val isLoadingMoreMembers: Boolean = false,
+    val showMemberList: Boolean = false,
+    val isEditingCategory: Boolean = false,
+    val newCategoryName: String = ""
 )
 
 @HiltViewModel
@@ -160,6 +163,161 @@ class GroupInfoViewModel @Inject constructor(
      */
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+    
+    /**
+     * 切换成员列表显示状态
+     */
+    fun toggleMemberList() {
+        _uiState.value = _uiState.value.copy(showMemberList = !_uiState.value.showMemberList)
+    }
+    
+    /**
+     * 显示编辑分类对话框
+     */
+    fun showEditCategoryDialog() {
+        val currentCategory = _uiState.value.groupInfo?.categoryName ?: ""
+        _uiState.value = _uiState.value.copy(isEditingCategory = true, newCategoryName = currentCategory)
+    }
+    
+    /**
+     * 隐藏编辑分类对话框
+     */
+    fun hideEditCategoryDialog() {
+        _uiState.value = _uiState.value.copy(isEditingCategory = false, newCategoryName = "")
+    }
+    
+    /**
+     * 更新新的分类名称
+     */
+    fun updateNewCategoryName(name: String) {
+        _uiState.value = _uiState.value.copy(newCategoryName = name)
+    }
+    
+    /**
+     * 保存分类名称修改
+     */
+    fun saveCategoryName(groupId: String) {
+        viewModelScope.launch {
+            val currentState = _uiState.value
+            val groupInfo = currentState.groupInfo ?: return@launch
+            
+            val editRequest = com.yhchat.canary.data.api.EditGroupInfoRequest(
+                groupId = groupId,
+                name = groupInfo.name,
+                introduction = groupInfo.introduction,
+                avatarUrl = groupInfo.avatarUrl,
+                directJoin = if (groupInfo.directJoin) 1 else 0,
+                historyMsg = if (groupInfo.historyMsgEnabled) 1 else 0,
+                categoryName = currentState.newCategoryName,
+                categoryId = groupInfo.categoryId,
+                `private` = if (groupInfo.isPrivate) 1 else 0
+            )
+            
+            groupRepository.editGroupInfo(editRequest).fold(
+                onSuccess = {
+                    // 更新成功，重新加载群信息
+                    loadGroupInfo(groupId)
+                    hideEditCategoryDialog()
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(error = error.message ?: "修改分类失败")
+                }
+            )
+        }
+    }
+    
+    /**
+     * 更新免审核进群设置
+     */
+    fun updateDirectJoin(groupId: String, directJoin: Boolean) {
+        viewModelScope.launch {
+            val groupInfo = _uiState.value.groupInfo ?: return@launch
+            
+            val editRequest = com.yhchat.canary.data.api.EditGroupInfoRequest(
+                groupId = groupId,
+                name = groupInfo.name,
+                introduction = groupInfo.introduction,
+                avatarUrl = groupInfo.avatarUrl,
+                directJoin = if (directJoin) 1 else 0,
+                historyMsg = if (groupInfo.historyMsgEnabled) 1 else 0,
+                categoryName = groupInfo.categoryName,
+                categoryId = groupInfo.categoryId,
+                `private` = if (groupInfo.isPrivate) 1 else 0
+            )
+            
+            groupRepository.editGroupInfo(editRequest).fold(
+                onSuccess = {
+                    // 更新成功，重新加载群信息
+                    loadGroupInfo(groupId)
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(error = error.message ?: "修改免审核进群设置失败")
+                }
+            )
+        }
+    }
+    
+    /**
+     * 更新历史消息设置
+     */
+    fun updateHistoryMsg(groupId: String, historyMsgEnabled: Boolean) {
+        viewModelScope.launch {
+            val groupInfo = _uiState.value.groupInfo ?: return@launch
+            
+            val editRequest = com.yhchat.canary.data.api.EditGroupInfoRequest(
+                groupId = groupId,
+                name = groupInfo.name,
+                introduction = groupInfo.introduction,
+                avatarUrl = groupInfo.avatarUrl,
+                directJoin = if (groupInfo.directJoin) 1 else 0,
+                historyMsg = if (historyMsgEnabled) 1 else 0,
+                categoryName = groupInfo.categoryName,
+                categoryId = groupInfo.categoryId,
+                `private` = if (groupInfo.isPrivate) 1 else 0
+            )
+            
+            groupRepository.editGroupInfo(editRequest).fold(
+                onSuccess = {
+                    // 更新成功，重新加载群信息
+                    loadGroupInfo(groupId)
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(error = error.message ?: "修改历史消息设置失败")
+                }
+            )
+        }
+    }
+    
+    /**
+     * 更新群聊私有设置
+     */
+    fun updatePrivateSetting(groupId: String, isPrivate: Boolean) {
+        viewModelScope.launch {
+            val groupInfo = _uiState.value.groupInfo ?: return@launch
+            
+            val editRequest = com.yhchat.canary.data.api.EditGroupInfoRequest(
+                groupId = groupId,
+                name = groupInfo.name,
+                introduction = groupInfo.introduction,
+                avatarUrl = groupInfo.avatarUrl,
+                directJoin = if (groupInfo.directJoin) 1 else 0,
+                historyMsg = if (groupInfo.historyMsgEnabled) 1 else 0,
+                categoryName = groupInfo.categoryName,
+                categoryId = groupInfo.categoryId,
+                `private` = if (isPrivate) 1 else 0
+            )
+            
+            groupRepository.editGroupInfo(editRequest).fold(
+                onSuccess = {
+                    // 更新成功，重新加载群信息
+                    loadGroupInfo(groupId)
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(error = error.message ?: "修改群聊私有设置失败")
+                }
+            )
+        }
     }
 }
 

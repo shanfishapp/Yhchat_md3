@@ -6,6 +6,7 @@ on:
     # 根据branch或者tags来触发
     branches:
       - canary
+      - main
   workflow_dispatch: 
 
     tags:
