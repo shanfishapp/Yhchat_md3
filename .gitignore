@@ -28,8 +28,8 @@ replay_pid*
 
 
 # gradle temps
-.gradle/*
-build/*
+.gradle/
+build/
 # editor and ides temp
-.idea/*
-.vscode/*
+.idea/
+.vscode/
