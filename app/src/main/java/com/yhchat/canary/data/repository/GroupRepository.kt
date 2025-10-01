@@ -4,6 +4,8 @@ import android.util.Log
 import com.google.protobuf.InvalidProtocolBufferException
 import com.yhchat.canary.data.model.GroupDetail
 import com.yhchat.canary.data.model.GroupMemberInfo
+import com.yhchat.canary.proto.group.edit_group
+import com.yhchat.canary.proto.group.edit_group_send
 import com.yhchat.canary.proto.group.info
 import com.yhchat.canary.proto.group.info_send
 import com.yhchat.canary.proto.group.list_member
@@ -221,22 +223,88 @@ class GroupRepository @Inject constructor() {
      * 修改群聊信息
      */
     suspend fun editGroupInfo(editGroupInfoRequest: com.yhchat.canary.data.api.EditGroupInfoRequest): Result<Boolean> = withContext(Dispatchers.IO) {
+        Log.d(tag, "🔍 Editing group info for: ${editGroupInfoRequest.groupId}")
         val token = tokenRepository?.getTokenSync()
         if (token.isNullOrEmpty()) {
+            Log.e(tag, "❌ No token available")
             return@withContext Result.failure(Exception("未登录"))
         }
         
+        Log.d(tag, "Token available, length: ${token.length}")
+        
         return@withContext try {
-            val apiService = ApiClient.apiService
-            val response = apiService.editGroupInfo(token, editGroupInfoRequest)
+            // 构建protobuf请求
+            val request = com.yhchat.canary.proto.group.edit_group_send.newBuilder()
+                .setGroupId(editGroupInfoRequest.groupId)
+                .setName(editGroupInfoRequest.name)
+                .setIntroduction(editGroupInfoRequest.introduction)
+                .setAvatarUrl(editGroupInfoRequest.avatarUrl)
+                .setDirectJoin(editGroupInfoRequest.directJoin.toLong())
+                .setHistoryMsg(editGroupInfoRequest.historyMsg.toLong())
+                .setCategoryName(editGroupInfoRequest.categoryName)
+                .setCategoryId(editGroupInfoRequest.categoryId.toLong())
+                .setPrivate(editGroupInfoRequest.`private`.toLong())
+                .build()
             
-            if (response.isSuccessful && response.body()?.code == 1) {
-                Result.success(true)
-            } else {
-                Result.failure(Exception(response.body()?.msg ?: "修改群聊信息失败"))
+            Log.d(tag, "Request protobuf built, groupId: ${editGroupInfoRequest.groupId}")
+            
+            val requestBody = request.toByteArray()
+                .toRequestBody("application/x-protobuf".toMediaTypeOrNull())
+            
+            val httpRequest = Request.Builder()
+                .url("$baseUrl/v1/group/edit-group")
+                .addHeader("token", token)
+                .post(requestBody)
+                .build()
+            
+            Log.d(tag, "Sending request to: $baseUrl/v1/group/edit-group")
+            
+            val response = client.newCall(httpRequest).execute()
+            
+            Log.d(tag, "✅ Response code: ${response.code}")
+            Log.d(tag, "Response message: ${response.message}")
+            Log.d(tag, "Response headers: ${response.headers}")
+            
+            if (!response.isSuccessful) {
+                val errorBody = response.body?.string() ?: "No error body"
+                Log.e(tag, "❌ Request failed with code ${response.code}: $errorBody")
+                return@withContext Result.failure(IOException("请求失败: ${response.code} - ${response.message}"))
             }
+            
+            val responseBody = response.body?.bytes()
+            if (responseBody == null) {
+                Log.e(tag, "❌ Response body is null")
+                return@withContext Result.failure(IOException("响应为空"))
+            }
+            
+            Log.d(tag, "✅ Response body size: ${responseBody.size} bytes")
+            
+            // 解析protobuf响应
+            Log.d(tag, "Parsing protobuf response, size: ${responseBody.size} bytes")
+            val editGroupResponse = com.yhchat.canary.proto.group.edit_group.parseFrom(responseBody)
+            
+            Log.d(tag, "Protobuf parsed. Status code: ${editGroupResponse.status.code}, msg: ${editGroupResponse.status.msg}")
+            
+            if (editGroupResponse.status.code != 1) {
+                Log.e(tag, "❌ Server returned error: ${editGroupResponse.status.msg}")
+                return@withContext Result.failure(Exception(editGroupResponse.status.msg))
+            }
+            
+            Log.d(tag, "✅ Group info successfully edited")
+            Result.success(true)
+            
+        } catch (e: InvalidProtocolBufferException) {
+            Log.e(tag, "❌ Protobuf parse error: ${e.message}", e)
+            Log.e(tag, "Error details: ${e.stackTraceToString()}")
+            Result.failure(e)
+        } catch (e: IOException) {
+            Log.e(tag, "❌ Network/IO error: ${e.message}", e)
+            Log.e(tag, "Error details: ${e.stackTraceToString()}")
+            Result.failure(e)
         } catch (e: Exception) {
-            Log.e(tag, "修改群聊信息失败", e)
+            Log.e(tag, "❌ Unknown error: ${e.message}", e)
+            Log.e(tag, "Error type: ${e::class.java.simpleName}")
+            Log.e(tag, "Error details: ${e.stackTraceToString()}")
             Result.failure(e)
         }
     }
