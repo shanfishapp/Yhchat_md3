@@ -17,16 +17,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
-import com.yhchat.canary.data.model.*
+import com.yhchat.canary.data.model.BotInfo
+import com.yhchat.canary.data.model.GroupDetail
+import com.yhchat.canary.data.model.UserInfo
 import com.yhchat.canary.ui.components.ImageUtils
 import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
 fun GroupInfoDialog(
-    group: GroupInfo?,
+    group: GroupDetail?,
     onDismiss: () -> Unit,
-    onAdd: (GroupInfo) -> Unit,
+    onAdd: (GroupDetail) -> Unit,
     isAdding: Boolean
 ) {
     if (group == null) return
@@ -64,7 +66,7 @@ fun GroupInfoDialog(
                 
                 // 群聊名称
                 Text(
-                    text = group.name ?: "未知群聊",
+                    text = group.name,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
@@ -73,20 +75,13 @@ fun GroupInfoDialog(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 // 群聊信息
-                InfoItem(label = "群ID", value = group.groupId ?: "-")
-                group.headcount?.let {
-                    InfoItem(label = "成员数", value = "$it 人")
-                }
-                group.createBy?.let {
-                    InfoItem(label = "创建者", value = it)
-                }
-                group.createTime?.let {
-                    InfoItem(label = "创建时间", value = formatTimestamp(it))
-                }
+                InfoItem(label = "群ID", value = group.groupId)
+                InfoItem(label = "成员数", value = "${group.memberCount} 人")
+                InfoItem(label = "创建者", value = group.createBy)
+                InfoItem(label = "查看历史消息", value = if (group.historyMsgEnabled) "开启" else "关闭")
                 
                 // 群聊简介
-                group.introduction?.let { intro ->
-                    if (intro.isNotBlank()) {
+                if (group.introduction.isNotBlank()) {
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = "群聊简介",
@@ -95,12 +90,11 @@ fun GroupInfoDialog(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = intro,
+                        text = group.introduction,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )
-                    }
                 }
                 
                 Spacer(modifier = Modifier.height(24.dp))

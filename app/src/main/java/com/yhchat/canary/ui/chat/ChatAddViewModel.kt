@@ -92,7 +92,7 @@ class ChatAddViewModel @Inject constructor(
                     displayName = groupInfo.name,
                     avatarUrl = groupInfo.avatarUrl,
                     description = groupInfo.introduction,
-                    additionalInfo = "${groupInfo.headcount} 人"
+                    additionalInfo = "${groupInfo.memberCount} 人"
                 )
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,

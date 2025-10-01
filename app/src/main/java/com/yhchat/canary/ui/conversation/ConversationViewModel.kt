@@ -164,8 +164,10 @@ class ConversationViewModel @Inject constructor(
      * 观察WebSocket会话更新
      */
     private fun observeWebSocketMessages() {
+        // 监听消息事件
         viewModelScope.launch {
             webSocketManager.getMessageEvents().collect { event ->
+                Log.d("ConversationViewModel", "Received MessageEvent: ${event::class.simpleName}")
                 when (event) {
                     is MessageEvent.NewMessage -> {
                         updateConversationWithNewMessage(event.message)
@@ -175,6 +177,21 @@ class ConversationViewModel @Inject constructor(
                     }
                     else -> {
                         // ignore other events
+                    }
+                }
+            }
+        }
+        
+        // 同时监听会话更新事件（这个流专门用于会话列表更新）
+        viewModelScope.launch {
+            webSocketManager.getConversationUpdates().collect { update ->
+                Log.d("ConversationViewModel", "Received ConversationUpdate: ${update::class.simpleName}")
+                when (update) {
+                    is com.yhchat.canary.data.websocket.ConversationUpdate.NewMessage -> {
+                        updateConversationWithNewMessage(update.message)
+                    }
+                    is com.yhchat.canary.data.websocket.ConversationUpdate.MessageEdited -> {
+                        updateConversationWithEditedMessage(update.message)
                     }
                 }
             }
@@ -245,6 +262,12 @@ class ConversationViewModel @Inject constructor(
             // 按时间排序
             currentConversations.sortByDescending { it.timestampMs }
             _conversations.value = currentConversations
+            
+            // 同步更新分页显示的会话列表
+            allLoadedConversations = currentConversations
+            _pagedConversations.value = currentConversations.take(currentPage * pageSize)
+            
+            Log.d("ConversationViewModel", "Updated conversation list, total: ${currentConversations.size}, displayed: ${_pagedConversations.value.size}")
         }
     }
     
@@ -258,11 +281,15 @@ class ConversationViewModel @Inject constructor(
         if (conversationIndex >= 0) {
             val conversation = currentConversations[conversationIndex]
             val updatedConversation = conversation.copy(
-                chatContent = message.content.text ?: "[消息]",
+                chatContent = getMessagePreview(message),
                 timestampMs = message.sendTime
             )
             currentConversations[conversationIndex] = updatedConversation
             _conversations.value = currentConversations
+            
+            // 同步更新分页显示的会话列表
+            allLoadedConversations = currentConversations
+            _pagedConversations.value = currentConversations.take(currentPage * pageSize)
         }
     }
     
@@ -290,10 +317,12 @@ class ConversationViewModel @Inject constructor(
         
         // 确定目标会话类型
         val isPrivateChat = message.chatId == message.recvId
-        val targetChatType = if (isPrivateChat) message.sender.chatType else message.chatType ?: return contentPreview ?: "[消息]"
+        val targetChatType = if (isPrivateChat) message.sender.chatType else (message.chatType ?: 1)
         
         // 确保返回非空字符串
         val nonNullContentPreview = contentPreview ?: "[消息]"
+        
+        Log.d("ConversationViewModel", "Message preview - chatType: $targetChatType, sender: ${message.sender.name}, content: $nonNullContentPreview")
         
         // 根据会话类型决定显示格式
         return when (targetChatType) {

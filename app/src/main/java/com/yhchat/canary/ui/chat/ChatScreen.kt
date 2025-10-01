@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.runtime.*
@@ -64,6 +65,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.input.pointer.pointerInput
+import com.yhchat.canary.ui.community.PostDetailActivity
+import androidx.compose.foundation.border
 // pointerInput 相关扩展函数无需单独 import，consume 已废弃
 
 /**
@@ -140,6 +143,24 @@ fun ChatScreen(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "返回"
                     )
+                }
+            },
+            actions = {
+                // 群聊信息菜单（只在群聊时显示）
+                if (chatType == 2) {
+                    IconButton(onClick = {
+                        android.util.Log.d("ChatScreen", "Opening group info: chatId=$chatId, chatName=$chatName")
+                        val intent = Intent(context, com.yhchat.canary.ui.group.GroupInfoActivity::class.java)
+                        intent.putExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_ID, chatId)
+                        intent.putExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_NAME, chatName)
+                        android.util.Log.d("ChatScreen", "Intent extras: groupId=${intent.getStringExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_ID)}, groupName=${intent.getStringExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_NAME)}")
+                        context.startActivity(intent)
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "群聊信息"
+                        )
+                    }
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
@@ -320,6 +341,10 @@ fun ChatScreen(
                    
                         viewModel.sendTextMessage(inputText.trim())
                         inputText = ""
+                        // 发送消息后自动滚动到最新消息
+                        coroutineScope.launch {
+                            listState.animateScrollToItem(0)
+                        }
                     }
                 },
                 onImageClick = {
@@ -335,8 +360,8 @@ fun ChatScreen(
                     // TODO: 实现相机拍照功能
                 },
                 modifier = Modifier.padding(
-                    start = 8.dp,
-                    end = 8.dp,
+                    start = 16.dp,
+                    end = 16.dp,
                     top = 8.dp,
                     bottom = 16.dp // 增加底部间距，避免粘在最底部
                 )
@@ -417,7 +442,7 @@ private fun MessageItem(
             // 发送者姓名（非自己的消息）
             if (!isMyMessage) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 2.dp),
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -690,6 +715,17 @@ private fun MessageContentView(
                     )
                 }
             }
+            6 -> {
+                // 文章消息
+                PostMessageView(
+                    postId = content.postId,
+                    postTitle = content.postTitle,
+                    postContent = content.postContent,
+                    postContentType = content.postContentType,
+                    textColor = textColor,
+                    isMyMessage = isMyMessage
+                )
+            }
             7 -> {
                 // 表情消息 (包括表情包和个人收藏表情)
                 // 根据示例，contentType: 7 统一处理表情消息，直接使用 imageUrl
@@ -808,6 +844,120 @@ private fun MessageContentView(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * 文章消息视图
+ */
+@Composable
+private fun PostMessageView(
+    postId: String?,
+    postTitle: String?,
+    postContent: String?,
+    postContentType: String?,
+    textColor: Color,
+    isMyMessage: Boolean
+) {
+    val context = LocalContext.current
+    
+    if (postId.isNullOrEmpty()) {
+        Text(
+            text = "📄 文章消息",
+            color = textColor,
+            style = MaterialTheme.typography.bodyMedium
+        )
+        return
+    }
+    
+    // 文章卡片
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                // 点击跳转到文章详情
+                val intent = Intent(context, PostDetailActivity::class.java).apply {
+                    putExtra("post_id", postId.toIntOrNull() ?: 0)
+                    putExtra("post_title", postTitle ?: "文章详情")
+                }
+                context.startActivity(intent)
+            }
+            .border(
+                width = 1.dp,
+                color = if (isMyMessage) {
+                    MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f)
+                } else {
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                },
+                shape = RoundedCornerShape(8.dp)
+            ),
+        color = Color.Transparent
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+            // 文章图标和标题
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "📄",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Text(
+                    text = postTitle ?: "文章",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = textColor,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            
+            // 文章内容预览
+            if (!postContent.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                when (postContentType) {
+                    "2" -> {
+                        // Markdown内容预览
+                        Text(
+                            text = postContent.take(100) + if (postContent.length > 100) "..." else "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = textColor.copy(alpha = 0.8f),
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    else -> {
+                        // 普通文本内容预览
+                        Text(
+                            text = postContent.take(100) + if (postContent.length > 100) "..." else "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = textColor.copy(alpha = 0.8f),
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+            
+            // 查看详情提示
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "点击查看文章详情 →",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isMyMessage) {
+                    MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                } else {
+                    MaterialTheme.colorScheme.primary
+                },
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }

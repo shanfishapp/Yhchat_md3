@@ -22,49 +22,32 @@ class WebSocketManager @Inject constructor(
     private val tag = "WebSocketManager"
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
-    // 是否已经初始化监听
-    private var isListening = false
-    
-    /**
-     * 开始监听WebSocket消息并处理数据更新
-     */
-    fun startListening() {
-        if (isListening) {
-            Log.d(tag, "Already listening to WebSocket messages")
-            return
-        }
-        
-        isListening = true
-        Log.d(tag, "Starting to listen to WebSocket messages")
-        
-        // 监听消息事件并处理
+    init {
+        // 在初始化时就开始持续监听WebSocket消息
+        // 使用SupervisorJob确保一个子协程失败不会影响其他协程
         scope.launch {
             webSocketService.messageEvents.collect { event ->
+                Log.d(tag, "Received message event: ${event::class.simpleName}")
                 handleMessageEvent(event)
             }
         }
         
-        // 监听会话更新事件
+        // 持续监听会话更新事件
         scope.launch {
             webSocketService.conversationUpdates.collect { update ->
+                Log.d(tag, "Received conversation update: ${update::class.simpleName}")
                 handleConversationUpdate(update)
             }
         }
-    }
-    
-    /**
-     * 停止监听
-     */
-    fun stopListening() {
-        isListening = false
-        scope.cancel()
+        
+        Log.d(tag, "WebSocketManager initialized with persistent listeners")
     }
     
     /**
      * 连接WebSocket
      */
     suspend fun connect(userId: String, platform: String = "android") {
-        startListening() // 确保开始监听
+        Log.d(tag, "Connecting WebSocket for user: $userId")
         webSocketService.connect(userId, platform)
     }
     
@@ -94,6 +77,13 @@ class WebSocketManager @Inject constructor(
      */
     fun getMessageEvents(): SharedFlow<MessageEvent> {
         return webSocketService.messageEvents
+    }
+    
+    /**
+     * 获取会话更新流 - 供会话列表UI监听
+     */
+    fun getConversationUpdates(): SharedFlow<ConversationUpdate> {
+        return webSocketService.conversationUpdates
     }
     
     /**
@@ -333,7 +323,8 @@ class WebSocketManager @Inject constructor(
         // 根据会话类型决定显示格式
         return when (targetChatType) {
             2, 3 -> {
-                // 群聊(2)或机器人会话(3)：显示"发送者：内容"
+
+
                 "${message.sender.name}：$contentPreview"
             }
             else -> {
@@ -347,7 +338,7 @@ class WebSocketManager @Inject constructor(
      * 销毁管理器
      */
     fun destroy() {
-        stopListening()
+        scope.cancel()
         webSocketService.destroy()
     }
 }

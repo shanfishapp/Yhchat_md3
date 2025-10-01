@@ -448,10 +448,17 @@ class WebSocketService @Inject constructor(
             )
         } else null
 
+        // 判断消息方向：当sender.chatId == recvId时，说明是自己发的消息（多设备同步）
+        val direction = if (protoMsg.sender.chatId == protoMsg.recvId) {
+            "right" // 自己发送的消息
+        } else {
+            "left" // 对方发送的消息
+        }
+        
         return ChatMessage(
             msgId = protoMsg.msgId,
             sender = sender,
-            direction = "left", // WebSocket消息通常是接收的消息
+            direction = direction,
             contentType = protoMsg.contentType,
             content = content,
             sendTime = protoMsg.timestamp,

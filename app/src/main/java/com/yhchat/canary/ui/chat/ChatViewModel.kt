@@ -114,6 +114,12 @@ class ChatViewModel @Inject constructor(
                 val insertIndex = _messages.indexOfLast { it.sendTime <= message.sendTime } + 1
                 _messages.add(insertIndex, message)
                 Log.d(tag, "Inserted new real-time message at index $insertIndex: ${message.msgId}")
+                
+                // 初始化流式消息缓存（如果是机器人消息，准备接收stream_message）
+                if (message.sender.chatType == 3) {
+                    streamingMessages[message.msgId] = message.content.text ?: ""
+                    Log.d(tag, "Initialized streaming cache for bot message: ${message.msgId}")
+                }
             }
         }
     }
@@ -156,37 +162,25 @@ class ChatViewModel @Inject constructor(
         
         Log.d(tag, "Handling stream message: msgId=${event.msgId}, content=${event.content}")
         
-        // 累积流式消息内容
-        val accumulatedContent = streamingMessages.getOrDefault(event.msgId, "") + event.content
-        streamingMessages[event.msgId] = accumulatedContent
-        
         // 查找是否已有此消息
         val existingIndex = _messages.indexOfFirst { it.msgId == event.msgId }
         
-        if (existingIndex != -1) {
-            // 更新现有消息的内容
-            val existingMessage = _messages[existingIndex]
-            val updatedMessage = existingMessage.copy(
-                content = existingMessage.content.copy(text = accumulatedContent)
-            )
-            _messages[existingIndex] = updatedMessage
-            Log.d(tag, "Updated stream message at index $existingIndex")
-        } else {
-            // 创建新的流式消息
-            val streamMessage = ChatMessage(
+        if (existingIndex == -1) {
+            // 消息不存在，先创建基础消息（push_message的作用）
+            val baseMessage = ChatMessage(
                 msgId = event.msgId,
                 sender = com.yhchat.canary.data.model.MessageSender(
                     chatId = event.chatId,
-                    chatType = 3, // 机器人
+                    chatType = 3,
                     name = "机器人",
                     avatarUrl = "",
                     tagOld = emptyList(),
                     tag = emptyList()
                 ),
                 direction = "left",
-                contentType = 1, // 文本消息
+                contentType = 1,
                 content = com.yhchat.canary.data.model.MessageContent(
-                    text = accumulatedContent
+                    text = event.content
                 ),
                 sendTime = System.currentTimeMillis(),
                 cmd = null,
@@ -195,14 +189,25 @@ class ChatViewModel @Inject constructor(
                 msgSeq = null,
                 editTime = null,
                 chatId = event.chatId,
-                chatType = 3, // 机器人
+                chatType = 3,
                 recvId = event.recvId
             )
             
-            // 按时间排序插入
-            val insertIndex = _messages.indexOfLast { it.sendTime <= streamMessage.sendTime } + 1
-            _messages.add(insertIndex, streamMessage)
-            Log.d(tag, "Created new stream message at index $insertIndex")
+            val insertIndex = _messages.indexOfLast { it.sendTime <= baseMessage.sendTime } + 1
+            _messages.add(insertIndex, baseMessage)
+            streamingMessages[event.msgId] = event.content
+            Log.d(tag, "Created base message for stream at index $insertIndex")
+        } else {
+            // 消息已存在，追加内容
+            val accumulatedContent = streamingMessages.getOrDefault(event.msgId, "") + event.content
+            streamingMessages[event.msgId] = accumulatedContent
+            
+            val existingMessage = _messages[existingIndex]
+            val updatedMessage = existingMessage.copy(
+                content = existingMessage.content.copy(text = accumulatedContent)
+            )
+            _messages[existingIndex] = updatedMessage
+            Log.d(tag, "Updated stream message at index $existingIndex")
         }
     }
 

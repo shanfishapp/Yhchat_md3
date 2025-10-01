@@ -683,37 +683,28 @@ data class GroupInfoResponse(
 
 data class GroupInfoData(
     @SerializedName("group")
-    val group: GroupInfo
+    val group: GroupInfoResponseGroupData
 )
 
-data class GroupInfo(
+data class GroupInfoResponseGroupData(
     @SerializedName("id")
     val id: Int,
-    
     @SerializedName("groupId")
     val groupId: String,
-    
     @SerializedName("name")
     val name: String,
-    
     @SerializedName("introduction")
     val introduction: String,
-    
     @SerializedName("createBy")
     val createBy: String,
-    
     @SerializedName("createTime")
     val createTime: Long,
-    
     @SerializedName("avatarId")
     val avatarId: Int,
-    
     @SerializedName("avatarUrl")
     val avatarUrl: String,
-    
     @SerializedName("headcount")
     val headcount: Int,
-    
     @SerializedName("readHistory")
     val readHistory: Int
 )
@@ -909,5 +900,47 @@ data class UserInfo(
     val continuousOnLineDay: Int? = null,
     @SerializedName("is_vip")
     val isVip: Int? = null
+)
+
+// ========== 群聊相关数据模型 ==========
+
+/**
+ * 群聊详细信息（Proto解析专用）
+ */
+data class GroupDetail(
+    val groupId: String,
+    val name: String,
+    val avatarUrl: String,
+    val introduction: String,
+    val memberCount: Int,
+    val createBy: String,
+    val directJoin: Boolean,
+    val permissionLevel: Int,
+    val historyMsgEnabled: Boolean,
+    val categoryName: String,
+    val categoryId: Long,
+    val isPrivate: Boolean,
+    val doNotDisturb: Boolean,
+    val communityId: Long,
+    val communityName: String,
+    val isTop: Boolean,
+    val adminIds: List<String>,
+    val ownerId: String,
+    val limitedMsgType: String,
+    val avatarId: Long? = null,
+    val recommendation: Int? = null
+)
+
+/**
+ * 群聊成员信息（Proto解析专用）
+ */
+data class GroupMemberInfo(
+    val userId: String,
+    val name: String,
+    val avatarUrl: String,
+    val isVip: Boolean,
+    val permissionLevel: Int,
+    val gagTime: Long,
+    val isGag: Boolean
 )
 

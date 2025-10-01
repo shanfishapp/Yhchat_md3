@@ -28,7 +28,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yhchat.canary.data.di.RepositoryFactory
-import com.yhchat.canary.data.model.*
+import com.yhchat.canary.data.model.BotInfo
+import com.yhchat.canary.data.model.GroupDetail
+import com.yhchat.canary.data.model.UserInfo
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import kotlinx.coroutines.launch
 
@@ -206,11 +208,11 @@ private fun ComprehensiveSearchScreen(
     
     // 显示详情弹窗
     if (uiState.showGroupDialog) {
-        GroupInfoDialog(
+    GroupInfoDialog(
             group = uiState.groupResult,
             onDismiss = { viewModel.hideGroupDialog() },
-            onAdd = { group ->
-                viewModel.addGroup(group.groupId ?: "")
+        onAdd = { group ->
+            viewModel.addGroup(group.groupId)
             },
             isAdding = uiState.isAdding
         )
@@ -241,9 +243,9 @@ private fun ComprehensiveSearchScreen(
 
 @Composable
 private fun GroupSearchPage(
-    groupResult: GroupInfo?,
+    groupResult: GroupDetail?,
     isLoading: Boolean,
-    onGroupClick: (GroupInfo) -> Unit
+    onGroupClick: (GroupDetail) -> Unit
 ) {
     when {
         isLoading -> {

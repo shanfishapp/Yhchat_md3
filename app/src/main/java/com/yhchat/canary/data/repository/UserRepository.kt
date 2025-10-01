@@ -380,14 +380,38 @@ class UserRepository @Inject constructor(
     /**
      * 获取群聊信息
      */
-    suspend fun getGroupInfo(groupId: String): Result<GroupInfo> {
+    suspend fun getGroupInfo(groupId: String): Result<GroupDetail> {
         return try {
             val request = mapOf("groupId" to groupId)
             val response = webApiService.getGroupInfo(request)
             if (response.isSuccessful) {
                 val groupInfoResponse = response.body()
                 if (groupInfoResponse?.code == 1) {
-                    Result.success(groupInfoResponse.data.group)
+                    val group = groupInfoResponse.data.group
+                    val groupDetail = GroupDetail(
+                        groupId = group.groupId,
+                        name = group.name,
+                        avatarUrl = group.avatarUrl,
+                        introduction = group.introduction,
+                        memberCount = group.headcount,
+                        createBy = group.createBy,
+                        directJoin = group.readHistory == 1,
+                        permissionLevel = 0,
+                        historyMsgEnabled = group.readHistory == 1,
+                        categoryName = "",
+                        categoryId = 0,
+                        isPrivate = false,
+                        doNotDisturb = false,
+                        communityId = 0,
+                        communityName = "",
+                        isTop = false,
+                        adminIds = emptyList(),
+                        ownerId = group.createBy,
+                        limitedMsgType = "",
+                        avatarId = group.avatarId.toLong(),
+                        recommendation = null
+                    )
+                    Result.success(groupDetail)
                 } else {
                     Result.failure(Exception(groupInfoResponse?.msg ?: "获取群聊信息失败"))
                 }

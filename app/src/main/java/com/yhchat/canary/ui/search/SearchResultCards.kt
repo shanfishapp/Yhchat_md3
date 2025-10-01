@@ -15,14 +15,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.yhchat.canary.data.model.*
+import com.yhchat.canary.data.model.BotInfo
+import com.yhchat.canary.data.model.GroupDetail
+import com.yhchat.canary.data.model.UserInfo
 import com.yhchat.canary.ui.components.ImageUtils
 import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
 fun GroupResultCard(
-    group: GroupInfo,
+    group: GroupDetail,
     onClick: () -> Unit
 ) {
     Card(
@@ -63,7 +65,7 @@ fun GroupResultCard(
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
-                    text = group.name ?: "未知群聊",
+                    text = group.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
@@ -71,16 +73,24 @@ fun GroupResultCard(
                 )
                 
                 Text(
-                    text = "群ID: ${group.groupId ?: "-"}",
+                    text = "群ID: ${group.groupId}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
-                group.headcount?.let { count ->
+                Text(
+                    text = "${group.memberCount} 名成员",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                if (group.introduction.isNotBlank()) {
                     Text(
-                        text = "$count 名成员",
+                        text = group.introduction,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

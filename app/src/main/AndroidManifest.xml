@@ -40,6 +40,11 @@
             android:label="聊天"
             android:theme="@style/Theme.YhchatCanary" />
         <activity
+            android:name=".ui.group.GroupInfoActivity"
+            android:exported="false"
+            android:label="群聊信息"
+            android:theme="@style/Theme.YhchatCanary" />
+        <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"

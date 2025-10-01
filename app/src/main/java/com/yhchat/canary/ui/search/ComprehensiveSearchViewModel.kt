@@ -4,7 +4,9 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.yhchat.canary.data.di.RepositoryFactory
-import com.yhchat.canary.data.model.*
+import com.yhchat.canary.data.model.BotInfo
+import com.yhchat.canary.data.model.GroupDetail
+import com.yhchat.canary.data.model.UserInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,7 +30,29 @@ class ComprehensiveSearchViewModel(application: Application) : AndroidViewModel(
                 if (responseBody != null) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        groupResult = responseBody.data.group,
+                        groupResult = GroupDetail(
+                            groupId = responseBody.data.group.groupId,
+                            name = responseBody.data.group.name,
+                            avatarUrl = responseBody.data.group.avatarUrl,
+                            introduction = responseBody.data.group.introduction,
+                            memberCount = responseBody.data.group.headcount,
+                            createBy = responseBody.data.group.createBy,
+                            directJoin = responseBody.data.group.readHistory == 1,
+                            permissionLevel = 0,
+                            historyMsgEnabled = responseBody.data.group.readHistory == 1,
+                            categoryName = "",
+                            categoryId = 0,
+                            isPrivate = false,
+                            doNotDisturb = false,
+                            communityId = 0,
+                            communityName = "",
+                            isTop = false,
+                            adminIds = emptyList(),
+                            ownerId = responseBody.data.group.createBy,
+                            limitedMsgType = "",
+                            avatarId = responseBody.data.group.avatarId.toLong(),
+                            recommendation = null
+                        ),
                         error = null
                     )
                 } else {
@@ -227,7 +251,7 @@ class ComprehensiveSearchViewModel(application: Application) : AndroidViewModel(
         }
     }
     
-    fun showGroupDialog(group: GroupInfo) {
+    fun showGroupDialog(group: GroupDetail) {
         _uiState.value = _uiState.value.copy(showGroupDialog = true)
     }
     
@@ -265,7 +289,7 @@ data class ComprehensiveSearchUiState(
     val isLoading: Boolean = false,
     val isAdding: Boolean = false,
     val error: String? = null,
-    val groupResult: GroupInfo? = null,
+    val groupResult: GroupDetail? = null,
     val userResult: UserInfo? = null,
     val botResult: BotInfo? = null,
     val showGroupDialog: Boolean = false,
