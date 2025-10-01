@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
+import com.yhchat.canary.data.api.ApiClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
@@ -226,7 +227,7 @@ class GroupRepository @Inject constructor() {
         }
         
         return@withContext try {
-            val apiService = com.yhchat.canary.data.api.ApiClient.create(com.yhchat.canary.data.api.ApiService::class.java)
+            val apiService = ApiClient.apiService
             val response = apiService.editGroupInfo(token, editGroupInfoRequest)
             
             if (response.isSuccessful && response.body()?.code == 1) {

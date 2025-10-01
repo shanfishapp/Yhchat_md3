@@ -210,7 +210,7 @@ class GroupInfoViewModel @Inject constructor(
                 directJoin = if (groupInfo.directJoin) 1 else 0,
                 historyMsg = if (groupInfo.historyMsgEnabled) 1 else 0,
                 categoryName = currentState.newCategoryName,
-                categoryId = groupInfo.categoryId,
+                categoryId = groupInfo.categoryId.toInt(),
                 `private` = if (groupInfo.isPrivate) 1 else 0
             )
             
@@ -242,7 +242,7 @@ class GroupInfoViewModel @Inject constructor(
                 directJoin = if (directJoin) 1 else 0,
                 historyMsg = if (groupInfo.historyMsgEnabled) 1 else 0,
                 categoryName = groupInfo.categoryName,
-                categoryId = groupInfo.categoryId,
+                categoryId = groupInfo.categoryId.toInt(),
                 `private` = if (groupInfo.isPrivate) 1 else 0
             )
             
@@ -273,7 +273,7 @@ class GroupInfoViewModel @Inject constructor(
                 directJoin = if (groupInfo.directJoin) 1 else 0,
                 historyMsg = if (historyMsgEnabled) 1 else 0,
                 categoryName = groupInfo.categoryName,
-                categoryId = groupInfo.categoryId,
+                categoryId = groupInfo.categoryId.toInt(),
                 `private` = if (groupInfo.isPrivate) 1 else 0
             )
             
@@ -304,7 +304,7 @@ class GroupInfoViewModel @Inject constructor(
                 directJoin = if (groupInfo.directJoin) 1 else 0,
                 historyMsg = if (groupInfo.historyMsgEnabled) 1 else 0,
                 categoryName = groupInfo.categoryName,
-                categoryId = groupInfo.categoryId,
+                categoryId = groupInfo.categoryId.toInt(),
                 `private` = if (isPrivate) 1 else 0
             )
             
