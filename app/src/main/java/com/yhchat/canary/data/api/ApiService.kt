@@ -284,7 +284,11 @@ interface ApiService {
         @Body request: ChangeInviteCodeRequest
     ): Response<Map<String, Any>>
 
-    // ========== 好友相关API ==========
+    @POST("v1/group/edit-group")
+    suspend fun editGroupInfo(
+        @Header("token") token: String,
+        @Body request: EditGroupInfoRequest
+    ): Response<EditGroupResponse>
 
     /**
      * 添加好友/加入群聊

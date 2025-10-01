@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshotFlow
@@ -88,6 +89,14 @@ fun GroupInfoScreenRoot(
                             }
                         }
                     }
+                    uiState.isEditingCategory -> {
+                        EditCategoryDialog(
+                            categoryName = uiState.newCategoryName,
+                            onCategoryNameChange = { viewModel.updateNewCategoryName(it) },
+                            onSave = { viewModel.saveCategoryName(groupId) },
+                            onDismiss = { viewModel.hideEditCategoryDialog() }
+                        )
+                    }
                     uiState.groupInfo != null -> {
                         GroupInfoContent(
                             groupId = groupId,
@@ -96,7 +105,18 @@ fun GroupInfoScreenRoot(
                             isLoadingMembers = uiState.isLoadingMembers,
                             isLoadingMoreMembers = uiState.isLoadingMoreMembers,
                             hasMoreMembers = uiState.hasMoreMembers,
+                            showMemberList = uiState.showMemberList,
+                            isEditingCategory = uiState.isEditingCategory,
+                            newCategoryName = uiState.newCategoryName,
                             onLoadMore = { viewModel.loadMoreMembers(groupId) },
+                            onToggleMemberList = { viewModel.toggleMemberList() },
+                            onShowEditCategoryDialog = { viewModel.showEditCategoryDialog() },
+                            onHideEditCategoryDialog = { viewModel.hideEditCategoryDialog() },
+                            onUpdateNewCategoryName = { viewModel.updateNewCategoryName(it) },
+                            onSaveCategoryName = { viewModel.saveCategoryName(groupId) },
+                            onUpdateDirectJoin = { viewModel.updateDirectJoin(groupId, it) },
+                            onUpdateHistoryMsg = { viewModel.updateHistoryMsg(groupId, it) },
+                            onUpdatePrivateSetting = { viewModel.updatePrivateSetting(groupId, it) },
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -114,7 +134,18 @@ private fun GroupInfoContent(
     isLoadingMembers: Boolean,
     isLoadingMoreMembers: Boolean,
     hasMoreMembers: Boolean,
+    showMemberList: Boolean,
+    isEditingCategory: Boolean,
+    newCategoryName: String,
     onLoadMore: () -> Unit,
+    onToggleMemberList: () -> Unit,
+    onShowEditCategoryDialog: () -> Unit,
+    onHideEditCategoryDialog: () -> Unit,
+    onUpdateNewCategoryName: (String) -> Unit,
+    onSaveCategoryName: (String) -> Unit,
+    onUpdateDirectJoin: (Boolean) -> Unit,
+    onUpdateHistoryMsg: (Boolean) -> Unit,
+    onUpdatePrivateSetting: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -197,19 +228,17 @@ private fun GroupInfoContent(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     InfoRow("成员数量", "${groupInfo.memberCount} 人")
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    InfoRow("群分类", groupInfo.categoryName)
+                    CategoryRow("群分类", groupInfo.categoryName, onShowEditCategoryDialog)
                     if (groupInfo.communityName.isNotEmpty()) {
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                         InfoRow("所属社区", groupInfo.communityName)
                     }
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    InfoRow("免审核进群", if (groupInfo.directJoin) "是" else "否")
+                    SwitchRow("免审核进群", groupInfo.directJoin, onUpdateDirectJoin)
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    InfoRow("查看历史消息", if (groupInfo.historyMsgEnabled) "是" else "否")
-                    if (groupInfo.isPrivate) {
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                        InfoRow("群聊类型", "私有群聊")
-                    }
+                    SwitchRow("查看历史消息", groupInfo.historyMsgEnabled, onUpdateHistoryMsg)
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    SwitchRow("群聊私有", groupInfo.isPrivate, onUpdatePrivateSetting)
                 }
             }
         }
@@ -220,11 +249,13 @@ private fun GroupInfoContent(
                 text = "成员列表 (${groupInfo.memberCount})",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(vertical = 8.dp)
+                modifier = Modifier
+                    .padding(vertical = 8.dp)
+                    .clickable { onToggleMemberList() }
             )
         }
         
-        if (isLoadingMembers && members.isEmpty()) {
+        if (showMemberList && (isLoadingMembers && members.isEmpty())) {
             // 首次加载显示加载指示器
             item {
                 Box(
@@ -236,7 +267,7 @@ private fun GroupInfoContent(
                     CircularProgressIndicator()
                 }
             }
-        } else {
+        } else if (showMemberList) {
             // 显示成员列表
             items(members) { member ->
                 MemberItem(member = member)
@@ -408,5 +439,41 @@ private fun MemberItem(member: GroupMemberInfo) {
             }
         }
     }
+}
+
+@Composable
+fun EditCategoryDialog(
+    categoryName: String,
+    onCategoryNameChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(text = "编辑群分类")
+        },
+        text = {
+            OutlinedTextField(
+                value = categoryName,
+                onValueChange = onCategoryNameChange,
+                label = { Text("分类名称") },
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            Button(onClick = {
+                onSave()
+                onDismiss()
+            }) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }
 

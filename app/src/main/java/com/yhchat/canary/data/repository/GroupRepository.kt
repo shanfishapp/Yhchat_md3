@@ -215,5 +215,28 @@ class GroupRepository @Inject constructor() {
             Result.failure(e)
         }
     }
-}
+    
+    /**
+     * 修改群聊信息
+     */
+    suspend fun editGroupInfo(editGroupInfoRequest: com.yhchat.canary.data.api.EditGroupInfoRequest): Result<Boolean> = withContext(Dispatchers.IO) {
+        val token = tokenRepository?.getTokenSync()
+        if (token.isNullOrEmpty()) {
+            return@withContext Result.failure(Exception("未登录"))
+        }
+        
+        return@withContext try {
+            val apiService = com.yhchat.canary.data.api.ApiClient.create(com.yhchat.canary.data.api.ApiService::class.java)
+            val response = apiService.editGroupInfo(token, editGroupInfoRequest)
+            
+            if (response.isSuccessful && response.body()?.code == 1) {
+                Result.success(true)
+            } else {
+                Result.failure(Exception(response.body()?.msg ?: "修改群聊信息失败"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "修改群聊信息失败", e)
+            Result.failure(e)
+        }
+    }
 
