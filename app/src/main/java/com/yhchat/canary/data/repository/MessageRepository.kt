@@ -159,6 +159,16 @@ class MessageRepository @Inject constructor(
             val contentBuilder = send_message_send.Content.newBuilder()
                 .setText(text)
             
+            // 如果有引用消息，添加引用消息文本
+            if (!quoteMsgId.isNullOrEmpty()) {
+                // 获取引用消息的文本内容
+                val quoteMessage = getMessageById(quoteMsgId)
+                quoteMessage?.let { msg ->
+                    val quoteText = "${msg.sender.name}: ${msg.content.text}"
+                    contentBuilder.setQuoteMsgText(quoteText)
+                }
+            }
+            
             val requestBuilder = send_message_send.newBuilder()
                 .setMsgId(msgId)
                 .setChatId(chatId)

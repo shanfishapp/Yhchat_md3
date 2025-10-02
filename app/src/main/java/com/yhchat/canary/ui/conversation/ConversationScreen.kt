@@ -16,6 +16,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.GroupAdd
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import kotlinx.coroutines.launch
@@ -59,7 +63,7 @@ fun ConversationScreen(
     userId: String,
     onConversationClick: (String, Int, String) -> Unit, // chatId, chatType, chatName
     onSearchClick: () -> Unit,
-    onMenuClick: () -> Unit,
+    onMenuClick: (String) -> Unit, // 添加参数用于区分不同的菜单项
     tokenRepository: TokenRepository? = null,
     viewModel: ConversationViewModel = viewModel(),
     scrollBehavior: ScrollBehavior? = null,
@@ -128,6 +132,9 @@ fun ConversationScreen(
 
 
 
+        // 顶部应用栏
+        var expanded by remember { mutableStateOf(false) }
+        
         TopAppBar(
             title = {
                 Text(
@@ -137,15 +144,78 @@ fun ConversationScreen(
                 )
             },
             actions = {
-                IconButton(onClick = {
-                    // 跳转到综合搜索页面
-                    val intent = Intent(context, ComprehensiveSearchActivity::class.java)
-                    context.startActivity(intent)
-                }) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "添加"
-                    )
+                Box {
+                    IconButton(onClick = { expanded = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "添加"
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { 
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("添加...")
+                                }
+                            },
+                            onClick = {
+                                // 跳转到综合搜索页面（原有跳转逻辑）
+                                val intent = Intent(context, ComprehensiveSearchActivity::class.java)
+                                context.startActivity(intent)
+                                expanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { 
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.GroupAdd, contentDescription = null, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("创建...")
+                                }
+                            },
+                            onClick = {
+                                // 创建...（暂时跳转到空屏幕）
+                                // TODO: 实现创建功能
+                                onMenuClick("create")
+                                expanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { 
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("扫一扫")
+                                }
+                            },
+                            onClick = {
+                                // 扫一扫（暂时跳转到空屏幕）
+                                // TODO: 实现扫描功能
+                                onMenuClick("scan")
+                                expanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { 
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("传文件")
+                                }
+                            },
+                            onClick = {
+                                // 传文件（暂时跳转到空屏幕）
+                                // TODO: 实现文件传输功能
+                                onMenuClick("transfer")
+                                expanded = false
+                            }
+                        )
+                    }
                 }
                 IconButton(onClick = onSearchClick) {
                     Icon(

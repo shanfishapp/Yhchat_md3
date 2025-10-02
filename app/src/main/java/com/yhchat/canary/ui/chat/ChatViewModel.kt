@@ -460,4 +460,11 @@ class ChatViewModel @Inject constructor(
         streamingMessages.remove(msgId)
         Log.d(tag, "Cleared streaming message: $msgId")
     }
+    
+    /**
+     * 同步获取用户token
+     */
+    suspend fun getTokenSync(): String? {
+        return tokenRepository.getTokenSync()
+    }
 }

@@ -1,6 +1,7 @@
 package com.yhchat.canary.ui.chat
 
 import android.content.Intent
+import com.yhchat.canary.ui.components.MessageContextMenu
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -19,12 +20,12 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
+import androidx.compose.foundation.border
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -32,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -65,9 +67,20 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.input.pointer.pointerInput
+import com.yhchat.canary.data.model.ShareRequest
+import com.yhchat.canary.data.model.ShareResponse
+import com.yhchat.canary.data.repository.TokenRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+// 添加缺失的导入语句
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.platform.LocalConfiguration
 import com.yhchat.canary.ui.community.PostDetailActivity
-import androidx.compose.foundation.border
-// pointerInput 相关扩展函数无需单独 import，consume 已废弃
+import androidx.compose.foundation.combinedClickable
+import com.yhchat.canary.ui.conversation.EmptyScreen
 
 /**
  * 聊天界面
@@ -90,6 +103,9 @@ fun ChatScreen(
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     
+    // 控制是否显示EmptyScreen的状态
+    var showEmptyScreen by remember { mutableStateOf(false) }
+    
     // 图片预览状态
     var showImageViewer by remember { mutableStateOf(false) }
     var currentImageUrl by remember { mutableStateOf("") }
@@ -97,6 +113,22 @@ fun ChatScreen(
     // 滚动到底部按钮状态
     var showScrollToBottomButton by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+    
+    // 引用消息状态
+    var quoteMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    
+    // 消息上下文菜单状态
+    var showContextMenu by remember { mutableStateOf(false) }
+    var selectedMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    var contextMenuPosition by remember { mutableStateOf(androidx.compose.ui.unit.IntOffset.Zero) }
+    
+    // 分享状态
+    var isSharing by remember { mutableStateOf(false) }
+    
+    // 屏幕尺寸
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp.value
+    val screenHeight = configuration.screenHeightDp.dp.value
     
     // 初始化聊天
     LaunchedEffect(chatId, chatType, userId) {
@@ -146,7 +178,6 @@ fun ChatScreen(
                 }
             },
             actions = {
-                // 群聊信息菜单（只在群聊时显示）
                 if (chatType == 2) {
                     IconButton(onClick = {
                         android.util.Log.d("ChatScreen", "Opening group info: chatId=$chatId, chatName=$chatName")
@@ -161,7 +192,21 @@ fun ChatScreen(
                             contentDescription = "群聊信息"
                         )
                     }
-                }
+                } else {
+                    IconButton(onClick = {
+                        android.util.Log.d("ChatScreen", "Opening group info: chatId=$chatId, chatName=$chatName")
+                        val intent = Intent(context, com.yhchat.canary.ui.group.GroupInfoActivity::class.java)
+                        intent.putExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_ID, chatId)
+                        intent.putExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_NAME, chatName)
+                        android.util.Log.d("ChatScreen", "Intent extras: groupId=${intent.getStringExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_ID)}, groupName=${intent.getStringExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_NAME)}")
+                        context.startActivity(intent)
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "群聊信息"
+                        )
+                    }
+                } 
             },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -232,6 +277,27 @@ fun ChatScreen(
                             onImageClick = { imageUrl ->
                                 currentImageUrl = imageUrl
                                 showImageViewer = true
+                            },
+                            onMessageClick = { clickedMessage ->
+                                // 双击消息跳转到引用消息位置
+                                clickedMessage.quoteMsgId?.let { quoteMsgId ->
+                                    val index = messages.indexOfFirst { it.msgId == quoteMsgId }
+                                    if (index != -1) {
+                                        coroutineScope.launch {
+                                            listState.animateScrollToItem(messages.size - 1 - index)
+                                        }
+                                    }
+                                }
+                            },
+                            onMessageLongClick = { longClickedMessage, messagePosition ->
+                                // 显示上下文菜单
+                                selectedMessage = longClickedMessage
+                                showContextMenu = true
+                                // 使用消息位置作为菜单位置
+                                contextMenuPosition = IntOffset(
+                                    x = (messagePosition.x + 100).toInt(), // 偏移一些像素使其不完全贴在消息上
+                                    y = (messagePosition.y + 50).toInt()
+                                )
                             },
                             onAvatarClick = { chatId, name, chatType ->
                                 // 处理头像点击事件
@@ -338,9 +404,11 @@ fun ChatScreen(
                 onTextChange = { inputText = it },
                 onSendMessage = {
                     if (inputText.isNotBlank()) {
-                   
-                        viewModel.sendTextMessage(inputText.trim())
+                        // 发送消息时包含引用消息信息
+                        val quoteMsgId = quoteMessage?.msgId
+                        viewModel.sendTextMessage(inputText.trim(), quoteMsgId)
                         inputText = ""
+                        quoteMessage = null // 清除引用消息
                         // 发送消息后自动滚动到最新消息
                         coroutineScope.launch {
                             listState.animateScrollToItem(0)
@@ -359,6 +427,8 @@ fun ChatScreen(
                 onCameraClick = {
                     // TODO: 实现相机拍照功能
                 },
+                quoteMessage = quoteMessage,
+                onClearQuote = { quoteMessage = null },
                 modifier = Modifier.padding(
                     start = 16.dp,
                     end = 16.dp,
@@ -380,6 +450,32 @@ fun ChatScreen(
             }
         )
     }
+    
+    // 消息上下文菜单
+    if (showContextMenu && selectedMessage != null) {
+        MessageContextMenu(
+            onReply = {
+                quoteMessage = selectedMessage
+            },
+            onCopy = {
+                // TODO: 实现复制消息功能
+            },
+            onForward = {
+                // TODO: 实现转发消息功能
+            },
+            onEdit = {
+                // TODO: 实现编辑消息功能
+            },
+            onDelete = {
+                // TODO: 实现撤回消息功能
+            },
+            onDismiss = {
+                showContextMenu = false
+                selectedMessage = null
+            },
+            position = contextMenuPosition
+        )
+    }
 }
 
 /**
@@ -391,6 +487,8 @@ private fun MessageItem(
     isMyMessage: Boolean,
     modifier: Modifier = Modifier,
     onImageClick: (String) -> Unit = {},
+    onMessageClick: (ChatMessage) -> Unit = {},
+    onMessageLongClick: (ChatMessage, androidx.compose.ui.geometry.Offset) -> Unit = { _, _ -> },
     onAvatarClick: (String, String, Int) -> Unit = { _, _, _ -> }
 ) {
     // 检查是否为撤回消息
@@ -403,8 +501,23 @@ private fun MessageItem(
         return
     }
     
+    var messagePosition by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    
     Row(
-        modifier = modifier,
+        modifier = modifier
+            .onGloballyPositioned { coordinates ->
+                messagePosition = coordinates.positionInRoot()
+            }
+            .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onDoubleClick = { onMessageClick(message) },
+                onLongClick = { 
+                    // 触发长按事件，传递消息位置
+                    onMessageLongClick(message, messagePosition) 
+                },
+                onClick = { }
+            ),
         horizontalArrangement = if (isMyMessage) {
             Arrangement.End
         } else {
@@ -560,7 +673,35 @@ private fun RecallMessageItem(
         }
     }
 }
-
+/**
+ * 提示消息显示
+ */
+@Composable
+private fun TipMessageItem(
+    message: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Surface(
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .widthIn(max = 280.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            tonalElevation = 1.dp
+        ) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
+    }
+}
 /**
  * 消息内容视图
  */
@@ -687,6 +828,14 @@ private fun MessageContentView(
                             )
                         }
                     }
+                }
+            }
+            9 -> {
+                content.text?.let { text -> 
+                    TipMessageItem(
+                        message = text,
+                        modifier = Modifier
+                    )
                 }
             }
             11 -> {

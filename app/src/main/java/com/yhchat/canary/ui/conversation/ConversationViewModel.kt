@@ -275,21 +275,32 @@ class ConversationViewModel @Inject constructor(
      * 用编辑的消息更新会话列表
      */
     private fun updateConversationWithEditedMessage(message: com.yhchat.canary.data.model.ChatMessage) {
-        val currentConversations = _conversations.value.toMutableList()
-        val conversationIndex = currentConversations.indexOfFirst { it.chatId == message.sender.chatId }
-        
-        if (conversationIndex >= 0) {
-            val conversation = currentConversations[conversationIndex]
-            val updatedConversation = conversation.copy(
-                chatContent = getMessagePreview(message),
-                timestampMs = message.sendTime
-            )
-            currentConversations[conversationIndex] = updatedConversation
-            _conversations.value = currentConversations
+        viewModelScope.launch {
+            val currentConversations = _conversations.value.toMutableList()
             
-            // 同步更新分页显示的会话列表
-            allLoadedConversations = currentConversations
-            _pagedConversations.value = currentConversations.take(currentPage * pageSize)
+            // 根据文档说明，只有当recvId和chatId相等时，才创建/更新与发送者的私聊会话
+            // 否则，应该更新chatId对应的群聊会话
+            val isPrivateChat = message.chatId == message.recvId
+            val targetChatId = if (isPrivateChat) message.sender.chatId else message.chatId ?: ""
+            
+            val conversationIndex = currentConversations.indexOfFirst { it.chatId == targetChatId }
+            
+            if (conversationIndex >= 0) {
+                val conversation = currentConversations[conversationIndex]
+                val updatedConversation = conversation.copy(
+                    chatContent = getMessagePreview(message) ?: "[消息]",
+                    timestampMs = message.sendTime
+                )
+                currentConversations[conversationIndex] = updatedConversation
+                
+                // 按时间排序
+                currentConversations.sortByDescending { it.timestampMs }
+                _conversations.value = currentConversations
+                
+                // 同步更新分页显示的会话列表
+                allLoadedConversations = currentConversations
+                _pagedConversations.value = currentConversations.take(currentPage * pageSize)
+            }
         }
     }
     

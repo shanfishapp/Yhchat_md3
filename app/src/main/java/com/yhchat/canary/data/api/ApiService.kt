@@ -299,6 +299,13 @@ interface ApiService {
         @Body request: AddFriendRequest
     ): Response<ApiStatus>
     
+    // 分享相关API
+    @POST("v1/share/create")
+    suspend fun createShare(
+        @Header("token") token: String,
+        @Body request: ShareRequest
+    ): Response<ShareResponse>
+    
 }
 
 /**

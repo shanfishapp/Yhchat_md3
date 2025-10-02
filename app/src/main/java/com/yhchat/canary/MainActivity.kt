@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.yhchat.canary.ui.login.LoginScreen
 import com.yhchat.canary.ui.conversation.ConversationScreen
+import com.yhchat.canary.ui.conversation.EmptyScreen
 import com.yhchat.canary.ui.chat.ChatScreen
 import com.yhchat.canary.ui.community.CommunityScreen
 import com.yhchat.canary.ui.contacts.ContactsScreen
@@ -101,6 +102,7 @@ class MainActivity : ComponentActivity() {
                 var currentChatType by remember { mutableStateOf(0) }
                 var currentChatName by remember { mutableStateOf("") }
                 var pendingLoginToken by remember { mutableStateOf<String?>(null) }
+                var emptyScreenType by remember { mutableStateOf("") } // 用于跟踪空屏幕类型
                 
                 // 保持ConversationScreen的ViewModel状态，避免重新创建
                 val conversationViewModel: ConversationViewModel = viewModel()
@@ -234,7 +236,10 @@ class MainActivity : ComponentActivity() {
                                                         currentScreen = "search"
                                                     }
                                                 },
-                                                onMenuClick = { },
+                                                onMenuClick = { menuType ->
+                                                    emptyScreenType = menuType
+                                                    currentScreen = "empty"
+                                                },
                                                 tokenRepository = tokenRepository,
                                                 viewModel = conversationViewModel,
                                                 scrollBehavior = scrollBehavior,
@@ -317,6 +322,20 @@ class MainActivity : ComponentActivity() {
                                         CircularProgressIndicator()
                                     }
                                 }
+                            } else if (currentScreen == "empty") {
+                                // 处理空屏幕
+                                EmptyScreen(
+                                    title = when (emptyScreenType) {
+                                        "create" -> "创建"
+                                        "scan" -> "扫一扫"
+                                        "transfer" -> "传文件"
+                                        else -> "功能开发中"
+                                    },
+                                    onBackClick = {
+                                        currentScreen = "conversation"
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
                             }
                         }
                     }
