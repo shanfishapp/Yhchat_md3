@@ -152,3 +152,15 @@ message send_message_send {
 message send_message {
     Status status = 1;
 }
+
+// 通过msgId撤回消息
+message recall_msg_send {
+    string msg_id = 2; // 信息ID
+    string chat_id = 3; // 信息所属对象ID
+    uint64 chat_type = 4; // 信息所属对象类型, 1-用户 2-群聊 3-机器人
+}
+
+// 撤回消息返回数据
+message recall_msg {
+    Status status = 1;
+}

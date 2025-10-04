@@ -559,7 +559,10 @@ data class ApiStatus(
     @SerializedName("msg")
     val message: String
 )
-
+data class DelFriendRequest(
+    val chatId: String,
+    val chatType: Int
+)
 /**
  * 撤回消息请求
  */
@@ -590,7 +593,7 @@ data class RecallMessageBatchRequest(
 enum class ChatType(val value: Int) {
     USER(1),
     GROUP(2),
-    BOT(3)
+    BOT(3);
 }
 
 /**
@@ -810,7 +813,21 @@ data class UserHomepageInfo(
     @SerializedName("isVip")
     val isVip: Int
 )
-
+data class createBotRequest(
+    val nickname: String,
+    val introduction: String,
+    val avatarUrl: String,
+    @SerializedName("private") // 添加注解避免关键字被占用
+    val isPrivate: Int
+)
+data class createBotResponse(
+    val code: Int,
+    val data: createBotData,
+    val msg: String
+)
+data class createBotData(
+    val botId: String
+)
 data class Medal(
     @SerializedName("id")
     val id: Int,
@@ -943,4 +960,3 @@ data class GroupMemberInfo(
     val gagTime: Long,
     val isGag: Boolean
 )
-

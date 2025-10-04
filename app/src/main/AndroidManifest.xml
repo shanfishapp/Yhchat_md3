@@ -167,12 +167,17 @@
             
         <!-- 机器人信息 Activity -->
         <activity
-            android:name=".ui.bot.BotInfoActivity"
+            android:name=".ui.info.BotProfileActivity"
             android:exported="false"
             android:label="机器人信息"
             android:theme="@style/Theme.YhchatCanary" />
-            
-        <!-- 综合搜索 Activity -->
+        
+        <!-- 用户信息 Activity -->
+        <activity
+            android:name=".ui.info.UserProfileActivity"
+            android:exported="false"
+            android:label="用户信息"
+            android:theme="@style/Theme.YhchatCanary" />
 
 
         <activity

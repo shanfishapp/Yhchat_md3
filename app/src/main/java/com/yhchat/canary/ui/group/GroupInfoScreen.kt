@@ -1,5 +1,6 @@
 package com.yhchat.canary.ui.group
 
+import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,7 +9,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshotFlow
@@ -54,6 +57,24 @@ fun GroupInfoScreenRoot(
                             )
                         }
                     },
+                    actions = {
+                        IconButton(
+                            onClick = { viewModel.shareGroup(groupId, groupName) },
+                            enabled = !uiState.isSharing
+                        ) {
+                            if (uiState.isSharing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "分享"
+                                )
+                            }
+                        }
+                    },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer
                     )
@@ -97,6 +118,49 @@ fun GroupInfoScreenRoot(
                             onDismiss = { viewModel.hideEditCategoryDialog() }
                         )
                     }
+                    uiState.shareUrl != null -> {
+                        // 分享成功，调用系统分享功能
+                        LaunchedEffect(uiState.shareUrl) {
+                            uiState.shareUrl?.let { shareMsg ->
+                                val sendIntent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, shareMsg)
+                                }
+                                
+                                val shareIntent = Intent.createChooser(sendIntent, "分享群聊")
+                                context.startActivity(shareIntent)
+                                
+                                // 重置分享URL状态
+                                viewModel.clearShareUrl()
+                            }
+                        }
+                        
+                        // 显示分享成功后的界面
+                        GroupInfoContent(
+                            groupId = groupId,
+                            groupInfo = uiState.groupInfo!!,
+                            members = uiState.members,
+                            isLoadingMembers = uiState.isLoadingMembers,
+                            isLoadingMoreMembers = uiState.isLoadingMoreMembers,
+                            hasMoreMembers = uiState.hasMoreMembers,
+                            showMemberList = uiState.showMemberList,
+                            isEditingCategory = uiState.isEditingCategory,
+                            newCategoryName = uiState.newCategoryName,
+                            isDeleting = uiState.isDeleting,
+                            onDeleteGroup = { viewModel.delGroup(it) },
+                            onLoadMore = { viewModel.loadMoreMembers(groupId) },
+                            onToggleMemberList = { viewModel.toggleMemberList() },
+                            onShowEditCategoryDialog = { viewModel.showEditCategoryDialog() },
+                            onHideEditCategoryDialog = { viewModel.hideEditCategoryDialog() },
+                            onUpdateNewCategoryName = { viewModel.updateNewCategoryName(it) },
+                            onSaveCategoryName = { viewModel.saveCategoryName(groupId) },
+                            onUpdateDirectJoin = { viewModel.updateDirectJoin(groupId, it) },
+                            onUpdateHistoryMsg = { viewModel.updateHistoryMsg(groupId, it) },
+                            onUpdatePrivateSetting = { viewModel.updatePrivateSetting(groupId, it) },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                     uiState.groupInfo != null -> {
                         GroupInfoContent(
                             groupId = groupId,
@@ -108,6 +172,8 @@ fun GroupInfoScreenRoot(
                             showMemberList = uiState.showMemberList,
                             isEditingCategory = uiState.isEditingCategory,
                             newCategoryName = uiState.newCategoryName,
+                            isDeleting = uiState.isDeleting,
+                            onDeleteGroup = { viewModel.delGroup(it) },
                             onLoadMore = { viewModel.loadMoreMembers(groupId) },
                             onToggleMemberList = { viewModel.toggleMemberList() },
                             onShowEditCategoryDialog = { viewModel.showEditCategoryDialog() },
@@ -137,6 +203,8 @@ private fun GroupInfoContent(
     showMemberList: Boolean,
     isEditingCategory: Boolean,
     newCategoryName: String,
+    isDeleting: Boolean,
+    onDeleteGroup: (String) -> Unit,
     onLoadMore: () -> Unit,
     onToggleMemberList: () -> Unit,
     onShowEditCategoryDialog: () -> Unit,
@@ -317,6 +385,41 @@ private fun GroupInfoContent(
                 }
             }
         }
+        
+        // 删除群聊按钮
+        item {
+            Button(
+                onClick = { onDeleteGroup(groupId) },
+                enabled = !isDeleting,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                if (isDeleting) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.onError,
+                        modifier = Modifier.size(24.dp)
+                    )
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "删除",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("删除群聊")
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -492,6 +595,7 @@ private fun MemberItem(member: GroupMemberInfo) {
         }
     }
 }
+
 
 @Composable
 fun EditCategoryDialog(

@@ -5,12 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yhchat.canary.data.model.GroupDetail
 import com.yhchat.canary.data.model.GroupMemberInfo
+import com.yhchat.canary.data.repository.FriendRepository
 import com.yhchat.canary.data.repository.GroupRepository
 import com.yhchat.canary.data.repository.TokenRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -25,13 +27,18 @@ data class GroupInfoUiState(
     val isLoadingMoreMembers: Boolean = false,
     val showMemberList: Boolean = false,
     val isEditingCategory: Boolean = false,
-    val newCategoryName: String = ""
+    val newCategoryName: String = "",
+    val isSharing: Boolean = false,
+    val shareUrl: String? = null,
+    val isDeleting: Boolean = false,
+    val deleteSuccess: Boolean = false
 )
 
 @HiltViewModel
 class GroupInfoViewModel @Inject constructor(
     private val groupRepository: GroupRepository,
-    private val tokenRepository: TokenRepository
+    private val tokenRepository: TokenRepository,
+    private val friendRepository: FriendRepository
 ) : ViewModel() {
     
     private val tag = "GroupInfoViewModel"
@@ -317,6 +324,74 @@ class GroupInfoViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(error = error.message ?: "修改群聊私有设置失败")
                 }
             )
+        }
+    }
+    
+    /**
+     * 分享群聊
+     */
+    fun shareGroup(groupId: String, groupName: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSharing = true, error = null)
+            
+            groupRepository.createShare(groupId, groupName).fold(
+                onSuccess = { response ->
+                    if (response.code == 1 && response.data != null) {
+                        _uiState.value = _uiState.value.copy(
+                            isSharing = false,
+                            shareUrl = "访问链接加入云湖群聊【$groupName】\n${response.data.shareUrl}share?key=${response.data.key}&ts=${response.data.ts}\n群ID: $groupId"
+                            // 历史遗留懒得修改原因，此处shareUrl应为shareMsg
+                        )
+                        // 这里可以添加分享逻辑，比如调用系统分享功能
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            isSharing = false,
+                            error = response.msg ?: "分享失败"
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isSharing = false,
+                        error = error.message ?: "分享失败"
+                    )
+                }
+            )
+        }
+    }
+    
+    /**
+     * 清除分享URL
+     */
+    fun clearShareUrl() {
+        _uiState.value = _uiState.value.copy(shareUrl = null)
+    }
+    
+    /**
+     * 删除群聊
+     */
+    fun delGroup(groupId: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isDeleting = true, error = null)
+            
+            try {
+                val token = tokenRepository.getToken().first()
+                if (token?.token.isNullOrBlank()) {
+                    _uiState.value = _uiState.value.copy(isDeleting = false, error = "未找到有效的token")
+                    return@launch
+                }
+                
+                val response = friendRepository.delFriend(token.token, groupId, 2) // 2表示群聊类型
+                
+                if (response.code == 1) {
+                    _uiState.value = _uiState.value.copy(isDeleting = false, deleteSuccess = true)
+                } else {
+                    _uiState.value = _uiState.value.copy(isDeleting = false, error = response.message)
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "删除群聊失败", e)
+                _uiState.value = _uiState.value.copy(isDeleting = false, error = e.message)
+            }
         }
     }
 }

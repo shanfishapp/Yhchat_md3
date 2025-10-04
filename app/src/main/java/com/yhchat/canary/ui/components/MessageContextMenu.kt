@@ -70,6 +70,7 @@ fun MessageContextMenu(
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
     position: IntOffset,
+    isMyMessage: Boolean = false, // 添加参数标识是否为自己发送的消息
     modifier: Modifier = Modifier
 ) {
     Popup(
@@ -140,36 +141,38 @@ fun MessageContextMenu(
                 )
                 
                 // 编辑（仅自己发送的消息）
-                MenuItem(
-                    text = "编辑",
-                    onClick = {
-                        onEdit()
-                        onDismiss()
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "编辑",
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                )
-                
-                // 撤回（仅自己发送的消息且在撤回时间范围内）
-                MenuItem(
-                    text = "撤回",
-                    onClick = {
-                        onDelete()
-                        onDismiss()
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "撤回",
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                )
+                if (isMyMessage) {
+                    MenuItem(
+                        text = "编辑",
+                        onClick = {
+                            onEdit()
+                            // 不要在这里调用onDismiss()，让调用者决定何时关闭
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "编辑",
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    )
+                    
+                    // 撤回（仅自己发送的消息且在撤回时间范围内）
+                    MenuItem(
+                        text = "撤回",
+                        onClick = {
+                            onDelete()
+                            onDismiss()
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "撤回",
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    )
+                }
             }
         }
     }

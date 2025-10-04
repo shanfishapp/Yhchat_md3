@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.yhchat.canary.ui.login.LoginScreen
 import com.yhchat.canary.ui.conversation.ConversationScreen
+import com.yhchat.canary.ui.conversation.CreateScreen
 import com.yhchat.canary.ui.conversation.EmptyScreen
 import com.yhchat.canary.ui.chat.ChatScreen
 import com.yhchat.canary.ui.community.CommunityScreen
@@ -324,18 +325,33 @@ class MainActivity : ComponentActivity() {
                                 }
                             } else if (currentScreen == "empty") {
                                 // 处理空屏幕
-                                EmptyScreen(
-                                    title = when (emptyScreenType) {
-                                        "create" -> "创建"
-                                        "scan" -> "扫一扫"
-                                        "transfer" -> "传文件"
-                                        else -> "功能开发中"
-                                    },
-                                    onBackClick = {
-                                        currentScreen = "conversation"
-                                    },
-                                    modifier = Modifier.fillMaxSize()
-                                )
+                                when (emptyScreenType) {
+                                    "create" -> {
+                                        // 创建界面
+                                        CreateScreen(
+                                            onBack = {
+                                                currentScreen = "conversation"
+                                            },
+                                            onBotCreated = { botId ->
+                                                // 机器人创建成功后返回会话列表
+                                                currentScreen = "conversation"
+                                            }
+                                        )
+                                    }
+                                    else -> {
+                                        EmptyScreen(
+                                            title = when (emptyScreenType) {
+                                                "scan" -> "扫一扫"
+                                                "transfer" -> "传文件"
+                                                else -> "功能开发中"
+                                            },
+                                            onBackClick = {
+                                                currentScreen = "conversation"
+                                            },
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

@@ -1,6 +1,7 @@
 package com.yhchat.canary.data.repository
 
 import com.yhchat.canary.data.model.AddFriendRequest
+import com.yhchat.canary.data.model.DelFriendRequest
 import com.yhchat.canary.data.api.ApiService
 import com.yhchat.canary.data.model.*
 import javax.inject.Inject
@@ -28,6 +29,30 @@ class FriendRepository @Inject constructor(
                 remark = remark
             )
             val response = apiService.addFriend(token, request)
+            if (response.isSuccessful) {
+                response.body() ?: ApiStatus(code = 0, message = "响应为空")
+            } else {
+                ApiStatus(code = 0, message = "网络请求失败: ${response.code()}")
+            }
+        } catch (e: Exception) {
+            ApiStatus(code = 0, message = "请求失败: ${e.message}")
+        }
+    }
+    
+    /**
+     * 删除好友/群聊/机器人
+     */
+    suspend fun delFriend(
+        token: String,
+        chatId: String,
+        chatType: Int // 1-用户，2-群聊，3-机器人
+    ): ApiStatus {
+        return try {
+            val request = DelFriendRequest(
+                chatId = chatId,
+                chatType = chatType
+            )
+            val response = apiService.delFriend(token, request)
             if (response.isSuccessful) {
                 response.body() ?: ApiStatus(code = 0, message = "响应为空")
             } else {

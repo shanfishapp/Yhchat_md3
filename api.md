@@ -1,28 +1,49 @@
-创建分享链接
+撤回信息
 
-POST /v1/share/create
+POST /v1/msg/recall-msg
 
 请求头:
 名称	必须	备注
-token	是	无
+token	是	空
 
-请求体：
+请求体:
 
-{
-  "chatId": "会话id",
-  "chatType": 2, // 会话类型，1-用户，2-群聊，3-机器人
-  "chatName": "会话名称"
+msg_id: "123123123123123123" // 信息ID
+chat_id: "123" // 信息所属对象ID
+chat_type: 2 // 信息所属对象类型, 1-用户 2-群聊 3-机器人
+
+ProtoBuf数据结构
+
+// 通过msgId撤回消息
+message recall_msg_send {
+    string msg_id = 2; // 信息ID
+    string chat_id = 3; // 信息所属对象ID
+    uint64 chat_type = 4; // 信息所属对象类型, 1-用户 2-群聊 3-机器人
 }
 
-响应体：
+// 通过msgId撤回消息
+message recall_msg_send {
+    string msg_id = 2; // 信息ID
+    string chat_id = 3; // 信息所属对象ID
+    uint64 chat_type = 4; // 信息所属对象类型, 1-用户 2-群聊 3-机器人
+}
 
-{
-  "code": 1, // 请求状态码，1为正常
-  "data": {
-    "imageKey": "share/...", // 图片key
-    "key": "123123123", // 分享链接的key
-    "shareUrl": "https://yhfx.jwznb.com/", // 分享开头的url
-    "ts": 123123123 // 分享链接创建时间戳
-  },
-  "msg": "success" // 返回消息
+响应体:
+
+status {
+  number: 114514
+  code: 1
+  msg: "success"
+}
+
+ProtoBuf数据结构
+
+// 撤回消息返回数据
+message recall_msg {
+    Status status = 1;
+}
+
+// 撤回消息返回数据
+message recall_msg {
+    Status status = 1;
 }

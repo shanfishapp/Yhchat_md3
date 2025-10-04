@@ -143,7 +143,8 @@ class MessageRepository @Inject constructor(
         chatType: Int,
         text: String,
         contentType: Int = 1, // 1-文本
-        quoteMsgId: String? = null
+        quoteMsgId: String? = null,
+        mentionedUserIds: List<String> = emptyList()
     ): Result<Boolean> {
         return try {
             val tokenFlow = tokenRepository.getToken()
@@ -158,6 +159,11 @@ class MessageRepository @Inject constructor(
             // 构建protobuf请求
             val contentBuilder = send_message_send.Content.newBuilder()
                 .setText(text)
+            
+            // 添加被@用户的ID
+            mentionedUserIds.forEach { userId ->
+                contentBuilder.addMentionedId(userId)
+            }
             
             // 如果有引用消息，添加引用消息文本
             if (!quoteMsgId.isNullOrEmpty()) {
@@ -183,7 +189,7 @@ class MessageRepository @Inject constructor(
             val request = requestBuilder.build()
             val requestBody = request.toByteArray().toRequestBody("application/x-protobuf".toMediaType())
 
-            Log.d(tag, "Sending message to chat: $chatId, type: $chatType, text: $text")
+            Log.d(tag, "Sending message to chat: $chatId, type: $chatType, text: $text, mentionedUserIds: $mentionedUserIds")
             
             val response = apiService.sendMessage(token, requestBody)
             
@@ -206,6 +212,132 @@ class MessageRepository @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e(tag, "Error sending message", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 编辑消息
+     */
+    suspend fun editMessage(
+        msgId: String,
+        chatId: String,
+        chatType: Int,
+        text: String,
+        contentType: Int = 1, // 1-文本
+        quoteMsgId: String? = null,
+        mentionedUserIds: List<String> = emptyList()
+    ): Result<Boolean> {
+        return try {
+            val tokenFlow = tokenRepository.getToken()
+            val token = tokenFlow.first()?.token
+            if (token.isNullOrEmpty()) {
+                Log.e(tag, "Token is null or empty")
+                return Result.failure(Exception("用户未登录"))
+            }
+            
+            // 构建protobuf请求
+            val contentBuilder = send_message_send.Content.newBuilder()
+                .setText(text)
+            
+            // 添加被@用户的ID
+            mentionedUserIds.forEach { userId ->
+                contentBuilder.addMentionedId(userId)
+            }
+            
+            // 如果有引用消息，添加引用消息文本
+            if (!quoteMsgId.isNullOrEmpty()) {
+                // 获取引用消息的文本内容
+                val quoteMessage = getMessageById(quoteMsgId)
+                quoteMessage?.let { msg ->
+                    val quoteText = "${msg.sender.name}: ${msg.content.text}"
+                    contentBuilder.setQuoteMsgText(quoteText)
+                }
+            }
+            
+            val requestBuilder = send_message_send.newBuilder()
+                .setMsgId(msgId) // 使用实际的消息ID而不是生成新的UUID
+                .setChatId(chatId)
+                .setChatType(chatType.toLong())
+                .setContent(contentBuilder.build())
+                .setContentType(contentType.toLong())
+            
+            if (!quoteMsgId.isNullOrEmpty()) {
+                requestBuilder.setQuoteMsgId(quoteMsgId)
+            }
+            
+            val request = requestBuilder.build()
+            val requestBody = request.toByteArray().toRequestBody("application/x-protobuf".toMediaType())
+
+            Log.d(tag, "Editing message: $msgId, chat: $chatId, type: $chatType, text: $text, mentionedUserIds: $mentionedUserIds")
+            
+            val response = apiService.editMessage(token, requestBody)
+            
+            if (response.isSuccessful) {
+                response.body()?.let { responseBody ->
+                    val bytes = responseBody.bytes()
+                    val sendResponse = send_message.parseFrom(bytes)
+                    
+                    if (sendResponse.status.code == 1) {
+                        Log.d(tag, "Message edited successfully")
+                    Result.success(true)
+                } else {
+                        Log.e(tag, "Edit message error: ${sendResponse.status.msg}")
+                        Result.failure(Exception(sendResponse.status.msg))
+                }
+                } ?: Result.failure(Exception("响应体为空"))
+            } else {
+                Log.e(tag, "HTTP error: ${response.code()}")
+                Result.failure(Exception("编辑失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error editing message", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 获取编辑历史
+     */
+    suspend fun getEditHistory(
+        msgId: String,
+        size: Int = 10,
+        page: Int = 1
+    ): Result<List<EditHistoryItem>> {
+        return try {
+            val tokenFlow = tokenRepository.getToken()
+            val token = tokenFlow.first()?.token
+            if (token.isNullOrEmpty()) {
+                Log.e(tag, "Token is null or empty")
+                return Result.failure(Exception("用户未登录"))
+            }
+
+            val request = ListEditRequest(
+                msgId = msgId,
+                size = size,
+                page = page
+            )
+
+            Log.d(tag, "Getting edit history for message: $msgId")
+            
+            val response = apiService.getEditList(token, request)
+            
+            if (response.isSuccessful) {
+                response.body()?.let { responseBody ->
+                    if (responseBody.code == 1) {
+                        Log.d(tag, "Successfully got ${responseBody.data.list.size} edit history items")
+                        Result.success(responseBody.data.list)
+                    } else {
+                        Log.e(tag, "API error: ${responseBody.msg}")
+                        Result.failure(Exception(responseBody.msg))
+                    }
+                } ?: Result.failure(Exception("响应体为空"))
+            } else {
+                Log.e(tag, "HTTP error: ${response.code()}")
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error getting edit history", e)
             Result.failure(e)
         }
     }
@@ -327,6 +459,57 @@ class MessageRepository @Inject constructor(
             Log.d(tag, "Deleted message: $msgId")
         } catch (e: Exception) {
             Log.e(tag, "Error deleting message: $msgId", e)
+        }
+    }
+    
+    /**
+     * 撤回消息
+     */
+    suspend fun recallMessage(
+        msgId: String,
+        chatId: String,
+        chatType: Int
+    ): Result<Boolean> {
+        return try {
+            val tokenFlow = tokenRepository.getToken()
+            val token = tokenFlow.first()?.token
+            if (token.isNullOrEmpty()) {
+                Log.e(tag, "Token is null or empty")
+                return Result.failure(Exception("用户未登录"))
+            }
+
+        
+            val requestBuilder = send_message_send.newBuilder()
+                .setMsgId(msgId) // 使用实际的消息ID而不是生成新的UUID
+                .setChatId(chatId)
+                .setChatType(chatType.toLong())
+            Log.d(tag, "Recalling message: $msgId, chat: $chatId, type: $chatType")
+            
+            val request = requestBuilder.build()
+            val requestBody = request.toByteArray().toRequestBody("application/x-protobuf".toMediaType())
+
+            val response = apiService.recallMessage(token, requestBody)
+            
+            if (response.isSuccessful) {
+                response.body()?.let { responseBody ->
+                    val bytes = responseBody.bytes()
+                    val sendResponse = recall_msg.parseFrom(bytes)
+                    
+                    if (sendResponse.status.code == 1) {
+                        Log.d(tag, "Message edited successfully")
+                    Result.success(true)
+                } else {
+                        Log.e(tag, "Edit message error: ${sendResponse.status.msg}")
+                        Result.failure(Exception(sendResponse.status.msg))
+                }
+                } ?: Result.failure(Exception("响应体为空"))
+            } else {
+                Log.e(tag, "HTTP error: ${response.code()}")
+                Result.failure(Exception("撤回失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error recalling message", e)
+            Result.failure(e)
         }
     }
     

@@ -22,6 +22,34 @@ interface ApiService {
         @Header("token") token: String
     ): Response<ResponseBody>
 
+    @POST("v1/bot/create-bot")
+    suspend fun createBotProto(
+        @Header("token") token: String,
+        @Body request: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
+    @POST("v1/group/create-group")
+    suspend fun createGroup(
+        @Header("token") token: String,
+        @Body request: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
+
+    @POST("v1/msg/list-message-edit-record")
+    suspend fun getEditList(
+        @Header("token") token: String?,
+        @Body request: ListEditRequest
+    ): Response<ListEditMessage>
+    @GET("https://chat-web-go.jwzhd.com/v1/user/homepage")
+    suspend fun getUserHomepageInfo(
+        @Header("token") token: String?,
+        @Query("userId") userId: String,
+    ): Response<UserHomepageResponse>
+    
+    @POST("https://chat-web-go.jwzhd.com/v1/bot/bot-info")
+    suspend fun getBotInfo(
+        @Header("token") token: String,
+        @Body request: Map<String, String>
+    ): Response<BotInfoResponse>
+
     
     @POST("v1/user/captcha")
     suspend fun getCaptcha(): Response<CaptchaResponse>
@@ -118,14 +146,25 @@ interface ApiService {
     @POST("v1/msg/recall-msg")
     suspend fun recallMessage(
         @Header("token") token: String,
-        @Body request: RecallMessageRequest
-    ): Response<ApiStatus>
+        @Body request: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
     
     @POST("v1/msg/recall-msg-batch")
     suspend fun recallMessagesBatch(
         @Header("token") token: String,
         @Body request: RecallMessagesBatchRequest
     ): Response<ApiStatus>
+    
+    @POST("v1/chat-background/list")
+    suspend fun getChatBackgroundList(
+        @Header("token") token: String
+    ): Response<ChatBackgroundListResponse>
+    
+    @POST("v1/msg/edit-message")
+    suspend fun editMessage(
+        @Header("token") token: String,
+        @Body request: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
     
     @POST("v1/msg/button-report")
     suspend fun buttonReport(
@@ -299,6 +338,12 @@ interface ApiService {
         @Body request: AddFriendRequest
     ): Response<ApiStatus>
     
+    // 删除好友/机器人/群聊
+    @POST("v1/friend/delete-friend")
+    suspend fun delFriend(
+        @Header("token") token: String,
+        @Body request: DelFriendRequest
+    ): Response<ApiStatus>
     // 分享相关API
     @POST("v1/share/create")
     suspend fun createShare(

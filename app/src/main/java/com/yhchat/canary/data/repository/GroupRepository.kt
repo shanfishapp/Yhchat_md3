@@ -2,8 +2,11 @@ package com.yhchat.canary.data.repository
 
 import android.util.Log
 import com.google.protobuf.InvalidProtocolBufferException
+import com.yhchat.canary.data.api.ApiClient
 import com.yhchat.canary.data.model.GroupDetail
 import com.yhchat.canary.data.model.GroupMemberInfo
+import com.yhchat.canary.data.model.ShareRequest
+import com.yhchat.canary.data.model.ShareResponse
 import com.yhchat.canary.proto.group.edit_group
 import com.yhchat.canary.proto.group.edit_group_send
 import com.yhchat.canary.proto.group.info
@@ -14,7 +17,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
-import com.yhchat.canary.data.api.ApiClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
@@ -305,6 +307,36 @@ class GroupRepository @Inject constructor() {
             Log.e(tag, "❌ Unknown error: ${e.message}", e)
             Log.e(tag, "Error type: ${e::class.java.simpleName}")
             Log.e(tag, "Error details: ${e.stackTraceToString()}")
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 创建分享链接
+     */
+    suspend fun createShare(groupId: String, groupName: String): Result<ShareResponse> = withContext(Dispatchers.IO) {
+        val token = tokenRepository?.getTokenSync()
+        if (token.isNullOrEmpty()) {
+            return@withContext Result.failure(Exception("未登录"))
+        }
+        
+        return@withContext try {
+            val apiService = ApiClient.apiService
+            val request = ShareRequest(
+                chatId = groupId,
+                chatType = 2, // 群聊类型
+                chatName = groupName
+            )
+            
+            val response = apiService.createShare(token, request)
+            
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception("分享创建失败: ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "创建分享链接失败", e)
             Result.failure(e)
         }
     }

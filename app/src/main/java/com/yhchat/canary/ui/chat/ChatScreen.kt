@@ -1,7 +1,11 @@
 package com.yhchat.canary.ui.chat
 
 import android.content.Intent
+import android.content.ClipData
+import android.content.ClipboardManager
 import com.yhchat.canary.ui.components.MessageContextMenu
+import com.yhchat.canary.ui.components.EditMessageDialog
+import com.yhchat.canary.ui.components.RecallMessageDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -122,17 +126,51 @@ fun ChatScreen(
     var selectedMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var contextMenuPosition by remember { mutableStateOf(androidx.compose.ui.unit.IntOffset.Zero) }
     
+    // 编辑消息对话框状态
+    var showEditMessageDialog by remember { mutableStateOf(false) }
+    
+    // 撤回消息确认对话框状态
+    var showRecallMessageDialog by remember { mutableStateOf(false) }
+    
     // 分享状态
     var isSharing by remember { mutableStateOf(false) }
+    
+    // 艾特用户状态
+    var mentionText by remember { mutableStateOf("") }
+    var mentionedUserIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    
+    // 获取当前聊天的消息类型
+    val contentType by viewModel.getContentTypeForChat(chatId).collectAsStateWithLifecycle()
     
     // 屏幕尺寸
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp.value
     val screenHeight = configuration.screenHeightDp.dp.value
     
+    // 艾特用户函数
+    val onMentionUser = { userName: String, userId: String ->
+        // 只在群聊中允许艾特用户，且不能艾特自己
+        if (chatType == 2 && userName != viewModel.getCurrentUserNickname()) {  // 2表示群聊
+            // 更新输入框文本，添加艾特用户名
+            mentionText = "@$userName "
+            inputText = if (inputText.isBlank()) {
+                mentionText
+            } else {
+                "$inputText $mentionText"
+            }
+            
+            // 添加被@用户的ID到列表中
+            if (!mentionedUserIds.contains(userId)) {
+                mentionedUserIds = mentionedUserIds + userId
+            }
+        }
+    }
+    
     // 初始化聊天
     LaunchedEffect(chatId, chatType, userId) {
         viewModel.initChat(chatId, chatType, userId)
+        // TODO: 设置当前用户昵称
+        // viewModel.setCurrentUserNickname("当前用户昵称")
     }
     
     // 监听滚动状态，当不在底部时显示"回到最新消息"按钮
@@ -154,14 +192,21 @@ fun ChatScreen(
         onRefresh = { viewModel.loadMoreMessages() }
     )
     
-    Surface(
-        modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
+    // 根据showEmptyScreen状态决定显示哪个界面
+    if (showEmptyScreen) {
+        EmptyScreen(
+            title = "功能完善中",
+            onBackClick = { showEmptyScreen = false }
+        )
+    } else {
+        Surface(
+            modifier = modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
         ) {
-        // 顶部应用栏
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+            // 顶部应用栏
         TopAppBar(
             title = {
                 Text(
@@ -192,21 +237,35 @@ fun ChatScreen(
                             contentDescription = "群聊信息"
                         )
                     }
-                } else {
+                } else if (chatType == 1) {
+                    // 实现用户信息跳转
                     IconButton(onClick = {
-                        android.util.Log.d("ChatScreen", "Opening group info: chatId=$chatId, chatName=$chatName")
-                        val intent = Intent(context, com.yhchat.canary.ui.group.GroupInfoActivity::class.java)
-                        intent.putExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_ID, chatId)
-                        intent.putExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_NAME, chatName)
-                        android.util.Log.d("ChatScreen", "Intent extras: groupId=${intent.getStringExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_ID)}, groupName=${intent.getStringExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_NAME)}")
+                        android.util.Log.d("ChatScreen", "Opening user profile: chatId=$chatId, chatName=$chatName")
+                        val intent = Intent(context, com.yhchat.canary.ui.info.UserProfileActivity::class.java)
+                        intent.putExtra(com.yhchat.canary.ui.info.UserProfileActivity.EXTRA_USER_ID, chatId)
+                        intent.putExtra(com.yhchat.canary.ui.info.UserProfileActivity.EXTRA_USER_NAME, chatName)
                         context.startActivity(intent)
                     }) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
-                            contentDescription = "群聊信息"
+                            contentDescription = "用户信息"
                         )
                     }
-                } 
+                } else {
+                    // 实现机器人跳转
+                    IconButton(onClick = {
+                        android.util.Log.d("ChatScreen", "Opening bot profile: chatId=$chatId, chatName=$chatName")
+                        val intent = Intent(context, com.yhchat.canary.ui.info.BotProfileActivity::class.java)
+                        intent.putExtra(com.yhchat.canary.ui.info.BotProfileActivity.EXTRA_BOT_ID, chatId)
+                        intent.putExtra(com.yhchat.canary.ui.info.BotProfileActivity.EXTRA_BOT_NAME, chatName)
+                        context.startActivity(intent)
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "机器人信息"
+                        )
+                    }
+                }
             },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -311,6 +370,16 @@ fun ChatScreen(
                                     // 用户头像点击，传递给外部处理（UserProfileActivity）
                                     onAvatarClick(chatId, name, chatType)
                                 }
+                            },
+                            onMentionUser = { userName, userId ->
+                    onMentionUser(userName, userId)
+                },
+                            onEditHistoryClick = { msgId ->
+                                // 跳转到编辑历史界面
+                                val intent = Intent(context, EditHistoryActivity::class.java).apply {
+                                    putExtra("msg_id", msgId)
+                                }
+                                context.startActivity(intent)
                             }
                         )
                     }
@@ -404,11 +473,13 @@ fun ChatScreen(
                 onTextChange = { inputText = it },
                 onSendMessage = {
                     if (inputText.isNotBlank()) {
-                        // 发送消息时包含引用消息信息
+                        // 发送消息时包含引用消息信息和被@用户ID
                         val quoteMsgId = quoteMessage?.msgId
-                        viewModel.sendTextMessage(inputText.trim(), quoteMsgId)
+                        viewModel.sendTextMessage(inputText.trim(), quoteMsgId, mentionedUserIds, contentType)
                         inputText = ""
                         quoteMessage = null // 清除引用消息
+                        mentionedUserIds = emptyList() // 清除被@用户ID
+                        // 不再重置消息类型，保持当前类型
                         // 发送消息后自动滚动到最新消息
                         coroutineScope.launch {
                             listState.animateScrollToItem(0)
@@ -429,6 +500,8 @@ fun ChatScreen(
                 },
                 quoteMessage = quoteMessage,
                 onClearQuote = { quoteMessage = null },
+                contentType = contentType,
+                onContentTypeChange = { type -> viewModel.setContentTypeForChat(chatId, type) },
                 modifier = Modifier.padding(
                     start = 16.dp,
                     end = 16.dp,
@@ -456,25 +529,90 @@ fun ChatScreen(
         MessageContextMenu(
             onReply = {
                 quoteMessage = selectedMessage
-            },
-            onCopy = {
-                // TODO: 实现复制消息功能
-            },
-            onForward = {
-                // TODO: 实现转发消息功能
-            },
-            onEdit = {
-                // TODO: 实现编辑消息功能
-            },
-            onDelete = {
-                // TODO: 实现撤回消息功能
-            },
-            onDismiss = {
                 showContextMenu = false
                 selectedMessage = null
             },
-            position = contextMenuPosition
+            onCopy = {
+                // 实现复制消息功能
+                selectedMessage?.content?.text?.let { text ->
+                    if (text.isNotBlank()) {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clip = ClipData.newPlainText("消息内容", text)
+                        clipboard.setPrimaryClip(clip)
+                        // 显示一个简单的提示（可以使用Toast或者Snackbar）
+                        Toast.makeText(context, "消息已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                showContextMenu = false
+                selectedMessage = null
+            },
+            onForward = {
+                // TODO: 实现转发消息功能
+                showContextMenu = false
+                selectedMessage = null
+            },
+            onEdit = {
+                // 显示编辑消息对话框，保持selectedMessage不变
+                showEditMessageDialog = true
+                showContextMenu = false
+                // 不要在这里重置selectedMessage，因为它需要传递给编辑对话框
+            },
+            onDelete = {
+                // 显示撤回消息确认对话框
+                showRecallMessageDialog = true
+                showContextMenu = false
+                // 不要在这里重置selectedMessage，因为它需要传递给确认对话框
+            },
+            onDismiss = {
+                showContextMenu = false
+                // 不要在这里重置selectedMessage
+            },
+            position = contextMenuPosition,
+            isMyMessage = viewModel.isMyMessage(selectedMessage!!) // 传递是否为自己发送的消息
         )
+    }
+    
+    // 编辑消息对话框
+    if (showEditMessageDialog && selectedMessage != null) {
+        EditMessageDialog(
+            initialText = selectedMessage!!.content.text ?: "",
+            initialContentType = selectedMessage!!.contentType,
+            onConfirm = { text, contentType ->
+                // 调用ViewModel编辑消息
+                viewModel.editTextMessage(
+                    msgId = selectedMessage!!.msgId,
+                    text = text,
+                    contentType = contentType
+                )
+                showEditMessageDialog = false
+                selectedMessage = null // 在确认后重置selectedMessage
+            },
+            onDismiss = {
+                showEditMessageDialog = false
+                selectedMessage = null // 在取消后重置selectedMessage
+            }
+        )
+    }
+    
+    // 撤回消息确认对话框
+    if (showRecallMessageDialog && selectedMessage != null) {
+        RecallMessageDialog(
+            onConfirm = {
+                // 调用ViewModel撤回消息
+                selectedMessage?.msgId?.let { msgId ->
+                    viewModel.recallMessage(msgId)
+                }
+                selectedMessage = null // 在确认后重置selectedMessage
+            },
+            onDismiss = {
+                showRecallMessageDialog = false
+                // 只有在取消时才重置selectedMessage
+                if (!showRecallMessageDialog) {
+                    selectedMessage = null
+                }
+            }
+        )
+    }
     }
 }
 
@@ -489,7 +627,9 @@ private fun MessageItem(
     onImageClick: (String) -> Unit = {},
     onMessageClick: (ChatMessage) -> Unit = {},
     onMessageLongClick: (ChatMessage, androidx.compose.ui.geometry.Offset) -> Unit = { _, _ -> },
-    onAvatarClick: (String, String, Int) -> Unit = { _, _, _ -> }
+    onAvatarClick: (String, String, Int) -> Unit = { _, _, _ -> },
+    onMentionUser: (String, String) -> Unit = { _, _ -> },
+    onEditHistoryClick: (String) -> Unit = {}
 ) {
     // 检查是否为撤回消息
     if (message.msgDeleteTime != null) {
@@ -526,6 +666,7 @@ private fun MessageItem(
     ) {
         if (!isMyMessage) {
             // 发送者头像
+            // 发送者头像
             AsyncImage(
                 model = ImageUtils.createAvatarImageRequest(
                     context = LocalContext.current,
@@ -535,9 +676,16 @@ private fun MessageItem(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .clickable {
-                        onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType)
-                    },
+                    .combinedClickable(
+                        onClick = {
+                            onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType)
+                        },
+                        onLongClick = {
+                            // 长按头像实现艾特功能
+                            // 只有在群聊中才允许艾特用户，且不能艾特自己
+                            onMentionUser(message.sender.name, message.sender.chatId)
+                        }
+                    ),
                 contentScale = ContentScale.Crop
             )
             
@@ -613,13 +761,35 @@ private fun MessageItem(
                 )
             }
 
-            // 时间戳
-            Text(
-                text = formatTimestamp(message.sendTime),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-            )
+            // 时间戳和编辑历史按钮
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = formatTimestamp(message.sendTime),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                // 如果消息有编辑时间，显示编辑历史按钮
+                if (message.editTime != null && message.editTime > 0) {
+                    TextButton(
+                        onClick = { onEditHistoryClick(message.msgId) },
+                        modifier = Modifier.height(16.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                    ) {
+                        Text(
+                            text = "编辑历史",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
         }
 
         if (isMyMessage) {

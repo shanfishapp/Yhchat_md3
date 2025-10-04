@@ -1,0 +1,36 @@
+syntax = "proto3";
+package yh_create_bot;
+
+option java_package = "com.yhchat.canary.proto.createbot";
+option java_multiple_files = true;
+
+message create_bot_send {
+    string name = 2;
+    string desc = 3;
+    string avatar_url = 4;
+    int32 is_private = 5;
+}
+message create_bot {
+    Status status = 1;
+    message Bot {
+        string bot_id = 1;
+    }
+    Bot bot = 2;
+}
+
+message Status {
+    int64 request_id = 1;
+    int32 code = 2;
+    string msg = 3;
+}
+
+message create_group_send {
+    string name = 2;
+    string desc = 3;
+    string avatar_url = 4;
+}
+
+message create_group {
+    string group_id = 2;
+    Status status = 1;
+}

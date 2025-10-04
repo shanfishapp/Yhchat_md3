@@ -15,8 +15,11 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Html
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,7 +32,8 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.TextFieldValue
 import com.yhchat.canary.data.model.ChatMessage
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.delay
 
 /**
@@ -48,9 +52,12 @@ fun ChatInputBar(
     onCameraClick: (() -> Unit)? = null,
     onDraftChange: ((String) -> Unit)? = null,
     quoteMessage: ChatMessage? = null,
-    onClearQuote: (() -> Unit)? = null
+    onClearQuote: (() -> Unit)? = null,
+    contentType: Int = 1,
+    onContentTypeChange: ((Int) -> Unit)? = null
 ) {
     var showAttachMenu by remember { mutableStateOf(false) }
+    var showMessageTypeDialog by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
     
     Surface(
@@ -108,6 +115,7 @@ fun ChatInputBar(
                 exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
             ) {
                 AttachmentMenu(
+                    currentContentType = contentType,
                     onImageClick = {
                         onImageClick?.invoke()
                         showAttachMenu = false
@@ -120,9 +128,25 @@ fun ChatInputBar(
                         onCameraClick?.invoke()
                         showAttachMenu = false
                     },
+                    onMessageTypeClick = {
+                        showMessageTypeDialog = true
+                        showAttachMenu = false
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+            
+            // 消息类型选择对话框
+            if (showMessageTypeDialog) {
+                MessageTypeDialog(
+                    currentContentType = contentType,
+                    onContentTypeSelected = { type ->
+                        onContentTypeChange?.invoke(type)
+                        showMessageTypeDialog = false
+                    },
+                    onDismiss = { showMessageTypeDialog = false }
                 )
             }
             
@@ -150,8 +174,8 @@ fun ChatInputBar(
                         )
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "附件",
+                        imageVector = getContentTypeIcon(contentType),
+                        contentDescription = getContentTypeDescription(contentType),
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(24.dp)
                     )
@@ -218,13 +242,40 @@ fun ChatInputBar(
 }
 
 /**
+ * 获取消息类型对应的图标
+ */
+@Composable
+private fun getContentTypeIcon(contentType: Int): ImageVector {
+    return when (contentType) {
+        1 -> Icons.Default.TextFields  // 文本
+        3 -> Icons.Default.Description  // Markdown
+        8 -> Icons.Default.Html  // HTML
+        else -> Icons.Default.Add
+    }
+}
+
+/**
+ * 获取消息类型对应的描述
+ */
+private fun getContentTypeDescription(contentType: Int): String {
+    return when (contentType) {
+        1 -> "文本"
+        3 -> "Markdown"
+        8 -> "HTML"
+        else -> "附件"
+    }
+}
+
+/**
  * 附件菜单
  */
 @Composable
 private fun AttachmentMenu(
+    currentContentType: Int,
     onImageClick: () -> Unit,
     onFileClick: () -> Unit,
     onCameraClick: () -> Unit,
+    onMessageTypeClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -232,29 +283,75 @@ private fun AttachmentMenu(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         shape = RoundedCornerShape(12.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+                .padding(16.dp)
         ) {
-            AttachmentMenuItem(
-                icon = Icons.Default.Image,
-                label = "图片",
-                onClick = onImageClick
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                AttachmentMenuItem(
+                    icon = Icons.Default.Image,
+                    label = "图片",
+                    onClick = onImageClick
+                )
+                
+                AttachmentMenuItem(
+                    icon = Icons.Default.CameraAlt,
+                    label = "拍照",
+                    onClick = onCameraClick
+                )
+                
+                AttachmentMenuItem(
+                    icon = Icons.Default.AttachFile,
+                    label = "文件",
+                    onClick = onFileClick
+                )
+            }
+            
+            // 分割线
+            Divider(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                color = MaterialTheme.colorScheme.outlineVariant
             )
             
-            AttachmentMenuItem(
-                icon = Icons.Default.CameraAlt,
-                label = "拍照",
-                onClick = onCameraClick
-            )
-            
-            AttachmentMenuItem(
-                icon = Icons.Default.AttachFile,
-                label = "文件",
-                onClick = onFileClick
-            )
+            // 消息类型选择
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onMessageTypeClick() }
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = getContentTypeIcon(currentContentType),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                Text(
+                    text = "消息类型: ${getContentTypeDescription(currentContentType)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                Spacer(modifier = Modifier.weight(1f))
+                
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "更改",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
     }
 }
@@ -298,6 +395,118 @@ private fun AttachmentMenuItem(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/**
+ * 消息类型选择对话框
+ */
+@Composable
+private fun MessageTypeDialog(
+    currentContentType: Int,
+    onContentTypeSelected: (Int) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "选择消息类型",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                
+                // 文本消息
+                RadioButtonRow(
+                    icon = Icons.Default.TextFields,
+                    text = "文本消息",
+                    selected = currentContentType == 1,
+                    onClick = { onContentTypeSelected(1) }
+                )
+                
+                // Markdown消息
+                RadioButtonRow(
+                    icon = Icons.Default.Description,
+                    text = "Markdown消息",
+                    selected = currentContentType == 3,
+                    onClick = { onContentTypeSelected(3) }
+                )
+                
+                // HTML消息
+                RadioButtonRow(
+                    icon = Icons.Default.Html,
+                    text = "HTML消息",
+                    selected = currentContentType == 8,
+                    onClick = { onContentTypeSelected(8) }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 单选按钮行
+ */
+@Composable
+private fun RadioButtonRow(
+    icon: ImageVector,
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (selected) 
+                MaterialTheme.colorScheme.primary 
+            else 
+                MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(24.dp)
+        )
+        
+        Spacer(modifier = Modifier.width(12.dp))
+        
+        RadioButton(
+            selected = selected,
+            onClick = onClick,
+            colors = RadioButtonDefaults.colors(
+                selectedColor = MaterialTheme.colorScheme.primary,
+                unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        )
+        
+        Spacer(modifier = Modifier.width(12.dp))
+        
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (selected) 
+                MaterialTheme.colorScheme.primary 
+            else 
+                MaterialTheme.colorScheme.onSurface
         )
     }
 }

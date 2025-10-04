@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yhchat.canary.data.model.ChatMessage
+import com.yhchat.canary.data.model.EditHistoryItem
 import com.yhchat.canary.data.repository.MessageRepository
 import com.yhchat.canary.data.repository.TokenRepository
 import com.yhchat.canary.data.websocket.WebSocketManager
@@ -15,12 +16,23 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import java.util.concurrent.ConcurrentHashMap
+
+// Trigger recompilation
 
 data class ChatUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val isConnected: Boolean = false,
     val isRefreshing: Boolean = false
+)
+
+data class EditHistoryUiState(
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val historyItems: List<EditHistoryItem> = emptyList()
 )
 
 @HiltViewModel
@@ -33,14 +45,21 @@ class ChatViewModel @Inject constructor(
     private var currentChatId: String = ""
     private var currentChatType: Int = 1
     private var currentUserId: String = ""
+    private var currentUserNickname: String = ""
     private var hasMoreMessages: Boolean = true
     private var oldestMsgSeq: Long = 0
     private var oldestMsgId: String? = null
+
+    // 消息类型状态管理
+    private val chatContentTypes = ConcurrentHashMap<String, MutableStateFlow<Int>>()
 
     private val tag = "ChatViewModel"
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+
+    private val _editHistoryState = MutableStateFlow(EditHistoryUiState())
+    val editHistoryState: StateFlow<EditHistoryUiState> = _editHistoryState.asStateFlow()
 
     private val _messages = mutableStateListOf<ChatMessage>()
     val messages: List<ChatMessage> = _messages
@@ -315,7 +334,7 @@ class ChatViewModel @Inject constructor(
     /**
      * 发送文本消息
      */
-    fun sendTextMessage(text: String, quoteMsgId: String? = null) {
+    fun sendTextMessage(text: String, quoteMsgId: String? = null, mentionedUserIds: List<String> = emptyList(), contentType: Int = 1) {
         if (text.isBlank() || currentChatId.isEmpty()) {
             Log.w(tag, "Cannot send empty message or chat not initialized")
             return
@@ -329,8 +348,9 @@ class ChatViewModel @Inject constructor(
                     chatId = currentChatId,
                     chatType = currentChatType,
                     text = text,
-                    contentType = 1, // 文本消息
-                    quoteMsgId = quoteMsgId
+                    contentType = contentType, // 使用传入的消息类型
+                    quoteMsgId = quoteMsgId,
+                    mentionedUserIds = mentionedUserIds
                 )
 
                 result.fold(
@@ -354,6 +374,149 @@ class ChatViewModel @Inject constructor(
                     error = e.message ?: "发送消息失败"
                 )
             }
+        }
+    }
+    
+    /**
+     * 编辑文本消息
+     */
+    fun editTextMessage(msgId: String, text: String, quoteMsgId: String? = null, mentionedUserIds: List<String> = emptyList(), contentType: Int = 1) {
+        if (text.isBlank() || currentChatId.isEmpty()) {
+            Log.w(tag, "Cannot send empty message or chat not initialized")
+            return
+        }
+        
+        viewModelScope.launch {
+            try {
+                Log.d(tag, "Editing message: $msgId, text: $text")
+                
+                val result = messageRepository.editMessage(
+                    msgId = msgId,
+                    chatId = currentChatId,
+                    chatType = currentChatType,
+                    text = text,
+                    contentType = contentType, // 使用传入的消息类型
+                    quoteMsgId = quoteMsgId,
+                    mentionedUserIds = mentionedUserIds
+                )
+
+                result.fold(
+                    onSuccess = { success ->
+                        if (success) {
+                            Log.d(tag, "Message edited successfully")
+                            // 编辑成功后刷新消息列表以获取最新消息
+                            loadMessages(refresh = true)
+                        }
+                    },
+                    onFailure = { exception ->
+                        Log.e(tag, "Failed to edit message", exception)
+                        _uiState.value = _uiState.value.copy(
+                            error = exception.message ?: "编辑消息失败"
+                        )
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(tag, "Error editing message", e)
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "编辑消息失败"
+                )
+            }
+        }
+    }
+    
+    /**
+     * 撤回消息
+     */
+    fun recallMessage(msgId: String) {
+        if (currentChatId.isEmpty()) {
+            Log.w(tag, "Chat not initialized")
+            return
+        }
+        
+        viewModelScope.launch {
+            try {
+                Log.d(tag, "Recalling message: $msgId")
+                
+                val result = messageRepository.recallMessage(
+                    msgId = msgId,
+                    chatId = currentChatId,
+                    chatType = currentChatType
+                )
+
+                result.fold(
+                    onSuccess = { success ->
+                        if (success) {
+                            Log.d(tag, "Message recalled successfully")
+                            // 撤回成功后刷新消息列表以获取最新消息
+                            loadMessages(refresh = true)
+                        }
+                    },
+                    onFailure = { exception ->
+                        Log.e(tag, "Failed to recall message", exception)
+                        _uiState.value = _uiState.value.copy(
+                            error = exception.message ?: "撤回消息失败"
+                        )
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(tag, "Error recalling message", e)
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "撤回消息失败"
+                )
+            }
+        }
+    }
+    
+    /**
+     * 获取编辑历史
+     */
+    suspend fun getEditHistory(msgId: String): Result<List<EditHistoryItem>> {
+        return try {
+            Log.d(tag, "Getting edit history for message: $msgId")
+            
+            val result = messageRepository.getEditHistory(msgId)
+            
+            result.fold(
+                onSuccess = { items ->
+                    Log.d(tag, "Successfully got ${items.size} edit history items")
+                    Result.success(items)
+                },
+                onFailure = { exception ->
+                    Log.e(tag, "Failed to get edit history", exception)
+                    Result.failure(exception)
+                }
+            )
+        } catch (e: Exception) {
+            Log.e(tag, "Error getting edit history", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 加载编辑历史
+     */
+    fun loadEditHistory(msgId: String) {
+        viewModelScope.launch {
+            _editHistoryState.value = EditHistoryUiState(isLoading = true, error = null)
+            
+            val result = getEditHistory(msgId)
+            
+            result.fold(
+                onSuccess = { items ->
+                    _editHistoryState.value = EditHistoryUiState(
+                        isLoading = false,
+                        error = null,
+                        historyItems = items
+                    )
+                },
+                onFailure = { exception ->
+                    _editHistoryState.value = EditHistoryUiState(
+                        isLoading = false,
+                        error = exception.message ?: "加载编辑历史失败",
+                        historyItems = emptyList()
+                    )
+                }
+            )
         }
     }
     
@@ -437,6 +600,18 @@ class ChatViewModel @Inject constructor(
      * 获取当前用户ID
      */
     fun getCurrentUserId(): String = currentUserId
+    
+    /**
+     * 设置当前用户昵称
+     */
+    fun setCurrentUserNickname(nickname: String) {
+        currentUserNickname = nickname
+    }
+    
+    /**
+     * 获取当前用户昵称
+     */
+    fun getCurrentUserNickname(): String = currentUserNickname
 
     /**
      * 检查消息是否来自当前用户
@@ -454,11 +629,28 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
-     * 清除流式消息缓存（当流式消息完成时调用）
+     * 获取指定聊天的内容类型状态流
      */
-    fun clearStreamingMessage(msgId: String) {
-        streamingMessages.remove(msgId)
-        Log.d(tag, "Cleared streaming message: $msgId")
+    fun getContentTypeForChat(chatId: String): StateFlow<Int> {
+        return chatContentTypes.getOrPut(chatId) { 
+            MutableStateFlow(1) // 默认为文本消息类型
+        }.asStateFlow()
+    }
+    
+    /**
+     * 设置指定聊天的内容类型
+     */
+    fun setContentTypeForChat(chatId: String, contentType: Int) {
+        chatContentTypes.getOrPut(chatId) { 
+            MutableStateFlow(1) // 默认为文本消息类型
+        }.value = contentType
+    }
+    
+    /**
+     * 清除所有聊天的内容类型状态（在退出应用时调用）
+     */
+    fun clearAllChatContentTypes() {
+        chatContentTypes.clear()
     }
     
     /**
