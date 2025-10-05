@@ -961,7 +961,7 @@ data class GroupMemberInfo(
  */
 data class AddExpressionRequest(
     @SerializedName("id")
-    val id: String
+    val id: Long  // 表情ID，数字类型
 )
 
 /**
@@ -969,7 +969,7 @@ data class AddExpressionRequest(
  */
 data class StickerPackDetailRequest(
     @SerializedName("id")
-    val id: String
+    val id: Long  // 表情包ID，数字类型
 )
 
 /**
@@ -977,7 +977,7 @@ data class StickerPackDetailRequest(
  */
 data class AddStickerPackRequest(
     @SerializedName("id")
-    val id: String
+    val id: Long  // 表情包ID，数字类型
 )
 
 /**

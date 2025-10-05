@@ -31,7 +31,9 @@ class StickerRepository @Inject constructor(
                 return Result.failure(Exception("用户未登录"))
             }
             
-            val request = StickerPackDetailRequest(id = stickerPackId)
+            // 将String转换为Long
+            val stickerPackIdLong = stickerPackId.toLongOrNull() ?: return Result.failure(Exception("无效的表情包ID"))
+            val request = StickerPackDetailRequest(id = stickerPackIdLong)
             
             Log.d(tag, "Getting sticker pack detail: $stickerPackId")
             
@@ -83,7 +85,9 @@ class StickerRepository @Inject constructor(
                 return Result.failure(Exception("用户未登录"))
             }
             
-            val request = AddStickerPackRequest(id = stickerPackId)
+            // 将String转换为Long
+            val stickerPackIdLong = stickerPackId.toLongOrNull() ?: return Result.failure(Exception("无效的表情包ID"))
+            val request = AddStickerPackRequest(id = stickerPackIdLong)
             
             Log.d(tag, "Adding sticker pack to favorites: $stickerPackId")
             

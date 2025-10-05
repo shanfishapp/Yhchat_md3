@@ -411,7 +411,9 @@ class MessageRepository @Inject constructor(
                 return Result.failure(Exception("用户未登录"))
             }
             
-            val request = AddExpressionRequest(id = expressionId)
+            // 将String转换为Long
+            val expressionIdLong = expressionId.toLongOrNull() ?: return Result.failure(Exception("无效的表情ID"))
+            val request = AddExpressionRequest(id = expressionIdLong)
             
             Log.d(tag, "Adding expression to favorites: $expressionId")
             
