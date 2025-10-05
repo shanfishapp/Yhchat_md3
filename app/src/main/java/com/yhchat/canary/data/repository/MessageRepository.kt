@@ -395,4 +395,63 @@ class MessageRepository @Inject constructor(
             Result.failure(e)
         }
     }
+    
+    /**
+     * 获取消息编辑历史记录
+     */
+    suspend fun getMessageEditHistory(msgId: String, size: Int = 10, page: Int = 1): Result<List<MessageEditRecord>> {
+        return try {
+            val tokenFlow = tokenRepository.getToken()
+            val token = tokenFlow.first()?.token
+            if (token.isNullOrEmpty()) {
+                Log.e(tag, "Token is null or empty")
+                return Result.failure(Exception("用户未登录"))
+            }
+            
+            val request = com.yhchat.canary.data.api.ListMessageEditRecordRequest(
+                msgId = msgId,
+                size = size,
+                page = page
+            )
+            
+            Log.d(tag, "Getting edit history for message: $msgId")
+            
+            val response = apiService.listMessageEditRecord(token, request)
+            
+            if (response.isSuccessful) {
+                response.body()?.let { body ->
+                    val code = body["code"] as? Double
+                    if (code == 1.0) {
+                        val data = body["data"] as? Map<*, *>
+                        val list = data?.get("list") as? List<*>
+                        
+                        val records = list?.mapNotNull { item ->
+                            val record = item as? Map<*, *> ?: return@mapNotNull null
+                            MessageEditRecord(
+                                id = (record["id"] as? Double)?.toLong() ?: 0L,
+                                msgId = record["msgId"] as? String ?: "",
+                                contentType = (record["contentType"] as? Double)?.toInt() ?: 1,
+                                contentOld = record["contentOld"] as? String ?: "",
+                                createTime = (record["createTime"] as? Double)?.toLong() ?: 0L,
+                                msgTime = (record["msgTime"] as? Double)?.toLong() ?: 0L
+                            )
+                        } ?: emptyList()
+                        
+                        Log.d(tag, "Successfully got ${records.size} edit records")
+                        Result.success(records)
+                    } else {
+                        val msg = body["msg"] as? String ?: "获取编辑历史失败"
+                        Log.e(tag, "API error: $msg")
+                        Result.failure(Exception(msg))
+                    }
+                } ?: Result.failure(Exception("响应体为空"))
+            } else {
+                Log.e(tag, "HTTP error: ${response.code()}")
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error getting edit history", e)
+            Result.failure(e)
+        }
+    }
 }

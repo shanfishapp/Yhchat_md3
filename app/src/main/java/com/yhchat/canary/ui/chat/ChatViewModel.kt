@@ -136,6 +136,13 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
+     * 获取消息编辑历史
+     */
+    suspend fun getMessageEditHistory(msgId: String): Result<List<com.yhchat.canary.data.model.MessageEditRecord>> {
+        return messageRepository.getMessageEditHistory(msgId)
+    }
+    
+    /**
      * 处理编辑的消息
      */
     private fun handleEditedMessage(message: ChatMessage) {
@@ -327,6 +334,16 @@ class ChatViewModel @Inject constructor(
      * 发送文本消息
      */
     fun sendTextMessage(text: String, quoteMsgId: String? = null) {
+        sendMessage(text, 1, quoteMsgId)
+    }
+    
+    /**
+     * 发送消息（支持不同类型）
+     * @param text 消息文本
+     * @param contentType 消息类型：1-文本，3-Markdown，8-HTML
+     * @param quoteMsgId 引用消息ID
+     */
+    fun sendMessage(text: String, contentType: Int = 1, quoteMsgId: String? = null) {
         if (text.isBlank() || currentChatId.isEmpty()) {
             Log.w(tag, "Cannot send empty message or chat not initialized")
             return
@@ -334,26 +351,31 @@ class ChatViewModel @Inject constructor(
         
         viewModelScope.launch {
             try {
-                Log.d(tag, "Sending message: $text")
+                val typeText = when (contentType) {
+                    3 -> "Markdown"
+                    8 -> "HTML"
+                    else -> "文本"
+                }
+                Log.d(tag, "Sending $typeText message: $text")
                 
                 val result = messageRepository.sendMessage(
                     chatId = currentChatId,
                     chatType = currentChatType,
                     text = text,
-                    contentType = 1, // 文本消息
+                    contentType = contentType,
                     quoteMsgId = quoteMsgId
                 )
 
                 result.fold(
                     onSuccess = { success ->
                         if (success) {
-                            Log.d(tag, "Message sent successfully")
+                            Log.d(tag, "$typeText message sent successfully")
                             // 发送成功后刷新消息列表以获取最新消息
                             loadMessages(refresh = true)
                         }
                     },
                     onFailure = { exception ->
-                        Log.e(tag, "Failed to send message", exception)
+                        Log.e(tag, "Failed to send $typeText message", exception)
                         _uiState.value = _uiState.value.copy(
                             error = exception.message ?: "发送消息失败"
                         )

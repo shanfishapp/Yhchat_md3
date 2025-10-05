@@ -260,7 +260,7 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier.fillMaxSize(),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text("没有可用的导航项")
+                                    Text("666全关了是吗，自己清数据解决。")
                                 }
                             }
                             

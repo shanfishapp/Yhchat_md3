@@ -20,6 +20,11 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.material3.*
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -93,6 +98,7 @@ fun ChatScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val messages = viewModel.messages
     var inputText by remember { mutableStateOf("") }
+    var selectedMessageType by remember { mutableStateOf(1) } // 1-文本, 3-Markdown, 8-HTML
     val listState = rememberLazyListState()
     
     // 图片预览状态
@@ -116,21 +122,10 @@ fun ChatScreen(
                                    (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset > 100)
     }
     
-    // 监听新消息，只在底部时自动滚动
+    // WebSocket新消息不再自动滚动，用户可以自己滑动查看
     LaunchedEffect(uiState.newMessageReceived) {
         if (uiState.newMessageReceived) {
-            // 检查用户是否在底部（允许一定的误差范围）
-            val isAtBottom = listState.firstVisibleItemIndex <= 2 && 
-                            listState.firstVisibleItemScrollOffset < 200
-            
-            if (isAtBottom) {
-                // 用户在底部，平滑滚动到最新消息（带动画）
-                kotlinx.coroutines.delay(50) // 等待消息插入完成
-                listState.animateScrollToItem(0)
-            }
-            // 如果用户不在底部，不自动滚动，保持当前位置
-            
-            // 重置新消息标记
+            // 重置新消息标记，但不进行任何滚动操作
             viewModel.resetNewMessageFlag()
         }
     }
@@ -369,9 +364,11 @@ fun ChatScreen(
                 onTextChange = { inputText = it },
                 onSendMessage = {
                     if (inputText.isNotBlank()) {
-                   
-                        viewModel.sendTextMessage(inputText.trim())
+                        // 根据选择的消息类型发送消息
+                        viewModel.sendMessage(inputText.trim(), selectedMessageType)
                         inputText = ""
+                        // 发送后重置为文本类型
+                        selectedMessageType = 1
                         // 发送消息后自动滚动到最新消息
                         coroutineScope.launch {
                             listState.animateScrollToItem(0)
@@ -389,6 +386,11 @@ fun ChatScreen(
                 },
                 onCameraClick = {
                     // TODO: 实现相机拍照功能
+                },
+                selectedMessageType = selectedMessageType,
+                onMessageTypeChange = { newType ->
+                    // 只能选择一个类型，点击已选中的类型则取消（回到文本）
+                    selectedMessageType = if (selectedMessageType == newType) 1 else newType
                 },
                 modifier = Modifier.padding(
                     start = 16.dp,
@@ -416,6 +418,7 @@ fun ChatScreen(
 /**
  * 消息项
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MessageItem(
     message: ChatMessage,
@@ -424,6 +427,10 @@ private fun MessageItem(
     onImageClick: (String) -> Unit = {},
     onAvatarClick: (String, String, Int) -> Unit = { _, _, _ -> }
 ) {
+    val context = LocalContext.current
+    val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+    var showContextMenu by remember { mutableStateOf(false) }
+    
     // 检查是否为撤回消息
     if (message.msgDeleteTime != null) {
         // 撤回消息显示
@@ -435,7 +442,23 @@ private fun MessageItem(
     }
     
     Row(
-        modifier = modifier,
+        modifier = modifier
+            .combinedClickable(
+                onClick = {}, // 单击不做任何事
+                onDoubleClick = {
+                    // 双击复制消息文本
+                    val textToCopy = message.content.text ?: ""
+                    if (textToCopy.isNotEmpty()) {
+                        val clip = android.content.ClipData.newPlainText("message", textToCopy)
+                        clipboardManager.setPrimaryClip(clip)
+                        Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onLongClick = {
+                    // 长按显示菜单
+                    showContextMenu = true
+                }
+            ),
         horizontalArrangement = if (isMyMessage) {
             Arrangement.End
         } else {
@@ -532,13 +555,49 @@ private fun MessageItem(
                 )
             }
 
-            // 时间戳
-            Text(
-                text = formatTimestamp(message.sendTime),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // 时间戳和编辑状态
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-            )
+            ) {
+                Text(
+                    text = formatTimestamp(message.sendTime),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                // 如果消息被编辑过，显示"已编辑"标记
+                if (message.editTime != null && message.editTime > 0) {
+                    var showEditHistory by remember { mutableStateOf(false) }
+                    
+                    Row(
+                        modifier = Modifier.clickable { showEditHistory = true },
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "已编辑",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "查看编辑历史",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                    
+                    // 编辑历史弹窗
+                    if (showEditHistory) {
+                        EditHistoryDialog(
+                            msgId = message.msgId,
+                            onDismiss = { showEditHistory = false }
+                        )
+                    }
+                }
+            }
         }
 
         if (isMyMessage) {
@@ -561,6 +620,131 @@ private fun MessageItem(
             )
         }
     }
+    
+    // 长按菜单
+    if (showContextMenu) {
+        MessageContextMenu(
+            message = message,
+            onDismiss = { showContextMenu = false },
+            onCopyAll = {
+                val textToCopy = message.content.text ?: ""
+                if (textToCopy.isNotEmpty()) {
+                    val clip = android.content.ClipData.newPlainText("message", textToCopy)
+                    clipboardManager.setPrimaryClip(clip)
+                    Toast.makeText(context, "已复制全部", Toast.LENGTH_SHORT).show()
+                }
+                showContextMenu = false
+            },
+            onQuote = {
+                // TODO: 实现引用功能
+                Toast.makeText(context, "引用功能开发中", Toast.LENGTH_SHORT).show()
+                showContextMenu = false
+            },
+            onRecall = {
+                // TODO: 实现撤回功能
+                Toast.makeText(context, "撤回功能开发中", Toast.LENGTH_SHORT).show()
+                showContextMenu = false
+            }
+        )
+    }
+}
+
+/**
+ * 消息上下文菜单
+ */
+@Composable
+private fun MessageContextMenu(
+    message: ChatMessage,
+    onDismiss: () -> Unit,
+    onCopyAll: () -> Unit,
+    onQuote: () -> Unit,
+    onRecall: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "消息操作",
+                style = MaterialTheme.typography.titleMedium
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // 复制全部
+                TextButton(
+                    onClick = onCopyAll,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Start,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "复制全部",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("复制全部")
+                    }
+                }
+                
+                // 引用
+                TextButton(
+                    onClick = onQuote,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Start,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FormatQuote,
+                            contentDescription = "引用",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("引用")
+                    }
+                }
+                
+                // 撤回
+                TextButton(
+                    onClick = onRecall,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Start,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "撤回",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            "撤回",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }
 
 /**
@@ -1019,6 +1203,138 @@ private fun PostMessageView(
                 },
                 fontWeight = FontWeight.Medium
             )
+        }
+    }
+}
+
+/**
+ * 编辑历史弹窗
+ */
+@Composable
+private fun EditHistoryDialog(
+    msgId: String,
+    onDismiss: () -> Unit
+) {
+    val viewModel: ChatViewModel = viewModel()
+    val coroutineScope = rememberCoroutineScope()
+    var editRecords by remember { mutableStateOf<List<com.yhchat.canary.data.model.MessageEditRecord>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    
+    LaunchedEffect(msgId) {
+        isLoading = true
+        val result = viewModel.getMessageEditHistory(msgId)
+        result.fold(
+            onSuccess = { records ->
+                editRecords = records
+                isLoading = false
+            },
+            onFailure = { error ->
+                errorMessage = error.message
+                isLoading = false
+            }
+        )
+    }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "编辑历史",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 400.dp)
+            ) {
+                when {
+                    isLoading -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                    errorMessage != null -> {
+                        Text(
+                            text = errorMessage ?: "加载失败",
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                    editRecords.isEmpty() -> {
+                        Text(
+                            text = "暂无编辑历史",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(editRecords) { record ->
+                                EditRecordItem(record)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("关闭")
+            }
+        }
+    )
+}
+
+/**
+ * 编辑记录项
+ */
+@Composable
+private fun EditRecordItem(record: com.yhchat.canary.data.model.MessageEditRecord) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // 编辑时间
+            Text(
+                text = "编辑于 ${formatTimestamp(record.msgTime)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+            
+            // 旧内容
+            try {
+                val contentJson = org.json.JSONObject(record.contentOld)
+                val text = contentJson.optString("text", "")
+                if (text.isNotEmpty()) {
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            } catch (e: Exception) {
+                Text(
+                    text = record.contentOld,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
     }
 }

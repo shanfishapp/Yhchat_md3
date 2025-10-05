@@ -449,6 +449,18 @@ data class ListMessageBySeqRequest(
 )
 
 /**
+ * 消息编辑记录
+ */
+data class MessageEditRecord(
+    val id: Long,
+    val msgId: String,
+    val contentType: Int,
+    val contentOld: String, // JSON格式的旧内容
+    val createTime: Long, // 创建时间戳（毫秒）
+    val msgTime: Long // 编辑时间戳（毫秒）
+)
+
+/**
  * 获取消息列表请求
  */
 data class ListMessageRequest(

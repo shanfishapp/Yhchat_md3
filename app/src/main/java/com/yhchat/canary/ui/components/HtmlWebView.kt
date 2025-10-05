@@ -3,6 +3,8 @@ package com.yhchat.canary.ui.components
 import android.os.Build
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.net.Uri
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -127,6 +129,32 @@ fun HtmlWebView(
                             }
                         }
                         return false
+                    }
+                    
+                    override fun shouldInterceptRequest(
+                        view: WebView?,
+                        request: WebResourceRequest?
+                    ): WebResourceResponse? {
+                        val url = request?.url?.toString() ?: return super.shouldInterceptRequest(view, request)
+                        
+                        // 为 https://chat-img.jwznb.com 的图片添加 Referer
+                        if (url.startsWith("https://chat-img.jwznb.com")) {
+                            try {
+                                val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                                connection.setRequestProperty("Referer", "https://myapp.jwznb.com")
+                                connection.connect()
+                                
+                                val contentType = connection.contentType
+                                val encoding = connection.contentEncoding ?: "UTF-8"
+                                val inputStream = connection.inputStream
+                                
+                                return WebResourceResponse(contentType, encoding, inputStream)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                        
+                        return super.shouldInterceptRequest(view, request)
                     }
                     
                     override fun onPageFinished(view: WebView?, url: String?) {

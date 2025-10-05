@@ -44,7 +44,9 @@ fun ChatInputBar(
     onImageClick: (() -> Unit)? = null,
     onFileClick: (() -> Unit)? = null,
     onCameraClick: (() -> Unit)? = null,
-    onDraftChange: ((String) -> Unit)? = null
+    onDraftChange: ((String) -> Unit)? = null,
+    selectedMessageType: Int = 1, // 1-文本, 3-Markdown, 8-HTML
+    onMessageTypeChange: ((Int) -> Unit)? = null
 ) {
     var showAttachMenu by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -57,11 +59,11 @@ fun ChatInputBar(
         color = MaterialTheme.colorScheme.surface
     ) {
         Column {
-            // 附件菜单
+            // 附件菜单（向下弹出）
             AnimatedVisibility(
                 visible = showAttachMenu,
-                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
             ) {
                 AttachmentMenu(
                     onImageClick = {
@@ -76,6 +78,15 @@ fun ChatInputBar(
                         onCameraClick?.invoke()
                         showAttachMenu = false
                     },
+                    onHtmlClick = {
+                        onMessageTypeChange?.invoke(8)
+                        showAttachMenu = false
+                    },
+                    onMarkdownClick = {
+                        onMessageTypeChange?.invoke(3)
+                        showAttachMenu = false
+                    },
+                    selectedMessageType = selectedMessageType,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -181,6 +192,9 @@ private fun AttachmentMenu(
     onImageClick: () -> Unit,
     onFileClick: () -> Unit,
     onCameraClick: () -> Unit,
+    onHtmlClick: () -> Unit,
+    onMarkdownClick: () -> Unit,
+    selectedMessageType: Int,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -188,29 +202,56 @@ private fun AttachmentMenu(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         shape = RoundedCornerShape(12.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            AttachmentMenuItem(
-                icon = Icons.Default.Image,
-                label = "图片",
-                onClick = onImageClick
-            )
+            // 第一行：图片、拍照、文件
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                AttachmentMenuItem(
+                    icon = Icons.Default.Image,
+                    label = "图片",
+                    onClick = onImageClick
+                )
+                
+                AttachmentMenuItem(
+                    icon = Icons.Default.CameraAlt,
+                    label = "拍照",
+                    onClick = onCameraClick
+                )
+                
+                AttachmentMenuItem(
+                    icon = Icons.Default.AttachFile,
+                    label = "文件",
+                    onClick = onFileClick
+                )
+            }
             
-            AttachmentMenuItem(
-                icon = Icons.Default.CameraAlt,
-                label = "拍照",
-                onClick = onCameraClick
-            )
-            
-            AttachmentMenuItem(
-                icon = Icons.Default.AttachFile,
-                label = "文件",
-                onClick = onFileClick
-            )
+            // 第二行：HTML、Markdown
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                MessageTypeMenuItem(
+                    label = "HTML",
+                    isSelected = selectedMessageType == 8,
+                    onClick = onHtmlClick
+                )
+                
+                MessageTypeMenuItem(
+                    label = "Markdown",
+                    isSelected = selectedMessageType == 3,
+                    onClick = onMarkdownClick
+                )
+                
+                // 占位，保持对齐
+                Spacer(modifier = Modifier.weight(1f))
+            }
         }
     }
 }
@@ -255,5 +296,42 @@ private fun AttachmentMenuItem(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+/**
+ * 消息类型菜单项（HTML/Markdown）
+ */
+@Composable
+private fun MessageTypeMenuItem(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .clickable { onClick() }
+            .padding(8.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = if (isSelected) 
+            MaterialTheme.colorScheme.primaryContainer 
+        else 
+            MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = if (isSelected) 4.dp else 0.dp
+    ) {
+        Box(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (isSelected) 
+                    MaterialTheme.colorScheme.onPrimaryContainer 
+                else 
+                    MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
