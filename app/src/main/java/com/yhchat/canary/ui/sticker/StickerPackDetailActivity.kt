@@ -3,7 +3,6 @@ package com.yhchat.canary.ui.sticker
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -27,7 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.yhchat.canary.ui.theme.YhchatTheme
+import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import dagger.hilt.android.AndroidEntryPoint
 import java.text.SimpleDateFormat
 import java.util.*
@@ -51,7 +50,7 @@ class StickerPackDetailActivity : ComponentActivity() {
         val stickerPackId = intent.getStringExtra(EXTRA_STICKER_PACK_ID) ?: ""
         
         setContent {
-            YhchatTheme {
+            YhchatCanaryTheme {
                 StickerPackDetailScreen(
                     stickerPackId = stickerPackId,
                     onBackClick = { finish() }

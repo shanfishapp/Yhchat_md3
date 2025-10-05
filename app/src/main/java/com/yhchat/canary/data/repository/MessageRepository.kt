@@ -2,7 +2,15 @@ package com.yhchat.canary.data.repository
 
 import android.util.Log
 import com.yhchat.canary.data.api.ApiService
-import com.yhchat.canary.data.model.*
+import com.yhchat.canary.data.model.AddExpressionRequest
+import com.yhchat.canary.data.model.ChatMessage
+import com.yhchat.canary.data.model.MessageEditRecord
+import com.yhchat.canary.data.model.MessageListData
+import com.yhchat.canary.data.model.MessageListResponse
+import com.yhchat.canary.data.model.MessageStatus
+import com.yhchat.canary.data.model.MessageUserInfo
+import com.yhchat.canary.data.model.MessageUserRelation
+import com.yhchat.canary.data.model.TokenInfo
 import com.yhchat.canary.proto.*
 import kotlinx.coroutines.flow.first
 import okhttp3.MediaType.Companion.toMediaType
@@ -419,12 +427,13 @@ class MessageRepository @Inject constructor(
             
             if (response.isSuccessful) {
                 response.body()?.let { body ->
+                    val message = body.message
                     if (body.code == 1) {
                         Log.d(tag, "Successfully added expression: $expressionId")
                         Result.success(Unit)
                     } else {
-                        Log.e(tag, "Failed to add expression: ${body.msg}")
-                        Result.failure(Exception(body.msg))
+                        Log.e(tag, "Failed to add expression: $message")
+                        Result.failure(Exception(message))
                     }
                 } ?: Result.failure(Exception("响应体为空"))
             } else {

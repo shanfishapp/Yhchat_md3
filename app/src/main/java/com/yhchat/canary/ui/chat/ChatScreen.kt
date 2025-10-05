@@ -272,7 +272,8 @@ fun ChatScreen(
                                     // 用户头像点击，传递给外部处理（UserProfileActivity）
                                     onAvatarClick(chatId, name, chatType)
                                 }
-                            }
+                            },
+            onAddExpression = viewModel::addExpressionToFavorites
                         )
                     }
 
@@ -426,7 +427,8 @@ private fun MessageItem(
     isMyMessage: Boolean,
     modifier: Modifier = Modifier,
     onImageClick: (String) -> Unit = {},
-    onAvatarClick: (String, String, Int) -> Unit = { _, _, _ -> }
+    onAvatarClick: (String, String, Int) -> Unit = { _, _, _ -> },
+    onAddExpression: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -562,9 +564,9 @@ private fun MessageItem(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
             ) {
-                Text(
-                    text = formatTimestamp(message.sendTime),
-                    style = MaterialTheme.typography.labelSmall,
+            Text(
+                text = formatTimestamp(message.sendTime),
+                style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
@@ -649,11 +651,10 @@ private fun MessageItem(
             onAddExpression = if (message.contentType == 7) {
                 {
                     // 添加表情到个人收藏
-                    val viewModel: ChatViewModel = viewModel()
                     val expressionId = message.content.expressionId
                     if (!expressionId.isNullOrEmpty()) {
-                        viewModel.addExpressionToFavorites(expressionId)
-                        Toast.makeText(context, "正在添加表情...", Toast.LENGTH_SHORT).show()
+                        onAddExpression(expressionId)
+                        Toast.makeText(context, "已添加表情", Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(context, "无法获取表情ID", Toast.LENGTH_SHORT).show()
                     }
@@ -845,24 +846,24 @@ private fun MessageContentView(
                             .fillMaxWidth()
                             .heightIn(min = 120.dp, max = 400.dp)
                     ) {
-                        HtmlWebView(
-                            htmlContent = htmlContent,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .pointerInput(Unit) {
-                                    awaitPointerEventScope {
-                                        while (true) {
-                                            val event = awaitPointerEvent()
-                                            event.changes.forEach { pointerInputChange ->
-                                                // 兼容旧Compose：手动判断down
-                                                if (!pointerInputChange.previousPressed && pointerInputChange.pressed) {
-                                                    pointerInputChange.consume()
-                                                }
+                    HtmlWebView(
+                        htmlContent = htmlContent,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        event.changes.forEach { pointerInputChange ->
+                                            // 兼容旧Compose：手动判断down
+                                            if (!pointerInputChange.previousPressed && pointerInputChange.pressed) {
+                                                pointerInputChange.consume()
                                             }
                                         }
                                     }
                                 }
-                        )
+                            }
+                    )
                     }
                 }
 
@@ -1008,10 +1009,10 @@ private fun MessageContentView(
                             .clip(RoundedCornerShape(8.dp))
                             .clickable {
                                 // 如果是表情包，点击跳转到详情页面
-                                if (!stickerPackId.isNullOrEmpty() && stickerPackId != "0") {
+                                if (stickerPackId != null && stickerPackId != 0L) {
                                     com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
                                         context,
-                                        stickerPackId
+                                        stickerPackId.toString()
                                     )
                                 }
                             },
@@ -1037,10 +1038,10 @@ private fun MessageContentView(
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable {
                                     // 如果是表情包，点击跳转到详情页面
-                                    if (!stickerPackId.isNullOrEmpty() && stickerPackId != "0") {
+                                    if (stickerPackId != null && stickerPackId != 0L) {
                                         com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
                                             context,
-                                            stickerPackId
+                                            stickerPackId.toString()
                                         )
                                     }
                                 },

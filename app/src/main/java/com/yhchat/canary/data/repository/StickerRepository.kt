@@ -2,7 +2,12 @@ package com.yhchat.canary.data.repository
 
 import android.util.Log
 import com.yhchat.canary.data.api.ApiService
-import com.yhchat.canary.data.model.*
+import com.yhchat.canary.data.model.AddStickerPackRequest
+import com.yhchat.canary.data.model.StickerItem
+import com.yhchat.canary.data.model.StickerPackCreator
+import com.yhchat.canary.data.model.StickerPackDetail
+import com.yhchat.canary.data.model.StickerPackDetailRequest
+import com.yhchat.canary.data.repository.TokenRepository
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,6 +40,7 @@ class StickerRepository @Inject constructor(
             if (response.isSuccessful) {
                 response.body()?.let { body ->
                     val code = body["code"] as? Double
+                    val message = body["msg"] as? String ?: "获取表情包详情失败"
                     if (code == 1.0) {
                         val data = body["data"] as? Map<*, *>
                         
@@ -51,9 +57,8 @@ class StickerRepository @Inject constructor(
                             Result.failure(Exception("数据格式错误"))
                         }
                     } else {
-                        val msg = body["msg"] as? String ?: "获取表情包详情失败"
-                        Log.e(tag, "API error: $msg")
-                        Result.failure(Exception(msg))
+                        Log.e(tag, "API error: $message")
+                        Result.failure(Exception(message))
                     }
                 } ?: Result.failure(Exception("响应体为空"))
             } else {
@@ -86,12 +91,13 @@ class StickerRepository @Inject constructor(
             
             if (response.isSuccessful) {
                 response.body()?.let { body ->
+                    val message = body.message
                     if (body.code == 1) {
                         Log.d(tag, "Successfully added sticker pack: $stickerPackId")
                         Result.success(Unit)
                     } else {
-                        Log.e(tag, "Failed to add sticker pack: ${body.msg}")
-                        Result.failure(Exception(body.msg))
+                        Log.e(tag, "Failed to add sticker pack: $message")
+                        Result.failure(Exception(message))
                     }
                 } ?: Result.failure(Exception("响应体为空"))
             } else {
@@ -124,7 +130,7 @@ class StickerRepository @Inject constructor(
                 createTime = (itemMap["createTime"] as? Double)?.toLong() ?: 0L
             )
         }
-        
+
         val creator = StickerPackCreator(
             userId = userData["user_id"] as? String ?: "",
             nickname = userData["nickname"] as? String ?: "",
