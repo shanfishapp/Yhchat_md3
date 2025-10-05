@@ -194,24 +194,9 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         
-                        Scaffold(
-                            bottomBar = {
-                                BottomNavigationBar(
-                                    currentScreen = currentPageItem,
-                                    visibleItems = visibleNavItems,
-                                    onScreenChange = { screen ->
-                                        val targetIndex = visibleNavItems.indexOfFirst { it.id == screen }
-                                        if (targetIndex >= 0) {
-                                            coroutineScope.launch {
-                                                pagerState.scrollToPage(targetIndex)
-                                            }
-                                        }
-                                        currentScreen = screen
-                                    },
-                                    isVisible = scrollBehavior.isVisible.value
-                                )
-                            }
-                        ) { paddingValues ->
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            // 主内容区域（全屏显示，不使用paddingValues）
+                            val paddingValues = PaddingValues(0.dp)
                             if (visibleNavItems.isNotEmpty()) {
                                 HorizontalPager(
                                     state = pagerState,
@@ -318,6 +303,23 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
+                            
+                            // 底部导航栏（浮动在内容上方）
+                            BottomNavigationBar(
+                                currentScreen = currentPageItem,
+                                visibleItems = visibleNavItems,
+                                onScreenChange = { screen ->
+                                    val targetIndex = visibleNavItems.indexOfFirst { it.id == screen }
+                                    if (targetIndex >= 0) {
+                                        coroutineScope.launch {
+                                            pagerState.scrollToPage(targetIndex)
+                                        }
+                                    }
+                                    currentScreen = screen
+                                },
+                                isVisible = scrollBehavior.isVisible.value,
+                                modifier = Modifier.align(Alignment.BottomCenter)
+                            )
                         }
                     }
                 }
