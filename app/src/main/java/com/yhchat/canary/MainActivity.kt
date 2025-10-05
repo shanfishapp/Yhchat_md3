@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import com.yhchat.canary.ui.login.LoginScreen
 import com.yhchat.canary.ui.conversation.ConversationScreen
 import com.yhchat.canary.ui.chat.ChatScreen
