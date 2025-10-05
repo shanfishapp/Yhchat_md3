@@ -59,40 +59,6 @@ fun ChatInputBar(
         color = MaterialTheme.colorScheme.surface
     ) {
         Column {
-            // 附件菜单（向下弹出）
-            AnimatedVisibility(
-                visible = showAttachMenu,
-                enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
-            ) {
-                AttachmentMenu(
-                    onImageClick = {
-                        onImageClick?.invoke()
-                        showAttachMenu = false
-                    },
-                    onFileClick = {
-                        onFileClick?.invoke()
-                        showAttachMenu = false
-                    },
-                    onCameraClick = {
-                        onCameraClick?.invoke()
-                        showAttachMenu = false
-                    },
-                    onHtmlClick = {
-                        onMessageTypeChange?.invoke(8)
-                        showAttachMenu = false
-                    },
-                    onMarkdownClick = {
-                        onMessageTypeChange?.invoke(3)
-                        showAttachMenu = false
-                    },
-                    selectedMessageType = selectedMessageType,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
-            
             // 主输入栏
             Row(
                 modifier = Modifier
@@ -179,6 +145,40 @@ fun ChatInputBar(
                         modifier = Modifier.size(20.dp)
                     )
                 }
+            }
+            
+            // 附件菜单（在输入框下方弹出）
+            AnimatedVisibility(
+                visible = showAttachMenu,
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+            ) {
+                AttachmentMenu(
+                    onImageClick = {
+                        onImageClick?.invoke()
+                        showAttachMenu = false
+                    },
+                    onFileClick = {
+                        onFileClick?.invoke()
+                        showAttachMenu = false
+                    },
+                    onCameraClick = {
+                        onCameraClick?.invoke()
+                        showAttachMenu = false
+                    },
+                    onHtmlClick = {
+                        onMessageTypeChange?.invoke(8)
+                        showAttachMenu = false
+                    },
+                    onMarkdownClick = {
+                        onMessageTypeChange?.invoke(3)
+                        showAttachMenu = false
+                    },
+                    selectedMessageType = selectedMessageType,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
             }
         }
     }

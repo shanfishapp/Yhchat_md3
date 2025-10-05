@@ -247,7 +247,7 @@ private fun UserProfileContent(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .background(
-                                MaterialTheme.colorScheme.tertiary,
+                                MaterialTheme.colorScheme.tertiaryContainer,
                                 RoundedCornerShape(16.dp)
                             )
                             .padding(horizontal = 12.dp, vertical = 4.dp)
