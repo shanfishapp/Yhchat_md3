@@ -327,11 +327,11 @@ class ConversationViewModel @Inject constructor(
         // 根据会话类型决定显示格式
         return when (targetChatType) {
             2, 3 -> {
-                // 群聊(2)或机器人会话(3)：显示"发送者：内容"
-                "${message.sender.name} : $nonNullContentPreview"
+                // 群聊(2)或机器人会话(3)：直接显示内容
+                nonNullContentPreview
             }
             else -> {
-                // 私聊(1)或其他：只显示内容
+                // 私聊(1)或其他：直接显示内容
                 nonNullContentPreview
             }
         }

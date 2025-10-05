@@ -95,7 +95,21 @@ fun ConversationScreen(
     // 监听列表滚动位置，控制置顶栏显示
     LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) {
         // 只有当滚动到顶部附近（前几个项目且滚动偏移较小）时才显示置顶栏
+        // 注意：这里判断是否在顶部，不考虑置顶会话
         showStickyBar = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 100
+    }
+    
+    // 连接滚动行为到底部导航栏的显示/隐藏
+    scrollBehavior?.let { behavior ->
+        listState.HandleScrollBehavior(scrollBehavior = behavior)
+    }
+    
+    // 防止刷新后滚动到置顶会话组件后面
+    LaunchedEffect(conversations.size) {
+        if (conversations.isNotEmpty() && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset > 0) {
+            // 如果在顶部附近但有偏移，重置到完全顶部
+            listState.scrollToItem(0, 0)
+        }
     }
 
     // 允许返回后重新刷新（移除禁止刷新逻辑）
@@ -212,15 +226,23 @@ fun ConversationScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
-                    items(pagedConversations) { conversation ->
+                    items(
+                        items = pagedConversations,
+                        key = { conversation -> "${conversation.chatId}_${conversation.timestampMs}" }
+                    ) { conversation ->
+                        // 使用remember确保点击时获取最新的conversation数据
+                        val chatId = conversation.chatId
+                        val chatType = conversation.chatType
+                        val chatName = conversation.name
+                        
                         ConversationItem(
                             conversation = conversation,
                             onClick = {
-                                // 跳转到聊天界面（无动画，交给系统默认）
+                                // 跳转到聊天界面（使用最新的会话数据）
                                 val intent = Intent(context, com.yhchat.canary.ui.chat.ChatActivity::class.java)
-                                intent.putExtra("chatId", conversation.chatId)
-                                intent.putExtra("chatType", conversation.chatType)
-                                intent.putExtra("chatName", conversation.name)
+                                intent.putExtra("chatId", chatId)
+                                intent.putExtra("chatType", chatType)
+                                intent.putExtra("chatName", chatName)
                                 // 使用 FLAG_ACTIVITY_CLEAR_TOP 确保清除栈顶到目标Activity之间的所有Activity
                                 // 配合 FLAG_ACTIVITY_SINGLE_TOP 确保如果已存在则重用并调用 onNewIntent
                                 intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -458,8 +480,15 @@ fun ConversationItem(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // 直接显示消息内容，不再显示"发送者："前缀
+                    val displayContent = if (conversation.at > 0) {
+                        "@${conversation.chatContent}"
+                    } else {
+                        conversation.chatContent
+                    }
+                    
                     Text(
-                        text = if (conversation.at > 0) "@${conversation.chatContent}" else conversation.chatContent,
+                        text = displayContent,
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (conversation.at > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

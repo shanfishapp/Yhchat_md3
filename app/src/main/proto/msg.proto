@@ -152,3 +152,35 @@ message send_message_send {
 message send_message {
     Status status = 1;
 }
+
+message button_report_send {
+    string msg_id = 2; // 信息ID
+    int64 chat_type = 3; // 对象类型, 1-用户 2-群聊 3-机器人
+    string chat_id = 4; // 对象ID
+    string user_id = 5; // 按钮事件发送者ID
+    string button_value = 6; // 欲点击按钮的值
+}
+
+
+
+// 撤回消息
+message recall_msg_send {
+    string msg_id = 2; // 信息ID
+    string chat_id = 3; // 信息所属对象ID
+    int64 chat_type = 4; // 信息所属对象类型, 1-用户 2-群聊 3-机器人
+}
+
+message recall_msg {
+    Status status = 1;
+}
+
+// 批量撤回消息
+message recall_msg_batch_send {
+    repeated string msg_id = 2; // 信息ID
+    string chat_id = 3; // 信息所属对象ID
+    int64 chat_type = 4; // 信息所属对象类型, 1-用户 2-群聊 3-机器人
+}
+
+message recall_msg_batch {
+    Status status = 1;
+}

@@ -260,6 +260,11 @@ fun BoardListContent(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     
+    // 连接滚动行为到底部导航栏的显示/隐藏
+    scrollBehavior?.let { behavior ->
+        listState.HandleScrollBehavior(scrollBehavior = behavior)
+    }
+    
     Column(
         modifier = modifier.fillMaxSize()
     ) {
@@ -350,6 +355,11 @@ fun MyPostListContent(
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    
+    // 连接滚动行为到底部导航栏的显示/隐藏
+    scrollBehavior?.let { behavior ->
+        listState.HandleScrollBehavior(scrollBehavior = behavior)
+    }
     
     Column(
         modifier = modifier.fillMaxSize()

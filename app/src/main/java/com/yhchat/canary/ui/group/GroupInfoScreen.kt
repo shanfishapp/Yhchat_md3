@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshotFlow
@@ -310,8 +311,19 @@ private fun InfoRow(label: String, value: String) {
 
 @Composable
 private fun MemberItem(member: GroupMemberInfo) {
+    val context = LocalContext.current
+    
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                // 点击成员卡片跳转到用户详情页
+                com.yhchat.canary.ui.profile.UserProfileActivity.start(
+                    context = context,
+                    userId = member.userId,
+                    userName = member.name
+                )
+            },
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
@@ -400,7 +412,7 @@ private fun MemberItem(member: GroupMemberInfo) {
                 // 禁言状态
                 if (member.isGag) {
                     Text(
-                        text = "🔇 已禁言",
+                        text = "🔇 被禁言",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -408,5 +420,41 @@ private fun MemberItem(member: GroupMemberInfo) {
             }
         }
     }
+}
+
+@Composable
+fun EditCategoryDialog(
+    categoryName: String,
+    onCategoryNameChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(text = "编辑群分类")
+        },
+        text = {
+            OutlinedTextField(
+                value = categoryName,
+                onValueChange = onCategoryNameChange,
+                label = { Text("分类名称") },
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            Button(onClick = {
+                onSave()
+                onDismiss()
+            }) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }
 

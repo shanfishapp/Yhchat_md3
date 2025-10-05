@@ -20,7 +20,8 @@ data class ChatUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val isConnected: Boolean = false,
-    val isRefreshing: Boolean = false
+    val isRefreshing: Boolean = false,
+    val newMessageReceived: Boolean = false  // 标记是否收到新消息
 )
 
 @HiltViewModel
@@ -115,6 +116,9 @@ class ChatViewModel @Inject constructor(
                 _messages.add(insertIndex, message)
                 Log.d(tag, "Inserted new real-time message at index $insertIndex: ${message.msgId}")
                 
+                // 标记收到新消息，触发UI更新
+                _uiState.value = _uiState.value.copy(newMessageReceived = true)
+                
                 // 初始化流式消息缓存（如果是机器人消息，准备接收stream_message）
                 if (message.sender.chatType == 3) {
                     streamingMessages[message.msgId] = message.content.text ?: ""
@@ -122,6 +126,13 @@ class ChatViewModel @Inject constructor(
                 }
             }
         }
+    }
+    
+    /**
+     * 重置新消息标记
+     */
+    fun resetNewMessageFlag() {
+        _uiState.value = _uiState.value.copy(newMessageReceived = false)
     }
     
     /**
@@ -459,5 +470,31 @@ class ChatViewModel @Inject constructor(
     fun clearStreamingMessage(msgId: String) {
         streamingMessages.remove(msgId)
         Log.d(tag, "Cleared streaming message: $msgId")
+    }
+    
+    /**
+     * 上报按钮点击事件
+     */
+    fun reportButtonClick(
+        chatId: String,
+        chatType: Int,
+        msgId: String,
+        buttonValue: String
+    ) {
+        viewModelScope.launch {
+            try {
+                val userId = tokenRepository.getUserId() ?: ""
+                messageRepository.reportButtonClick(
+                    chatId = chatId,
+                    chatType = chatType,
+                    msgId = msgId,
+                    userId = userId,
+                    buttonValue = buttonValue
+                )
+                Log.d(tag, "Button click reported successfully: msgId=$msgId, value=$buttonValue")
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to report button click", e)
+            }
+        }
     }
 }

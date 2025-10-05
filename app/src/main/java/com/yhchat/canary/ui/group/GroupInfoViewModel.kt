@@ -22,7 +22,10 @@ data class GroupInfoUiState(
     val isLoadingMembers: Boolean = false,
     val currentPage: Int = 1,
     val hasMoreMembers: Boolean = true,
-    val isLoadingMoreMembers: Boolean = false
+    val isLoadingMoreMembers: Boolean = false,
+    val showMemberList: Boolean = false,
+    val isEditingCategory: Boolean = false,
+    val newCategoryName: String = ""
 )
 
 @HiltViewModel
@@ -160,6 +163,35 @@ class GroupInfoViewModel @Inject constructor(
      */
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+    
+    /**
+     * 切换成员列表显示状态
+     */
+    fun toggleMemberList() {
+        _uiState.value = _uiState.value.copy(showMemberList = !_uiState.value.showMemberList)
+    }
+    
+    /**
+     * 显示编辑分类对话框
+     */
+    fun showEditCategoryDialog() {
+        val currentCategory = _uiState.value.groupInfo?.categoryName ?: ""
+        _uiState.value = _uiState.value.copy(isEditingCategory = true, newCategoryName = currentCategory)
+    }
+    
+    /**
+     * 隐藏编辑分类对话框
+     */
+    fun hideEditCategoryDialog() {
+        _uiState.value = _uiState.value.copy(isEditingCategory = false, newCategoryName = "")
+    }
+    
+    /**
+     * 更新新的分类名称
+     */
+    fun updateNewCategoryName(name: String) {
+        _uiState.value = _uiState.value.copy(newCategoryName = name)
     }
 }
 

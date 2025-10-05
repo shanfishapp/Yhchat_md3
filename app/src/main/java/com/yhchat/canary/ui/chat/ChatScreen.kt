@@ -18,8 +18,11 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.activity.compose.BackHandler
@@ -67,12 +70,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.input.pointer.pointerInput
 import com.yhchat.canary.ui.community.PostDetailActivity
 import androidx.compose.foundation.border
+import org.json.JSONArray
+import org.json.JSONObject
 // pointerInput 相关扩展函数无需单独 import，consume 已废弃
 
 /**
  * 聊天界面
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun ChatScreen(
     chatId: String,
@@ -109,6 +114,25 @@ fun ChatScreen(
         // 因为是 reverseLayout，第一个可见项目的索引大于0表示不在最新消息位置
         showScrollToBottomButton = listState.firstVisibleItemIndex > 0 || 
                                    (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset > 100)
+    }
+    
+    // 监听新消息，只在底部时自动滚动
+    LaunchedEffect(uiState.newMessageReceived) {
+        if (uiState.newMessageReceived) {
+            // 检查用户是否在底部（允许一定的误差范围）
+            val isAtBottom = listState.firstVisibleItemIndex <= 2 && 
+                            listState.firstVisibleItemScrollOffset < 200
+            
+            if (isAtBottom) {
+                // 用户在底部，平滑滚动到最新消息（带动画）
+                kotlinx.coroutines.delay(50) // 等待消息插入完成
+                listState.animateScrollToItem(0)
+            }
+            // 如果用户不在底部，不自动滚动，保持当前位置
+            
+            // 重置新消息标记
+            viewModel.resetNewMessageFlag()
+        }
     }
 
     // 处理系统返回键/手势返回
@@ -221,14 +245,21 @@ fun ChatScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     reverseLayout = true // 最新消息在底部
                 ) {
+                    val reversedMessages = messages.reversed()
                     items(
-                        items = messages.reversed(), // 反转显示顺序
-                        key = { it.msgId }
-                    ) { message ->
+                        count = reversedMessages.size,
+                        key = { index -> 
+                            // 使用索引和msgId组合作为key，确保唯一性
+                            "${reversedMessages[index].msgId}_$index"
+                        }
+                    ) { index ->
+                        val message = reversedMessages[index]
                         MessageItem(
                             message = message,
                             isMyMessage = viewModel.isMyMessage(message),
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .animateItemPlacement(),
                             onImageClick = { imageUrl ->
                                 currentImageUrl = imageUrl
                                 showImageViewer = true
@@ -492,6 +523,7 @@ private fun MessageItem(
                 }
             ) {
                 MessageContentView(
+                    message = message,
                     content = message.content,
                     contentType = message.contentType,
                     isMyMessage = isMyMessage,
@@ -566,6 +598,7 @@ private fun RecallMessageItem(
  */
 @Composable
 private fun MessageContentView(
+    message: ChatMessage,
     content: MessageContent,
     contentType: Int,
     isMyMessage: Boolean,
@@ -584,25 +617,31 @@ private fun MessageContentView(
             8 -> {
                 // HTML消息
                 content.text?.let { htmlContent ->
-                    HtmlWebView(
-                        htmlContent = htmlContent,
+                    // 使用Box包裹，添加占位符以减少初始渲染压力
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 120.dp, max = 400.dp)
-                            .pointerInput(Unit) {
-                                awaitPointerEventScope {
-                                    while (true) {
-                                        val event = awaitPointerEvent()
-                                        event.changes.forEach { pointerInputChange ->
-                                            // 兼容旧Compose：手动判断down
-                                            if (!pointerInputChange.previousPressed && pointerInputChange.pressed) {
-                                                pointerInputChange.consume()
+                    ) {
+                        HtmlWebView(
+                            htmlContent = htmlContent,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .pointerInput(Unit) {
+                                    awaitPointerEventScope {
+                                        while (true) {
+                                            val event = awaitPointerEvent()
+                                            event.changes.forEach { pointerInputChange ->
+                                                // 兼容旧Compose：手动判断down
+                                                if (!pointerInputChange.previousPressed && pointerInputChange.pressed) {
+                                                    pointerInputChange.consume()
+                                                }
                                             }
                                         }
                                     }
                                 }
-                            }
-                    )
+                        )
+                    }
                 }
 
             }
@@ -768,11 +807,21 @@ private fun MessageContentView(
                     }
                 }
             }
-            19 -> {
-                // 视频消息 - 已移除视频播放功能，显示提示文本
-                content.videoUrl?.let { videoPath ->
+            10 -> {
+                // 视频消息 (contentType 10)
+                content.videoUrl?.let { videoUrl ->
+                    VideoMessageView(
+                        videoUrl = videoUrl,
+                        textColor = textColor,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+            5 -> {
+                // 表单消息（带按钮）
+                content.text?.let { text ->
                     Text(
-                        text = "📹 视频消息 (暂不支持播放)",
+                        text = text,
                         color = textColor,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -845,6 +894,18 @@ private fun MessageContentView(
                 }
             }
         }
+        
+        // 按钮（用于表单消息等）
+        content.buttons?.let { buttonsJson ->
+            if (buttonsJson.isNotBlank() && buttonsJson != "null") {
+                MessageButtons(
+                    buttonsJson = buttonsJson,
+                    message = message,
+                    textColor = textColor,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
     }
 }
 
@@ -864,7 +925,7 @@ private fun PostMessageView(
     
     if (postId.isNullOrEmpty()) {
         Text(
-            text = "📄 文章消息",
+            text = "文章消息",
             color = textColor,
             style = MaterialTheme.typography.bodyMedium
         )
@@ -1049,6 +1110,113 @@ private fun handleFileDownload(
 }
 
 /**
+ * 视频消息视图
+ */
+@Composable
+private fun VideoMessageView(
+    videoUrl: String,
+    textColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var downloadState by remember { mutableStateOf<DownloadState>(DownloadState.NotStarted) }
+    
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable {
+                if (downloadState == DownloadState.NotStarted) {
+                    downloadState = DownloadState.Downloading
+                    // 提取文件名
+                    val fileName = videoUrl.substringAfterLast("/").ifEmpty { "video_${System.currentTimeMillis()}.mp4" }
+                    
+                    // 启动下载，下载完成后自动打开
+                    FileDownloadService.startDownload(
+                        context = context,
+                        fileUrl = videoUrl,
+                        fileName = fileName,
+                        fileSize = 0L,
+                        autoOpen = true
+                    )
+                    
+                    Toast.makeText(context, "开始下载视频：$fileName", Toast.LENGTH_SHORT).show()
+                }
+            },
+        color = textColor.copy(alpha = 0.1f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 视频图标
+            Box(
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(textColor.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "视频",
+                    tint = textColor,
+                    modifier = Modifier.size(36.dp)
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            // 视频信息
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "视频消息",
+                    color = textColor,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = when (downloadState) {
+                        DownloadState.NotStarted -> "点击下载，使用外部播放器播放"
+                        DownloadState.Downloading -> "正在下载..."
+                        DownloadState.Completed -> "已下载"
+                    },
+                    color = textColor.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            
+            // 下载图标
+            Icon(
+                imageVector = when (downloadState) {
+                    DownloadState.NotStarted -> Icons.Default.PlayArrow
+                    DownloadState.Downloading -> Icons.Default.Add // 用作loading的临时替代
+                    DownloadState.Completed -> Icons.Default.Check
+                },
+                contentDescription = when (downloadState) {
+                    DownloadState.NotStarted -> "下载"
+                    DownloadState.Downloading -> "下载中"
+                    DownloadState.Completed -> "完成"
+                },
+                tint = textColor.copy(alpha = 0.7f),
+                modifier = Modifier.size(24.dp)
+            )
+        }
+    }
+}
+
+/**
+ * 下载状态
+ */
+private enum class DownloadState {
+    NotStarted,
+    Downloading,
+    Completed
+}
+
+/**
  * 语音消息视图
  */
 @Composable
@@ -1129,6 +1297,166 @@ private fun AudioMessageView(
                 color = textColor,
                 style = MaterialTheme.typography.bodySmall
             )
+        }
+    }
+}
+
+/**
+ * 消息按钮组件
+ */
+@Composable
+private fun MessageButtons(
+    buttonsJson: String,
+    message: ChatMessage,
+    textColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val viewModel: ChatViewModel = viewModel()
+    
+    // 在Composable外部解析JSON
+    val buttonData = remember(buttonsJson) {
+        try {
+            val buttonRows = JSONArray(buttonsJson)
+            val rows = mutableListOf<List<ButtonData>>()
+            
+            for (i in 0 until buttonRows.length()) {
+                val buttonRow = buttonRows.getJSONArray(i)
+                val buttons = mutableListOf<ButtonData>()
+                
+                for (j in 0 until buttonRow.length()) {
+                    val button = buttonRow.getJSONObject(j)
+                    buttons.add(
+                        ButtonData(
+                            text = button.optString("text", "按钮"),
+                            actionType = button.optInt("actionType", 0),
+                            url = button.optString("url", ""),
+                            value = button.optString("value", "")
+                        )
+                    )
+                }
+                rows.add(buttons)
+            }
+            rows
+        } catch (e: Exception) {
+            android.util.Log.e("MessageButtons", "Failed to parse buttons JSON", e)
+            emptyList()
+        }
+    }
+    
+    if (buttonData.isNotEmpty()) {
+        Column(modifier = modifier) {
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // 遍历每一行按钮
+            buttonData.forEach { buttonRow ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // 遍历每一行的按钮
+                    buttonRow.forEach { btnData ->
+                        Button(
+                            onClick = {
+                                handleButtonClick(
+                                    context = context,
+                                    viewModel = viewModel,
+                                    message = message,
+                                    actionType = btnData.actionType,
+                                    url = btnData.url,
+                                    value = btnData.value,
+                                    buttonText = btnData.text
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = textColor.copy(alpha = 0.15f),
+                                contentColor = textColor
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = btnData.text,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 按钮数据类
+ */
+private data class ButtonData(
+    val text: String,
+    val actionType: Int,
+    val url: String,
+    val value: String
+)
+
+/**
+ * 处理按钮点击事件
+ */
+private fun handleButtonClick(
+    context: Context,
+    viewModel: ChatViewModel,
+    message: ChatMessage,
+    actionType: Int,
+    url: String,
+    value: String,
+    buttonText: String
+) {
+    when (actionType) {
+        1 -> {
+            // 打开URL
+            if (url.isNotBlank()) {
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    Toast.makeText(context, "无法打开链接", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        2 -> {
+            // 复制文本
+            if (value.isNotBlank()) {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val clip = android.content.ClipData.newPlainText("button_value", value)
+                clipboard.setPrimaryClip(clip)
+                Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+            }
+        }
+        3 -> {
+            // 按钮事件上报（button_report）
+            val chatId = message.chatId ?: ""
+            val chatType = message.chatType ?: 1
+            
+            viewModel.reportButtonClick(
+                chatId = chatId,
+                chatType = chatType,
+                msgId = message.msgId,
+                buttonValue = value
+            )
+            
+            val chatTypeText = when (chatType) {
+                1 -> "私聊"
+                2 -> "群聊"
+                3 -> "机器人"
+                else -> "未知"
+            }
+            android.util.Log.d("ButtonClick", "点击按钮: 类型=$chatTypeText, chatId=$chatId, 按钮值=$value")
+            Toast.makeText(context, "已点击：$buttonText", Toast.LENGTH_SHORT).show()
+        }
+        else -> {
+            Toast.makeText(context, "未知按钮类型", Toast.LENGTH_SHORT).show()
         }
     }
 }

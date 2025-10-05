@@ -8,8 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -23,6 +22,7 @@ import com.yhchat.canary.data.repository.NavigationRepository
 import com.yhchat.canary.data.model.NavigationItem
 import com.yhchat.canary.data.model.NavigationConfig
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
+import kotlin.system.exitProcess
 
 /**
  * 导航栏设置Activity
@@ -70,8 +70,19 @@ fun NavigationSettingsScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val navigationConfig by navigationRepository.navigationConfig.collectAsStateWithLifecycle()
-    val allAvailableItems = NavigationConfig.getAllAvailableItems()
+    
+    // 使用State管理可编辑的列表
+    var items by remember { mutableStateOf(navigationConfig.items.sortedBy { it.order }) }
+    var hasChanges by remember { mutableStateOf(false) }
+    var showRestartDialog by remember { mutableStateOf(false) }
+    
+    // 当配置更新时同步items
+    LaunchedEffect(navigationConfig) {
+        items = navigationConfig.items.sortedBy { it.order }
+        hasChanges = false
+    }
     
     Column(
         modifier = modifier.fillMaxSize()
@@ -123,16 +134,50 @@ fun NavigationSettingsScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "• 开启/关闭导航项的显示\n• 未来版本将支持拖拽排序功能\n• 需要重新启动应用才能更新底部导航栏",
+                    text = "• 点击开关显示/隐藏导航项\n• 使用上下箭头调整显示顺序\n• 修改后需要重启应用才能生效",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-
-
-
-
-
+        }
+        
+        // 应用更改按钮
+        if (hasChanges) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "有未保存的更改",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Button(
+                        onClick = {
+                            // 保存更改
+                            navigationRepository.updateItemsOrder(items)
+                            showRestartDialog = true
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text("应用并重启")
+                    }
+                }
+            }
         }
         
         // 导航项列表
@@ -141,15 +186,36 @@ fun NavigationSettingsScreen(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
         ) {
-            items(allAvailableItems, key = { it.id }) { availableItem ->
-                val currentItem = navigationConfig.items.find { it.id == availableItem.id }
-                    ?: availableItem
-                
+            itemsIndexed(items, key = { _, item -> item.id }) { index, item ->
                 NavigationItemCard(
-                    item = currentItem,
-                    isDragging = false,
+                    item = item,
+                    index = index,
+                    totalItems = items.size,
                     onVisibilityChange = { isVisible ->
-                        navigationRepository.updateItemVisibility(currentItem.id, isVisible)
+                        items = items.map {
+                            if (it.id == item.id) it.copy(isVisible = isVisible) else it
+                        }
+                        hasChanges = true
+                    },
+                    onMoveUp = {
+                        if (index > 0) {
+                            items = items.toMutableList().apply {
+                                val temp = this[index]
+                                this[index] = this[index - 1]
+                                this[index - 1] = temp
+                            }
+                            hasChanges = true
+                        }
+                    },
+                    onMoveDown = {
+                        if (index < items.size - 1) {
+                            items = items.toMutableList().apply {
+                                val temp = this[index]
+                                this[index] = this[index + 1]
+                                this[index + 1] = temp
+                            }
+                            hasChanges = true
+                        }
                     }
                 )
             }
@@ -158,6 +224,36 @@ fun NavigationSettingsScreen(
             item {
                 Spacer(modifier = Modifier.height(16.dp))
             }
+        }
+        
+        // 重启确认对话框
+        if (showRestartDialog) {
+            AlertDialog(
+                onDismissRequest = { showRestartDialog = false },
+                title = { Text("重启应用") },
+                text = { Text("更改已保存。应用需要重启才能生效，是否立即重启？") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            // 重启应用
+                            val intent = context.packageManager
+                                .getLaunchIntentForPackage(context.packageName)
+                            intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(intent)
+                            (context as? ComponentActivity)?.finish()
+                            exitProcess(0)
+                        }
+                    ) {
+                        Text("立即重启")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showRestartDialog = false }) {
+                        Text("稍后")
+                    }
+                }
+            )
         }
     }
 }
@@ -168,8 +264,11 @@ fun NavigationSettingsScreen(
 @Composable
 private fun NavigationItemCard(
     item: NavigationItem,
-    isDragging: Boolean,
+    index: Int,
+    totalItems: Int,
     onVisibilityChange: (Boolean) -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -181,14 +280,14 @@ private fun NavigationItemCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // 导航项图标
             Icon(
                 imageVector = item.getIcon(),
                 contentDescription = item.title,
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(25.dp),
                 tint = MaterialTheme.colorScheme.primary
             )
             
@@ -200,21 +299,62 @@ private fun NavigationItemCard(
             ) {
                 Text(
                     text = item.title,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "ID: ${item.id}",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = "位置: 第 ${index + 1} 个",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             
+            // 上下移动按钮
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                IconButton(
+                    onClick = onMoveUp,
+                    enabled = index > 0
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowUp,
+                        contentDescription = "上移",
+                        tint = if (index > 0) MaterialTheme.colorScheme.primary 
+                               else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                    )
+                }
+                IconButton(
+                    onClick = onMoveDown,
+                    enabled = index < totalItems - 1
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "下移",
+                        tint = if (index < totalItems - 1) MaterialTheme.colorScheme.primary 
+                               else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
             // 可见性开关
-            Switch(
-                checked = item.isVisible,
-                onCheckedChange = onVisibilityChange
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = if (item.isVisible) "显示" else "隐藏",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Switch(
+                    checked = item.isVisible,
+                    onCheckedChange = onVisibilityChange
+                )
+            }
         }
     }
 }

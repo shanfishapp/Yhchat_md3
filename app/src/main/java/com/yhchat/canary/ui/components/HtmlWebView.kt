@@ -1,5 +1,6 @@
 package com.yhchat.canary.ui.components
 
+import android.os.Build
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.net.Uri
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
@@ -112,6 +114,10 @@ fun HtmlWebView(
         modifier = modifier.fillMaxWidth(),
         factory = { ctx: android.content.Context ->
             WebView(ctx).apply {
+                // 使用软件渲染层以避免GPU硬件加速导致的崩溃
+                // 这会稍微降低性能，但能显著提高稳定性
+                setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
+                
                 webViewClient = object : WebViewClient() {
                     override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
                         url?.let {
@@ -122,15 +128,35 @@ fun HtmlWebView(
                         }
                         return false
                     }
+                    
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        super.onPageFinished(view, url)
+                        // 页面加载完成，可以进行一些清理
+                    }
                 }
                 settings.apply {
-                    javaScriptEnabled = true // HTML消息可能需要JS
+                    javaScriptEnabled = true // 保留JS功能
                     domStorageEnabled = true
                     allowFileAccess = false
                     allowContentAccess = false
                     setSupportZoom(true)
                     builtInZoomControls = false
                     displayZoomControls = false
+                    
+                    // 性能优化设置
+                    cacheMode = android.webkit.WebSettings.LOAD_NO_CACHE
+                    loadsImagesAutomatically = true
+                    blockNetworkImage = false
+                    
+                    // 减少内存占用
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                        mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                    }
+                    
+                    // 禁用预加载以减少内存占用
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        offscreenPreRaster = false
+                    }
                 }
                 setBackgroundColor(backgroundColor)
             }
@@ -161,4 +187,11 @@ fun HtmlWebView(
             }
         }
     )
+    
+    // 使用DisposableEffect管理WebView生命周期
+    DisposableEffect(htmlContent) {
+        onDispose {
+            // WebView会由AndroidView自动管理销毁
+        }
+    }
 }

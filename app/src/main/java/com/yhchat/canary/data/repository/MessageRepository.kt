@@ -61,7 +61,7 @@ class MessageRepository @Inject constructor(
                     
                     if (messageResponse.status.code == 1) {
                         val messages = messageResponse.msgList.map { protoMsg ->
-                            convertProtoToMessage(protoMsg)
+                            convertProtoToMessage(protoMsg, chatId, chatType)
                         }
                         Log.d(tag, "Successfully got ${messages.size} messages")
                         Result.success(messages)
@@ -113,10 +113,10 @@ class MessageRepository @Inject constructor(
                 response.body()?.let { responseBody ->
                     val bytes = responseBody.bytes()
                     val messageResponse = list_message_by_seq.parseFrom(bytes)
-                    
+
                     if (messageResponse.status.code == 1) {
                         val messages = messageResponse.msgList.map { protoMsg ->
-                            convertProtoToMessage(protoMsg)
+                            convertProtoToMessage(protoMsg, chatId, chatType)
                         }
                         Log.d(tag, "Successfully got ${messages.size} messages by seq")
                         Result.success(messages)
@@ -203,7 +203,7 @@ class MessageRepository @Inject constructor(
     /**
      * 将Proto消息转换为应用内消息模型
      */
-    private fun convertProtoToMessage(protoMsg: Msg): ChatMessage {
+    private fun convertProtoToMessage(protoMsg: Msg, chatId: String, chatType: Int): ChatMessage {
         val sender = MessageSender(
             chatId = protoMsg.sender.chatId,
             chatType = protoMsg.sender.chatType,
@@ -264,7 +264,9 @@ class MessageRepository @Inject constructor(
             msgDeleteTime = if (protoMsg.msgDeleteTime > 0) protoMsg.msgDeleteTime else null,
             quoteMsgId = if (protoMsg.quoteMsgId.isNotEmpty()) protoMsg.quoteMsgId else null,
             msgSeq = protoMsg.msgSeq,
-            editTime = if (protoMsg.editTime > 0) protoMsg.editTime else null
+            editTime = if (protoMsg.editTime > 0) protoMsg.editTime else null,
+            chatId = chatId,  // 设置会话ID
+            chatType = chatType  // 设置会话类型
         )
     }
     
@@ -329,6 +331,68 @@ class MessageRepository @Inject constructor(
         } catch (e: Exception) {
             Log.e(tag, "Error getting last message for chat: $chatId", e)
             null
+        }
+    }
+    
+    /**
+     * 上报按钮点击事件
+     */
+    suspend fun reportButtonClick(
+        chatId: String,
+        chatType: Int,
+        msgId: String,
+        userId: String,
+        buttonValue: String
+    ): Result<Unit> {
+        return try {
+            val tokenFlow = tokenRepository.getToken()
+            val token = tokenFlow.first()?.token
+            if (token.isNullOrEmpty()) {
+                Log.e(tag, "Token is null or empty")
+                return Result.failure(Exception("用户未登录"))
+            }
+
+            // 构建protobuf请求
+            val request = button_report_send.newBuilder()
+                .setMsgId(msgId)
+                .setChatType(chatType.toLong())
+                .setChatId(chatId)
+                .setUserId(userId)
+                .setButtonValue(buttonValue)
+                .build()
+            
+            val requestBody = request.toByteArray().toRequestBody("application/x-protobuf".toMediaType())
+
+            val chatTypeText = when (chatType) {
+                1 -> "私聊用户"
+                2 -> "群聊"
+                3 -> "机器人"
+                else -> "未知类型($chatType)"
+            }
+            Log.d(tag, "Reporting button click: chatType=$chatTypeText, chatId=$chatId, msgId=$msgId, value=$buttonValue")
+            
+            val response = apiService.buttonReport(token, requestBody)
+            
+            if (response.isSuccessful) {
+                response.body()?.let { responseBody ->
+                    val bytes = responseBody.bytes()
+                    val buttonResponse = recall_msg.parseFrom(bytes) // 使用 recall_msg 解析（只有status）
+                    
+                    if (buttonResponse.status.code == 1) {
+                        Log.d(tag, "Button click reported successfully")
+                        Result.success(Unit)
+                    } else {
+                        Log.e(tag, "API error: ${buttonResponse.status.msg}")
+                        Result.failure(Exception(buttonResponse.status.msg))
+                    }
+                } ?: Result.failure(Exception("响应体为空"))
+            } else {
+                Log.e(tag, "HTTP error: ${response.code()}")
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error reporting button click", e)
+            Result.failure(e)
         }
     }
 }

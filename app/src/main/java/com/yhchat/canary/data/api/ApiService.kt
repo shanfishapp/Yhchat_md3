@@ -130,8 +130,8 @@ interface ApiService {
     @POST("v1/msg/button-report")
     suspend fun buttonReport(
         @Header("token") token: String,
-        @Body request: ButtonReportRequest
-    ): Response<ApiStatus>
+        @Body request: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
     
     @POST("v1/msg/list-message-edit-record")
     suspend fun listMessageEditRecord(
@@ -284,7 +284,6 @@ interface ApiService {
         @Body request: ChangeInviteCodeRequest
     ): Response<Map<String, Any>>
 
-    // ========== 好友相关API ==========
 
     /**
      * 添加好友/加入群聊
