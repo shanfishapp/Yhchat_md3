@@ -128,6 +128,13 @@
             android:exported="false"
             android:label="用户资料"
             android:theme="@style/Theme.YhchatCanary" />
+        
+        <!-- 表情包详情 -->
+        <activity
+            android:name=".ui.sticker.StickerPackDetailActivity"
+            android:exported="false"
+            android:label="表情包详情"
+            android:theme="@style/Theme.YhchatCanary" />
             
         <!-- 群聊列表 Activity -->
         <activity

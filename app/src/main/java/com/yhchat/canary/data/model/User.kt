@@ -956,3 +956,63 @@ data class GroupMemberInfo(
     val isGag: Boolean
 )
 
+/**
+ * 添加个人表情收藏请求
+ */
+data class AddExpressionRequest(
+    @SerializedName("id")
+    val id: String
+)
+
+/**
+ * 表情包详情请求
+ */
+data class StickerPackDetailRequest(
+    @SerializedName("id")
+    val id: String
+)
+
+/**
+ * 添加表情包请求
+ */
+data class AddStickerPackRequest(
+    @SerializedName("id")
+    val id: String
+)
+
+/**
+ * 表情包详情信息
+ */
+data class StickerPackDetail(
+    val id: Int,
+    val name: String,
+    val createBy: String,
+    val createTime: Long,
+    val userCount: Int,
+    val uuid: String,
+    val updateTime: Long,
+    val stickerItems: List<StickerItem>,
+    val creator: StickerPackCreator
+)
+
+/**
+ * 表情包中的表情项
+ */
+data class StickerItem(
+    val id: Int,
+    val name: String,
+    val url: String,
+    val stickerPackId: Int,
+    val createBy: String,
+    val createTime: Long
+)
+
+/**
+ * 表情包创建者信息
+ */
+data class StickerPackCreator(
+    val userId: String,
+    val nickname: String,
+    val avatarUrl: String
+)
+

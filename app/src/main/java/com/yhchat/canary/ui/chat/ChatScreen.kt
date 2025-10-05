@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material3.*
 import androidx.compose.material.ExperimentalMaterialApi
@@ -644,7 +645,21 @@ private fun MessageItem(
                 // TODO: 实现撤回功能
                 Toast.makeText(context, "撤回功能开发中", Toast.LENGTH_SHORT).show()
                 showContextMenu = false
-            }
+            },
+            onAddExpression = if (message.contentType == 7) {
+                {
+                    // 添加表情到个人收藏
+                    val viewModel: ChatViewModel = viewModel()
+                    val expressionId = message.content.expressionId
+                    if (!expressionId.isNullOrEmpty()) {
+                        viewModel.addExpressionToFavorites(expressionId)
+                        Toast.makeText(context, "正在添加表情...", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "无法获取表情ID", Toast.LENGTH_SHORT).show()
+                    }
+                    showContextMenu = false
+                }
+            } else null
         )
     }
 }
@@ -658,7 +673,8 @@ private fun MessageContextMenu(
     onDismiss: () -> Unit,
     onCopyAll: () -> Unit,
     onQuote: () -> Unit,
-    onRecall: () -> Unit
+    onRecall: () -> Unit,
+    onAddExpression: (() -> Unit)? = null
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -710,6 +726,28 @@ private fun MessageContextMenu(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text("引用")
+                    }
+                }
+                
+                // 添加表情（仅对消息类型7显示）
+                if (onAddExpression != null && message.contentType == 7) {
+                    TextButton(
+                        onClick = onAddExpression,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Start,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AddCircle,
+                                contentDescription = "添加表情",
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("添加表情")
+                        }
                     }
                 }
                 
@@ -951,21 +989,32 @@ private fun MessageContentView(
             }
             7 -> {
                 // 表情消息 (包括表情包和个人收藏表情)
-                // 根据示例，contentType: 7 统一处理表情消息，直接使用 imageUrl
+                val context = LocalContext.current
+                val stickerPackId = content.stickerPackId
+                
                 content.imageUrl?.let { imageUrl ->
                     AsyncImage(
                         model = ImageUtils.createStickerImageRequest(
-                            context = LocalContext.current,
+                            context = context,
                             url = imageUrl
                         ),
                         contentDescription = when {
                             content.expressionId != null && content.expressionId != "0" -> "个人收藏表情"
-                            content.stickerPackId != null -> "表情包"
+                            stickerPackId != null -> "表情包"
                             else -> "表情"
                         },
                         modifier = Modifier
                             .size(120.dp)
-                            .clip(RoundedCornerShape(8.dp)),
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                // 如果是表情包，点击跳转到详情页面
+                                if (!stickerPackId.isNullOrEmpty() && stickerPackId != "0") {
+                                    com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
+                                        context,
+                                        stickerPackId
+                                    )
+                                }
+                            },
                         contentScale = ContentScale.Fit
                     )
                 } ?: run {
@@ -979,13 +1028,22 @@ private fun MessageContentView(
                         
                         AsyncImage(
                             model = ImageUtils.createStickerImageRequest(
-                                context = LocalContext.current,
+                                context = context,
                                 url = fullUrl
                             ),
                             contentDescription = "表情",
                             modifier = Modifier
                                 .size(120.dp)
-                                .clip(RoundedCornerShape(8.dp)),
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    // 如果是表情包，点击跳转到详情页面
+                                    if (!stickerPackId.isNullOrEmpty() && stickerPackId != "0") {
+                                        com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
+                                            context,
+                                            stickerPackId
+                                        )
+                                    }
+                                },
                             contentScale = ContentScale.Fit
                         )
                     }

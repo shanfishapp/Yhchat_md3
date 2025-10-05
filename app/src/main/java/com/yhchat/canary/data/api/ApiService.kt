@@ -294,6 +294,37 @@ interface ApiService {
         @Body request: AddFriendRequest
     ): Response<ApiStatus>
     
+    // ========== 表情相关API ==========
+    
+    /**
+     * 添加个人表情收藏
+     */
+    @POST("v1/expression/add")
+    suspend fun addExpression(
+        @Header("token") token: String,
+        @Body request: AddExpressionRequest
+    ): Response<ApiStatus>
+    
+    // ========== 表情包相关API ==========
+    
+    /**
+     * 获取表情包详情
+     */
+    @POST("v1/sticker/detail")
+    suspend fun getStickerPackDetail(
+        @Header("token") token: String,
+        @Body request: StickerPackDetailRequest
+    ): Response<Map<String, Any>>
+    
+    /**
+     * 添加表情包到收藏
+     */
+    @POST("v1/sticker/add")
+    suspend fun addStickerPack(
+        @Header("token") token: String,
+        @Body request: AddStickerPackRequest
+    ): Response<ApiStatus>
+    
 }
 
 /**

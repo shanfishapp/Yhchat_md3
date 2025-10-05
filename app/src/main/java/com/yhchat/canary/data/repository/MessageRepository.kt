@@ -399,6 +399,44 @@ class MessageRepository @Inject constructor(
     /**
      * 获取消息编辑历史记录
      */
+    /**
+     * 添加表情到个人收藏
+     */
+    suspend fun addExpressionToFavorites(expressionId: String): Result<Unit> {
+        return try {
+            val tokenFlow = tokenRepository.getToken()
+            val token = tokenFlow.first()?.token
+            if (token.isNullOrEmpty()) {
+                Log.e(tag, "Token is null or empty")
+                return Result.failure(Exception("用户未登录"))
+            }
+            
+            val request = AddExpressionRequest(id = expressionId)
+            
+            Log.d(tag, "Adding expression to favorites: $expressionId")
+            
+            val response = apiService.addExpression(token, request)
+            
+            if (response.isSuccessful) {
+                response.body()?.let { body ->
+                    if (body.code == 1) {
+                        Log.d(tag, "Successfully added expression: $expressionId")
+                        Result.success(Unit)
+                    } else {
+                        Log.e(tag, "Failed to add expression: ${body.msg}")
+                        Result.failure(Exception(body.msg))
+                    }
+                } ?: Result.failure(Exception("响应体为空"))
+            } else {
+                Log.e(tag, "Failed to add expression: ${response.message()}")
+                Result.failure(Exception("添加表情失败: ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error adding expression", e)
+            Result.failure(e)
+        }
+    }
+    
     suspend fun getMessageEditHistory(msgId: String, size: Int = 10, page: Int = 1): Result<List<MessageEditRecord>> {
         return try {
             val tokenFlow = tokenRepository.getToken()

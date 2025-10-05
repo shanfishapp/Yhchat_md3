@@ -143,6 +143,29 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
+     * 添加表情到个人收藏
+     */
+    fun addExpressionToFavorites(expressionId: String) {
+        viewModelScope.launch {
+            try {
+                val result = messageRepository.addExpressionToFavorites(expressionId)
+                result.fold(
+                    onSuccess = {
+                        Log.d(tag, "添加表情成功: $expressionId")
+                    },
+                    onFailure = { error ->
+                        Log.e(tag, "添加表情失败: ${error.message}")
+                        _uiState.value = _uiState.value.copy(error = "添加表情失败: ${error.message}")
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(tag, "添加表情异常", e)
+                _uiState.value = _uiState.value.copy(error = "添加表情异常: ${e.message}")
+            }
+        }
+    }
+    
+    /**
      * 处理编辑的消息
      */
     private fun handleEditedMessage(message: ChatMessage) {
