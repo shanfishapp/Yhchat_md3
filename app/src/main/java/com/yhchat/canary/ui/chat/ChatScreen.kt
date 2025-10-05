@@ -1216,7 +1216,6 @@ private fun EditHistoryDialog(
     onDismiss: () -> Unit
 ) {
     val viewModel: ChatViewModel = viewModel()
-    val coroutineScope = rememberCoroutineScope()
     var editRecords by remember { mutableStateOf<List<com.yhchat.canary.data.model.MessageEditRecord>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -1300,6 +1299,13 @@ private fun EditHistoryDialog(
  */
 @Composable
 private fun EditRecordItem(record: com.yhchat.canary.data.model.MessageEditRecord) {
+    val parsedText = remember(record) {
+        runCatching {
+            val json = org.json.JSONObject(record.contentOld)
+            json.optString("text").takeIf { it.isNotEmpty() }
+        }.getOrNull()
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -1318,19 +1324,10 @@ private fun EditRecordItem(record: com.yhchat.canary.data.model.MessageEditRecor
             )
             
             // 旧内容
-            try {
-                val contentJson = org.json.JSONObject(record.contentOld)
-                val text = contentJson.optString("text", "")
-                if (text.isNotEmpty()) {
-                    Text(
-                        text = text,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            } catch (e: Exception) {
+            val displayText = parsedText ?: record.contentOld
+            if (displayText.isNotEmpty()) {
                 Text(
-                    text = record.contentOld,
+                    text = displayText,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
