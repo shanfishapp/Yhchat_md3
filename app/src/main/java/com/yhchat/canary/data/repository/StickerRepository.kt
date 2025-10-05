@@ -117,7 +117,7 @@ class StickerRepository @Inject constructor(
         stickerPackData: Map<*, *>,
         userData: Map<*, *>
     ): StickerPackDetail {
-        val stickerItemsList = stickerPackData["stickerItems"] as? List<*> ?: emptyList()
+        val stickerItemsList = stickerPackData["stickerItems"] as? List<Map<String, Any>> ?: emptyList()
         
         val stickerItems = stickerItemsList.mapNotNull { item ->
             val itemMap = item as? Map<*, *> ?: return@mapNotNull null
