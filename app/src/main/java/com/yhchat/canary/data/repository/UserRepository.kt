@@ -702,14 +702,14 @@ class UserRepository @Inject constructor(
         return try {
             val token = getToken() ?: return Result.failure(Exception("未登录"))
             val request = ShareInfoRequest(key = key, ts = ts)
-            val response = webApiService.getShareInfo(token, request)
+            val response = apiService.getShareInfo(token, request)
             
             if (response.isSuccessful) {
                 response.body()?.let { body ->
                     if (body.code == 1 && body.data?.share != null) {
                         Result.success(body.data.share)
                     } else {
-                        Result.failure(Exception(body.msg ?: "获取分享信息失败"))
+                        Result.failure(Exception(body.message ?: "获取分享信息失败"))
                     }
                 } ?: Result.failure(Exception("响应为空"))
             } else {

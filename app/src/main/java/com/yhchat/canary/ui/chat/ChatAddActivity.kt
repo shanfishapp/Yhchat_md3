@@ -186,15 +186,16 @@ fun ChatAddScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = when (chatAddInfo.type) {
-                            ChatAddType.USER -> "用户详情"
-                            ChatAddType.GROUP -> "群聊详情"
-                            ChatAddType.BOT -> "机器人详情"
-                        },
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
+                Text(
+                    text = when (chatAddInfo?.type) {
+                        ChatAddType.USER -> "用户详情"
+                        ChatAddType.GROUP -> "群聊详情"
+                        ChatAddType.BOT -> "机器人详情"
+                        null -> "详情"
+                    },
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
                     
                     IconButton(onClick = onDismiss) {
                         Icon(
@@ -245,9 +246,8 @@ fun ChatAddScreen(
                     
                     uiState.chatInfo != null -> {
                         // 详情内容
-                        val chatInfo = uiState.chatInfo!! // 解决委托属性智能转换问题
                         ChatDetailContent(
-                            chatInfo = chatInfo,
+                            chatInfo = uiState.chatInfo,
                             addState = uiState,
                             onAddClick = { viewModel.addChat() }
                         )
@@ -263,10 +263,11 @@ fun ChatAddScreen(
  */
 @Composable
 private fun ChatDetailContent(
-    chatInfo: ChatAddInfo,
+    chatInfo: ChatAddInfo?,
     addState: ChatAddUiState,
     onAddClick: () -> Unit
 ) {
+    if (chatInfo == null) return
     Column {
         // 头像和基本信息
         Row(

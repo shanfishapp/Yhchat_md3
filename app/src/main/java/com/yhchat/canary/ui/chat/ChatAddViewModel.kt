@@ -57,11 +57,11 @@ class ChatAddViewModel @Inject constructor(
                         val chatAddInfo = ChatAddInfo(
                             id = shareInfo.chatId,
                             type = chatAddType,
-                            displayName = shareInfo.chatName,
-                            avatarUrl = if (shareInfo.imageUrl.startsWith("http")) {
+                            displayName = shareInfo.chatName ?: "",
+                            avatarUrl = if (shareInfo.imageUrl?.startsWith("http") == true) {
                                 shareInfo.imageUrl
                             } else {
-                                "https://chat-img.jwznb.com/${shareInfo.imageUrl}"
+                                "https://chat-img.jwznb.com/${shareInfo.imageUrl ?: ""}"
                             },
                             description = ""
                         )
