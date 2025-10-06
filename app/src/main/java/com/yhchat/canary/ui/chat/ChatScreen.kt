@@ -523,6 +523,9 @@ private fun MessageItem(
         }
         
         Column(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .widthIn(max = 280.dp),
             horizontalAlignment = if (isMyMessage) Alignment.End else Alignment.Start
         ) {
             // 发送者姓名和标签
@@ -535,7 +538,9 @@ private fun MessageItem(
 
             // 消息气泡
             Surface(
-                modifier = Modifier.clip(
+                modifier = Modifier
+                    .wrapContentWidth()
+                    .clip(
                     RoundedCornerShape(
                         topStart = if (isMyMessage) 16.dp else 4.dp,
                         topEnd = if (isMyMessage) 4.dp else 16.dp,
@@ -810,13 +815,19 @@ private fun SenderNameAndTags(
     val hasMultipleTags = tags.size > 2
     
     Column(
-        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+        modifier = Modifier
+            .wrapContentWidth()
+            .padding(horizontal = 4.dp, vertical = 2.dp),
         horizontalAlignment = if (isMyMessage) Alignment.End else Alignment.Start
     ) {
         // 第一行：名称、机器人标签、前两个tag
         Row(
+            modifier = Modifier.wrapContentWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = if (isMyMessage) 
+                Arrangement.spacedBy(6.dp, Alignment.End) 
+            else 
+                Arrangement.spacedBy(6.dp, Alignment.Start)
         ) {
             Text(
                 text = message.sender.name,
@@ -878,8 +889,11 @@ private fun SenderNameAndTags(
         if (tagsExpanded && tags.size > 2) {
             Spacer(modifier = Modifier.height(4.dp))
             FlowRow(
-                modifier = Modifier,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.wrapContentWidth(),
+                horizontalArrangement = if (isMyMessage)
+                    Arrangement.spacedBy(6.dp, Alignment.End)
+                else
+                    Arrangement.spacedBy(6.dp, Alignment.Start),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 tags.drop(2).forEach { tag ->
