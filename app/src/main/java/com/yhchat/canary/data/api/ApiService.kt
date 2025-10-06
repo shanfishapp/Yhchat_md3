@@ -305,6 +305,19 @@ interface ApiService {
         @Body request: AddExpressionRequest
     ): Response<ApiStatus>
     
+    // 分享链接相关API
+    @POST("v1/share/info")
+    suspend fun getShareInfo(
+        @Header("token") token: String,
+        @Body request: ShareInfoRequest
+    ): Response<ShareInfoResponse>
+    
+    @POST("v1/friend/apply")
+    suspend fun applyFriend(
+        @Header("token") token: String,
+        @Body request: FriendApplyRequest
+    ): Response<ApiStatus>
+    
     // ========== 表情包相关API ==========
     
     /**

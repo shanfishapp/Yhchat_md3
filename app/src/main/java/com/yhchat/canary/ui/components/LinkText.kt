@@ -11,7 +11,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import com.yhchat.canary.ui.webview.WebViewActivity
-import com.yhchat.canary.utils.ChatAddLinkHandler
+import com.yhchat.canary.utils.UnifiedLinkHandler
 import java.util.regex.Pattern
 
 /**
@@ -74,9 +74,10 @@ fun LinkText(
                 annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
                 .firstOrNull()?.let { annotation ->
                     val url = annotation.item
-                    if (url.startsWith("yunhu://")) {
-                        // 处理yunhu协议链接
-                        ChatAddLinkHandler.handleLink(context, url)
+                    if (UnifiedLinkHandler.isHandleableLink(url)) {
+                        // 处理 yunhu:// 和 yhfx 分享链接
+                        UnifiedLinkHandler.handleLink(context, url)
+                        // 注：yhfx 分享链接需要异步处理，这里只能处理 yunhu://
                     } else {
                         // 启动 WebView Activity（HTTP链接）
                         WebViewActivity.start(context, url)

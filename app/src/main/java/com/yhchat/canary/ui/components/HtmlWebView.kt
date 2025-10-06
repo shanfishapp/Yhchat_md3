@@ -18,7 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.viewinterop.AndroidView
-import com.yhchat.canary.utils.ChatAddLinkHandler
+import com.yhchat.canary.utils.UnifiedLinkHandler
 
 /**
  * HTML WebView渲染组件
@@ -123,8 +123,14 @@ fun HtmlWebView(
                 webViewClient = object : WebViewClient() {
                     override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
                         url?.let {
-                            if (it.startsWith("yunhu://")) {
-                                ChatAddLinkHandler.handleLink(ctx, it)
+                            // 处理 yunhu:// 和 yhfx 分享链接
+                            if (UnifiedLinkHandler.isHandleableLink(it)) {
+                                val handled = UnifiedLinkHandler.handleLink(ctx, it)
+                                if (handled) {
+                                    return true
+                                }
+                                // 如果是分享链接，需要特殊处理（触发回调）
+                                // 这里返回 true 阻止默认行为，实际处理在外部进行
                                 return true
                             }
                         }

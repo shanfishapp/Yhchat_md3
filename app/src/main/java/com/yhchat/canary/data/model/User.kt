@@ -1016,3 +1016,73 @@ data class StickerPackCreator(
     val avatarUrl: String
 )
 
+// ========== 分享链接相关数据模型 ==========
+
+/**
+ * 分享链接信息请求
+ */
+data class ShareInfoRequest(
+    @SerializedName("key")
+    val key: String,
+    @SerializedName("ts")
+    val ts: String
+)
+
+/**
+ * 分享链接信息响应
+ */
+data class ShareInfoResponse(
+    @SerializedName("code")
+    val code: Int,
+    @SerializedName("data")
+    val data: ShareInfoData?,
+    @SerializedName("msg")
+    val message: String
+)
+
+/**
+ * 分享链接数据
+ */
+data class ShareInfoData(
+    @SerializedName("share")
+    val share: ShareInfo
+)
+
+/**
+ * 分享信息
+ */
+data class ShareInfo(
+    @SerializedName("id")
+    val id: Int,
+    @SerializedName("user_id")
+    val userId: String,
+    @SerializedName("chat_name")
+    val chatName: String,
+    @SerializedName("chat_type")
+    val chatType: Int,
+    @SerializedName("chat_id")
+    val chatId: String,
+    @SerializedName("key")
+    val key: String,
+    @SerializedName("create_by")
+    val createBy: String,
+    @SerializedName("create_time")
+    val createTime: Long,
+    @SerializedName("imageUrl")
+    val imageUrl: String?,
+    @SerializedName("imageName")
+    val imageName: String?
+)
+
+/**
+ * 添加好友/群聊/机器人请求
+ */
+data class FriendApplyRequest(
+    @SerializedName("chatId")
+    val chatId: String,
+    @SerializedName("chatType")
+    val chatType: Int,
+    @SerializedName("remark")
+    val remark: String
+)
+
