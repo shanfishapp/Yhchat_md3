@@ -65,7 +65,6 @@ import io.noties.markwon.core.MarkwonTheme
 import io.noties.markwon.AbstractMarkwonPlugin
 import io.noties.markwon.MarkwonConfiguration
 import io.noties.markwon.SoftBreakAddsNewLinePlugin
-import me.saket.bettermovementmethod.BetterLinkMovementMethod
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 
