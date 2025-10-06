@@ -1174,13 +1174,8 @@ private fun MessageContentView(
                             .size(120.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .clickable {
-                                // 如果是表情包，点击跳转到详情页面
-                                if (stickerPackId != null && stickerPackId != 0L) {
-                                    com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
-                                        context,
-                                        stickerPackId.toString()
-                                    )
-                                }
+                                // 点击打开图片预览
+                                onImageClick(imageUrl)
                             },
                         contentScale = ContentScale.Fit
                     )
@@ -1203,13 +1198,8 @@ private fun MessageContentView(
                                 .size(120.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable {
-                                    // 如果是表情包，点击跳转到详情页面
-                                    if (stickerPackId != null && stickerPackId != 0L) {
-                                        com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
-                                            context,
-                                            stickerPackId.toString()
-                                        )
-                                    }
+                                    // 点击打开图片预览
+                                    onImageClick(fullUrl)
                                 },
                             contentScale = ContentScale.Fit
                         )

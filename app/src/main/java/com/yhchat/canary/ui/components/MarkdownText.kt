@@ -22,6 +22,7 @@ import io.noties.markwon.ext.tables.TablePlugin
 import io.noties.markwon.html.HtmlPlugin
 import io.noties.markwon.image.coil.CoilImagesPlugin
 import io.noties.markwon.linkify.LinkifyPlugin
+import io.noties.markwon.SoftBreakAddsNewLinePlugin
 
 /**
  * 自定义链接点击处理
@@ -80,6 +81,7 @@ fun MarkdownText(
     
     val markwon = remember(context, isDarkTheme, textColorInt) {
         Markwon.builder(context)
+            .usePlugin(SoftBreakAddsNewLinePlugin.create())  // 支持软换行（单个回车换行）
             .usePlugin(HtmlPlugin.create())
             .usePlugin(CoilImagesPlugin.create(context))
             .usePlugin(LinkifyPlugin.create())

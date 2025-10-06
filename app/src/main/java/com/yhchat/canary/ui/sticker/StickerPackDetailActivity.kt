@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
+import com.yhchat.canary.ui.components.ImageViewer
 import dagger.hilt.android.AndroidEntryPoint
 import java.text.SimpleDateFormat
 import java.util.*
@@ -68,6 +69,10 @@ fun StickerPackDetailScreen(
 ) {
     val viewModel: StickerPackDetailViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
+    
+    // 图片预览状态
+    var showImageViewer by remember { mutableStateOf(false) }
+    var currentImageUrl by remember { mutableStateOf("") }
     
     LaunchedEffect(stickerPackId) {
         viewModel.loadStickerPackDetail(stickerPackId)
@@ -120,17 +125,33 @@ fun StickerPackDetailScreen(
                 }
                 uiState.stickerPack != null -> {
                     StickerPackDetailContent(
-                        stickerPack = uiState.stickerPack!!
+                        stickerPack = uiState.stickerPack!!,
+                        onImageClick = { imageUrl ->
+                            currentImageUrl = imageUrl
+                            showImageViewer = true
+                        }
                     )
                 }
             }
         }
     }
+    
+    // 图片预览器
+    if (showImageViewer && currentImageUrl.isNotEmpty()) {
+        ImageViewer(
+            imageUrl = currentImageUrl,
+            onDismiss = {
+                showImageViewer = false
+                currentImageUrl = ""
+            }
+        )
+    }
 }
 
 @Composable
 fun StickerPackDetailContent(
-    stickerPack: com.yhchat.canary.data.model.StickerPackDetail
+    stickerPack: com.yhchat.canary.data.model.StickerPackDetail,
+    onImageClick: (String) -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -248,7 +269,10 @@ fun StickerPackDetailContent(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(stickerPack.stickerItems) { sticker ->
-                StickerItemView(sticker = sticker)
+                StickerItemView(
+                    sticker = sticker,
+                    onImageClick = onImageClick
+                )
             }
         }
     }
@@ -256,13 +280,17 @@ fun StickerPackDetailContent(
 
 @Composable
 fun StickerItemView(
-    sticker: com.yhchat.canary.data.model.StickerItem
+    sticker: com.yhchat.canary.data.model.StickerItem,
+    onImageClick: (String) -> Unit = {}
 ) {
+    val imageUrl = "https://chat-img.jwznb.com/${sticker.url}"
+    
     Card(
         modifier = Modifier
             .aspectRatio(1f)
             .clickable {
-                // TODO: 可以添加预览或其他功能
+                // 点击打开图片预览
+                onImageClick(imageUrl)
             },
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
@@ -270,7 +298,7 @@ fun StickerItemView(
             modifier = Modifier.fillMaxSize()
         ) {
             AsyncImage(
-                model = "https://chat-img.jwznb.com/${sticker.url}",
+                model = imageUrl,
                 contentDescription = sticker.name,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop

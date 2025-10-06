@@ -79,17 +79,9 @@ class ChatViewModel @Inject constructor(
         // 开始监听WebSocket消息
         startListeningToWebSocketMessages()
         
-        // 检查是否有上次读取位置
-        val readPosition = readPositionStore.getReadPosition(chatId, chatType)
-        if (readPosition != null) {
-            // 从上次读取位置加载消息
-            Log.d(tag, "Found read position: msgId=${readPosition.first}, msgSeq=${readPosition.second}")
-            loadMessagesFromPosition(readPosition.first)
-        } else {
-            // 没有读取位置，加载最新消息
-            Log.d(tag, "No read position found, loading latest messages")
-            loadMessages()
-        }
+        // 始终加载最新消息（移除跳转到上次读取位置功能）
+        Log.d(tag, "Loading latest messages")
+        loadMessages()
     }
     
     /**
