@@ -694,4 +694,30 @@ class UserRepository @Inject constructor(
             Result.failure(e)
         }
     }
+    
+    /**
+     * 获取分享信息
+     */
+    suspend fun getShareInfo(key: String, ts: String): Result<ShareInfo> {
+        return try {
+            val token = getToken() ?: return Result.failure(Exception("未登录"))
+            val request = ShareInfoRequest(key = key, ts = ts)
+            val response = webApiService.getShareInfo(token, request)
+            
+            if (response.isSuccessful) {
+                response.body()?.let { body ->
+                    if (body.code == 1 && body.data?.share != null) {
+                        Result.success(body.data.share)
+                    } else {
+                        Result.failure(Exception(body.msg ?: "获取分享信息失败"))
+                    }
+                } ?: Result.failure(Exception("响应为空"))
+            } else {
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e("UserRepository", "获取分享信息异常", e)
+            Result.failure(e)
+        }
+    }
 }

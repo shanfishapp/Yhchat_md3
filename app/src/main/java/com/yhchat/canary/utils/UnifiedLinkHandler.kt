@@ -26,30 +26,27 @@ object UnifiedLinkHandler {
     
     /**
      * 处理链接（同步处理，用于 WebView）
-     * @return true 表示已处理，false 表示未处理
      */
-    fun handleLink(context: Context, url: String): Boolean {
-        return try {
+    fun handleLink(context: Context, url: String) {
+        try {
             Log.d(TAG, "Processing link: $url")
             
             when {
                 url.startsWith("yunhu://chat-add") -> {
                     handleChatAddLink(context, url)
-                    true
                 }
                 url.startsWith("yunhu://post-detail") -> {
                     handlePostDetailLink(context, url)
-                    true
                 }
                 url.startsWith("https://yhfx.jwznb.com/share") -> {
-                    // 分享链接需要异步处理，返回 false 让调用者处理
-                    false
+                    handleYhfxShareLink(context, url)
                 }
-                else -> false
+                else -> {
+                    Log.w(TAG, "Unknown link type: $url")
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to handle link: $url", e)
-            false
         }
     }
     
@@ -107,29 +104,27 @@ object UnifiedLinkHandler {
     }
     
     /**
-     * 解析 yhfx 分享链接
-     * @return Pair(key, ts) 或 null
+     * 处理 yhfx 分享链接
      */
-    fun parseYhfxShareLink(url: String): Pair<String, String>? {
-        return try {
-            if (!url.startsWith("https://yhfx.jwznb.com/share")) {
-                return null
-            }
-            
-            val uri = Uri.parse(url)
-            val key = uri.getQueryParameter("key")
-            val ts = uri.getQueryParameter("ts")
-            
-            if (key.isNullOrEmpty() || ts.isNullOrEmpty()) {
-                Log.w(TAG, "Invalid yhfx share link: $url")
-                return null
-            }
-            
-            Pair(key, ts)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to parse yhfx share link: $url", e)
-            null
+    private fun handleYhfxShareLink(context: Context, url: String) {
+        val uri = Uri.parse(url)
+        val key = uri.getQueryParameter("key")
+        val ts = uri.getQueryParameter("ts")
+        
+        if (key.isNullOrEmpty() || ts.isNullOrEmpty()) {
+            Log.w(TAG, "Invalid yhfx share link: $url")
+            android.widget.Toast.makeText(context, "分享链接格式错误", android.widget.Toast.LENGTH_SHORT).show()
+            return
         }
+        
+        Log.d(TAG, "Opening yhfx share: key=$key, ts=$ts")
+        // 直接打开 ChatAddActivity，传递 key 和 ts 参数
+        val intent = Intent(context, ChatAddActivity::class.java).apply {
+            putExtra("share_key", key)
+            putExtra("share_ts", ts)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
     }
 }
 

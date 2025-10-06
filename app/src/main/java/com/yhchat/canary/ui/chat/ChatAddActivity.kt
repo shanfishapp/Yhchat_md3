@@ -53,43 +53,79 @@ class ChatAddActivity : ComponentActivity() {
         enableEdgeToEdge()
         
         try {
-            val link = intent.getStringExtra(EXTRA_LINK) ?: intent.data?.toString()
+            // 检查是否为分享链接
+            val shareKey = intent.getStringExtra("share_key")
+            val shareTs = intent.getStringExtra("share_ts")
             
-            if (link == null) {
-                finish()
-                return
-            }
-            
-            if (!ChatAddLinkHandler.isChatAddLink(link)) {
-                finish()
-                return
-            }
-            
-            val chatAddInfo = ChatAddLinkHandler.parseChatAddLink(link)
-            if (chatAddInfo == null) {
-                finish()
-                return
-            }
-            
-            setContent {
-                YhchatCanaryTheme {
-                    Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.background
-                    ) {
-                        val viewModel: ChatAddViewModel = hiltViewModel()
-                        
-                        ChatAddScreen(
-                            chatAddInfo = chatAddInfo,
-                            viewModel = viewModel,
-                            onDismiss = { finish() }
-                        )
+            if (shareKey != null && shareTs != null) {
+                // 处理 yhfx 分享链接
+                setContent {
+                    YhchatCanaryTheme {
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.background
+                        ) {
+                            val viewModel: ChatAddViewModel = hiltViewModel()
+                            
+                            ChatAddScreen(
+                                shareKey = shareKey,
+                                shareTs = shareTs,
+                                viewModel = viewModel,
+                                onDismiss = { finish() }
+                            )
+                        }
                     }
                 }
+                return
             }
+            
+            // 处理 yunhu://chat-add 链接
+            val chatId = intent.getStringExtra("chat_id")
+            val chatType = intent.getIntExtra("chat_type", 0)
+            
+            if (chatId != null && chatType > 0) {
+                val chatAddType = when (chatType) {
+                    1 -> ChatAddType.USER
+                    2 -> ChatAddType.GROUP
+                    3 -> ChatAddType.BOT
+                    else -> null
+                }
+                
+                if (chatAddType != null) {
+                    val chatAddInfo = ChatAddInfo(
+                        id = chatId,
+                        type = chatAddType,
+                        displayName = "",
+                        avatarUrl = "",
+                        description = ""
+                    )
+                    
+                    setContent {
+                        YhchatCanaryTheme {
+                            Surface(
+                                modifier = Modifier.fillMaxSize(),
+                                color = MaterialTheme.colorScheme.background
+                            ) {
+                                val viewModel: ChatAddViewModel = hiltViewModel()
+                                
+                                ChatAddScreen(
+                                    chatAddInfo = chatAddInfo,
+                                    viewModel = viewModel,
+                                    onDismiss = { finish() }
+                                )
+                            }
+                        }
+                    }
+                    return
+                }
+            }
+            
+            // 如果都不匹配，关闭Activity
+            android.util.Log.w("ChatAddActivity", "无效的参数")
+            finish()
         } catch (e: Exception) {
             // 防止崩溃，记录错误日志
-            android.util.Log.e("ChatAddActivity", "Deep Link 解析失败", e)
+            android.util.Log.e("ChatAddActivity", "初始化失败", e)
             finish()
         }
     }
@@ -100,7 +136,9 @@ class ChatAddActivity : ComponentActivity() {
  */
 @Composable
 fun ChatAddScreen(
-    chatAddInfo: ChatAddInfo,
+    chatAddInfo: ChatAddInfo? = null,
+    shareKey: String? = null,
+    shareTs: String? = null,
     viewModel: ChatAddViewModel,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
@@ -108,8 +146,17 @@ fun ChatAddScreen(
     val uiState by viewModel.uiState.collectAsState()
     
     // 加载数据
-    LaunchedEffect(chatAddInfo) {
-        viewModel.loadChatInfo(chatAddInfo)
+    LaunchedEffect(chatAddInfo, shareKey, shareTs) {
+        when {
+            chatAddInfo != null -> {
+                // 直接加载聊天信息（yunhu://chat-add）
+                viewModel.loadChatInfo(chatAddInfo)
+            }
+            shareKey != null && shareTs != null -> {
+                // 先获取分享信息，再加载聊天信息（yhfx分享链接）
+                viewModel.loadShareInfo(shareKey, shareTs)
+            }
+        }
     }
     
     // 成功后自动关闭

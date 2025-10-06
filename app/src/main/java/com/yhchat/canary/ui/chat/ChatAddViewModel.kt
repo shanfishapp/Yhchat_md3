@@ -26,6 +26,68 @@ class ChatAddViewModel @Inject constructor(
     val uiState: StateFlow<ChatAddUiState> = _uiState.asStateFlow()
     
     /**
+     * 加载分享信息（yhfx分享链接）
+     */
+    fun loadShareInfo(key: String, ts: String) {
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = true,
+                    error = null
+                )
+                
+                Log.d("ChatAddViewModel", "开始加载分享信息: key=$key, ts=$ts")
+                
+                userRepository.getShareInfo(key, ts).fold(
+                    onSuccess = { shareInfo ->
+                        // 根据分享信息构建 ChatAddInfo
+                        val chatAddType = when (shareInfo.chatType) {
+                            1 -> ChatAddType.USER
+                            2 -> ChatAddType.GROUP
+                            3 -> ChatAddType.BOT
+                            else -> {
+                                _uiState.value = _uiState.value.copy(
+                                    isLoading = false,
+                                    error = "不支持的会话类型"
+                                )
+                                return@fold
+                            }
+                        }
+                        
+                        val chatAddInfo = ChatAddInfo(
+                            id = shareInfo.chatId,
+                            type = chatAddType,
+                            displayName = shareInfo.chatName,
+                            avatarUrl = if (shareInfo.imageUrl.startsWith("http")) {
+                                shareInfo.imageUrl
+                            } else {
+                                "https://chat-img.jwznb.com/${shareInfo.imageUrl}"
+                            },
+                            description = ""
+                        )
+                        
+                        // 继续加载详细信息
+                        loadChatInfo(chatAddInfo)
+                    },
+                    onFailure = { exception ->
+                        Log.e("ChatAddViewModel", "加载分享信息失败", exception)
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = exception.message ?: "加载分享信息失败"
+                        )
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e("ChatAddViewModel", "加载分享信息异常", e)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = e.message ?: "加载失败"
+                )
+            }
+        }
+    }
+    
+    /**
      * 加载聊天信息
      */
     fun loadChatInfo(chatAddInfo: ChatAddInfo) {

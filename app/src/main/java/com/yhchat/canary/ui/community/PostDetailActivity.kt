@@ -572,6 +572,24 @@ fun MarkdownContent(
                     .usePlugin(SoftBreakAddsNewLinePlugin.create())  // 支持软换行（单个回车换行）
                     .usePlugin(HtmlPlugin.create())
                     .usePlugin(CoilImagesPlugin.create(ctx))
+                    .usePlugin(object : AbstractMarkwonPlugin() {
+                        override fun configureConfiguration(builder: MarkwonConfiguration.Builder) {
+                            builder.linkResolver { view, link ->
+                                // 处理链接点击
+                                if (UnifiedLinkHandler.isHandleableLink(link)) {
+                                    UnifiedLinkHandler.handleLink(ctx, link)
+                                } else {
+                                    // 使用默认浏览器打开其他链接
+                                    try {
+                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(link))
+                                        ctx.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(ctx, "无法打开链接", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        }
+                    })
                     .usePlugin(LinkifyPlugin.create())
                     .usePlugin(StrikethroughPlugin.create())
                     .usePlugin(TablePlugin.create(ctx))
@@ -581,14 +599,9 @@ fun MarkdownContent(
                 setPadding(0, 0, 0, 0)
                 setTextColor(textColor)
                 
-                // 设置链接可点击，并自定义链接点击行为
+                // 设置链接可点击
                 movementMethod = LinkMovementMethod.getInstance()
                 linksClickable = true
-                
-                // 设置点击监听器来处理 yunhu:// 链接
-                setOnClickListener {
-                    // 这个方法会被 LinkMovementMethod 拦截，所以需要另一种方式
-                }
                 
                 markwon.setMarkdown(this, markdown)
             }
