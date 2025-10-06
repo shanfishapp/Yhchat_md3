@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -13,9 +14,9 @@ import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
-class GroupInfoActivity : ComponentActivity() {
+class GroupSettingsActivity : ComponentActivity() {
     
-    private val viewModel: GroupInfoViewModel by viewModels()
+    private val viewModel: GroupSettingsViewModel by viewModels()
     
     companion object {
         const val EXTRA_GROUP_ID = "groupId"
@@ -24,16 +25,17 @@ class GroupInfoActivity : ComponentActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         
         val groupId = intent.getStringExtra(EXTRA_GROUP_ID) ?: run {
-            android.util.Log.e("GroupInfoActivity", "Missing groupId in intent")
+            android.util.Log.e("GroupSettingsActivity", "Missing groupId in intent")
             finish()
             return
         }
         
-        val groupName = intent.getStringExtra(EXTRA_GROUP_NAME) ?: "群聊"
+        val groupName = intent.getStringExtra(EXTRA_GROUP_NAME) ?: "群聊设置"
         
-        android.util.Log.d("GroupInfoActivity", "Opening group info: id=$groupId, name=$groupName")
+        android.util.Log.d("GroupSettingsActivity", "Opening group settings: id=$groupId, name=$groupName")
         
         setContent {
             YhchatCanaryTheme {
@@ -41,26 +43,14 @@ class GroupInfoActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    GroupInfoScreenRoot(
+                    GroupSettingsScreenRoot(
                         groupId = groupId,
                         groupName = groupName,
                         viewModel = viewModel,
-                        onBackClick = { finish() },
-                        onSettingsClick = {
-                            val intent = Intent(this@GroupInfoActivity, GroupSettingsActivity::class.java).apply {
-                                putExtra(GroupSettingsActivity.EXTRA_GROUP_ID, groupId)
-                                putExtra(GroupSettingsActivity.EXTRA_GROUP_NAME, groupName)
-                            }
-                            startActivity(intent)
-                        },
-                        onShareClick = {
-                            // TODO: 实现分享功能
-                            android.widget.Toast.makeText(this, "分享功能待实现", android.widget.Toast.LENGTH_SHORT).show()
-                        }
+                        onBackClick = { finish() }
                     )
                 }
             }
         }
     }
 }
-

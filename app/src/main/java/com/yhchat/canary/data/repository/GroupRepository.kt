@@ -8,6 +8,8 @@ import com.yhchat.canary.proto.group.info
 import com.yhchat.canary.proto.group.info_send
 import com.yhchat.canary.proto.group.list_member
 import com.yhchat.canary.proto.group.list_member_send
+import com.yhchat.canary.proto.group.edit_group
+import com.yhchat.canary.proto.group.edit_group_send
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -217,6 +219,83 @@ class GroupRepository @Inject constructor() {
             Log.d(tag, "Group members loaded: ${members.size}")
             Result.success(members)
 
+        } catch (e: InvalidProtocolBufferException) {
+            Log.e(tag, "Protobuf parse error", e)
+            Result.failure(e)
+        } catch (e: IOException) {
+            Log.e(tag, "Network error", e)
+            Result.failure(e)
+        } catch (e: Exception) {
+            Log.e(tag, "Unknown error", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 编辑群聊信息
+     */
+    suspend fun editGroupInfo(
+        groupId: String,
+        name: String,
+        introduction: String,
+        avatarUrl: String,
+        directJoin: Boolean,
+        historyMsg: Boolean,
+        categoryName: String,
+        categoryId: Long,
+        isPrivate: Boolean
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        Log.d(tag, "✏️ Editing group info for: $groupId")
+        val token = tokenRepository?.getTokenSync()
+        if (token.isNullOrEmpty()) {
+            Log.e(tag, "❌ No token available")
+            return@withContext Result.failure(Exception("未登录"))
+        }
+
+        return@withContext try {
+            // 构建请求
+            val requestBuilder = edit_group_send.newBuilder()
+                .setGroupId(groupId)
+                .setName(name)
+                .setIntroduction(introduction)
+                .setAvatarUrl(avatarUrl)
+                .setDirectJoin(if (directJoin) 1 else 0)
+                .setHistoryMsg(if (historyMsg) 1 else 0)
+                .setCategoryName(categoryName)
+                .setCategoryId(categoryId)
+                .setPrivate(if (isPrivate) 1 else 0)
+
+            val requestData = requestBuilder.build()
+            val requestBody = requestData.toByteArray().toRequestBody("application/x-protobuf".toMediaTypeOrNull())
+
+            val request = Request.Builder()
+                .url("$baseUrl/v1/group/edit-group")
+                .addHeader("token", token)
+                .post(requestBody)
+                .build()
+
+            Log.d(tag, "📤 Sending edit group request...")
+            val response = client.newCall(request).execute()
+
+            if (response.isSuccessful) {
+                val responseData = response.body?.bytes()
+                if (responseData != null) {
+                    val editResponse = edit_group.parseFrom(responseData)
+                    if (editResponse.status.code == 1) {
+                        Log.d(tag, "✅ Group info edited successfully")
+                        Result.success(true)
+                    } else {
+                        Log.e(tag, "❌ Edit failed: ${editResponse.status.msg}")
+                        Result.failure(Exception(editResponse.status.msg))
+                    }
+                } else {
+                    Log.e(tag, "❌ Empty response body")
+                    Result.failure(Exception("响应为空"))
+                }
+            } else {
+                Log.e(tag, "❌ HTTP error: ${response.code}")
+                Result.failure(Exception("网络请求失败: ${response.code}"))
+            }
         } catch (e: InvalidProtocolBufferException) {
             Log.e(tag, "Protobuf parse error", e)
             Result.failure(e)
