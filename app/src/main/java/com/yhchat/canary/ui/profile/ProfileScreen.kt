@@ -247,7 +247,7 @@ private fun UserProfileContent(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .background(
-                                MaterialTheme.colorScheme.tertiaryContainer,
+                                MaterialTheme.colorScheme.primary,
                                 RoundedCornerShape(16.dp)
                             )
                             .padding(horizontal = 12.dp, vertical = 4.dp)
@@ -256,13 +256,13 @@ private fun UserProfileContent(
                             imageVector = Icons.Default.Star,
                             contentDescription = "VIP",
                             modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onTertiary
+                            tint = MaterialTheme.colorScheme.onprimary
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "VIP",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onTertiary,
+                            color = MaterialTheme.colorScheme.onprimary,
                             fontWeight = FontWeight.Bold
                         )
                     }

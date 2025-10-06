@@ -365,8 +365,14 @@ class ChatViewModel @Inject constructor(
      * @param text 消息文本
      * @param contentType 消息类型：1-文本，3-Markdown，8-HTML
      * @param quoteMsgId 引用消息ID
+     * @param quoteMsgText 引用消息文本
      */
-    fun sendMessage(text: String, contentType: Int = 1, quoteMsgId: String? = null) {
+    fun sendMessage(
+        text: String, 
+        contentType: Int = 1, 
+        quoteMsgId: String? = null,
+        quoteMsgText: String? = null
+    ) {
         if (text.isBlank() || currentChatId.isEmpty()) {
             Log.w(tag, "Cannot send empty message or chat not initialized")
             return
@@ -379,14 +385,15 @@ class ChatViewModel @Inject constructor(
                     8 -> "HTML"
                     else -> "文本"
                 }
-                Log.d(tag, "Sending $typeText message: $text")
+                Log.d(tag, "Sending $typeText message: $text${if (!quoteMsgId.isNullOrEmpty()) " (引用消息)" else ""}")
                 
                 val result = messageRepository.sendMessage(
                     chatId = currentChatId,
                     chatType = currentChatType,
                     text = text,
                     contentType = contentType,
-                    quoteMsgId = quoteMsgId
+                    quoteMsgId = quoteMsgId,
+                    quoteMsgText = quoteMsgText
                 )
 
                 result.fold(

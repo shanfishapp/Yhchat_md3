@@ -143,7 +143,8 @@ class MessageRepository @Inject constructor(
         chatType: Int,
         text: String,
         contentType: Int = 1, // 1-文本
-        quoteMsgId: String? = null
+        quoteMsgId: String? = null,
+        quoteMsgText: String? = null
     ): Result<Boolean> {
         return try {
             val tokenFlow = tokenRepository.getToken()
@@ -158,6 +159,11 @@ class MessageRepository @Inject constructor(
             // 构建protobuf请求
             val contentBuilder = send_message_send.Content.newBuilder()
                 .setText(text)
+            
+            // 添加引用消息文本
+            if (!quoteMsgText.isNullOrEmpty()) {
+                contentBuilder.setQuoteMsgText(quoteMsgText)
+            }
             
             val requestBuilder = send_message_send.newBuilder()
                 .setMsgId(msgId)

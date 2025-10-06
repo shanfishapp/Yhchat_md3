@@ -110,6 +110,10 @@ fun ChatScreen(
     var showScrollToBottomButton by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     
+    // 引用消息状态
+    var quotedMessageId by remember { mutableStateOf<String?>(null) }
+    var quotedMessageText by remember { mutableStateOf<String?>(null) }
+    
     // 初始化聊天
     LaunchedEffect(chatId, chatType, userId) {
         viewModel.initChat(chatId, chatType, userId)
@@ -366,11 +370,19 @@ fun ChatScreen(
                 onTextChange = { inputText = it },
                 onSendMessage = {
                     if (inputText.isNotBlank()) {
-                        // 根据选择的消息类型发送消息
-                        viewModel.sendMessage(inputText.trim(), selectedMessageType)
+                        // 根据选择的消息类型发送消息，带上引用信息
+                        viewModel.sendMessage(
+                            text = inputText.trim(),
+                            contentType = selectedMessageType,
+                            quoteMsgId = quotedMessageId,
+                            quoteMsgText = quotedMessageText
+                        )
                         inputText = ""
                         // 发送后重置为文本类型
                         selectedMessageType = 1
+                        // 清除引用状态
+                        quotedMessageId = null
+                        quotedMessageText = null
                         // 发送消息后自动滚动到最新消息
                         coroutineScope.launch {
                             listState.animateScrollToItem(0)
@@ -393,6 +405,11 @@ fun ChatScreen(
                 onMessageTypeChange = { newType ->
                     // 只能选择一个类型，点击已选中的类型则取消（回到文本）
                     selectedMessageType = if (selectedMessageType == newType) 1 else newType
+                },
+                quotedMessageText = quotedMessageText,
+                onClearQuote = {
+                    quotedMessageId = null
+                    quotedMessageText = null
                 },
                 modifier = Modifier.padding(
                     start = 16.dp,
@@ -639,8 +656,9 @@ private fun MessageItem(
                 showContextMenu = false
             },
             onQuote = {
-                // TODO: 实现引用功能
-                Toast.makeText(context, "引用功能开发中", Toast.LENGTH_SHORT).show()
+                // 设置引用消息
+                quotedMessageId = message.msgId
+                quotedMessageText = message.content.quoteMsgText ?: message.content.text ?: ""
                 showContextMenu = false
             },
             onRecall = {

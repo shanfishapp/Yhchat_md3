@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
@@ -25,7 +26,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.delay
@@ -46,7 +49,9 @@ fun ChatInputBar(
     onCameraClick: (() -> Unit)? = null,
     onDraftChange: ((String) -> Unit)? = null,
     selectedMessageType: Int = 1, // 1-文本, 3-Markdown, 8-HTML
-    onMessageTypeChange: ((Int) -> Unit)? = null
+    onMessageTypeChange: ((Int) -> Unit)? = null,
+    quotedMessageText: String? = null, // 引用的消息文本
+    onClearQuote: (() -> Unit)? = null // 清除引用
 ) {
     var showAttachMenu by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -59,6 +64,14 @@ fun ChatInputBar(
         color = MaterialTheme.colorScheme.surface
     ) {
         Column {
+            // 引用消息显示框
+            if (quotedMessageText != null) {
+                QuotedMessageBar(
+                    quotedText = quotedMessageText,
+                    onClearQuote = { onClearQuote?.invoke() }
+                )
+            }
+            
             // 主输入栏
             Row(
                 modifier = Modifier
@@ -332,6 +345,83 @@ private fun MessageTypeMenuItem(
                 else 
                     MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+/**
+ * 引用消息显示栏
+ */
+@Composable
+private fun QuotedMessageBar(
+    quotedText: String,
+    onClearQuote: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 左侧：引用线和文本
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 引用线
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .height(32.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primary,
+                            RoundedCornerShape(2.dp)
+                        )
+                )
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                // 引用文本
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "引用消息",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = quotedText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            
+            // 右侧：关闭按钮
+            IconButton(
+                onClick = onClearQuote,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "取消引用",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }
