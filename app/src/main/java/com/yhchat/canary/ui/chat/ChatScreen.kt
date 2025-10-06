@@ -522,33 +522,47 @@ private fun MessageItem(
                 Alignment.Start
             }
         ) {
-            // 发送者姓名（非自己的消息）
-            if (!isMyMessage) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = message.sender.name,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            // 发送者姓名和标签（所有消息都显示）
+            Row(
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = message.sender.name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-                    // 机器人标签
-                    if (message.sender.chatType == 3) {
-                        Surface(
-                            modifier = Modifier,
-                            shape = RoundedCornerShape(4.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer
-                        ) {
-                            Text(
-                                text = "机器人",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
+                // 机器人标签
+                if (message.sender.chatType == 3) {
+                    Surface(
+                        modifier = Modifier,
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            text = "机器人",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                
+                // 显示消息发送者的标签
+                message.sender.tag?.take(3)?.forEach { tag ->
+                    Surface(
+                        modifier = Modifier,
+                        shape = RoundedCornerShape(4.dp),
+                        color = parseTagColor(tag.color)
+                    ) {
+                        Text(
+                            text = tag.text,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
                     }
                 }
             }
@@ -1859,5 +1873,44 @@ private fun handleButtonClick(
         else -> {
             Toast.makeText(context, "未知按钮类型", Toast.LENGTH_SHORT).show()
         }
+    }
+}
+
+/**
+ * 解析标签颜色字符串为 Color 对象
+ * 支持格式：#RRGGBB 或 #AARRGGBB
+ */
+private fun parseTagColor(colorString: String): Color {
+    return try {
+        val cleanColor = colorString.trim()
+        if (cleanColor.startsWith("#")) {
+            val hex = cleanColor.substring(1)
+            when (hex.length) {
+                6 -> {
+                    // #RRGGBB
+                    val rgb = hex.toLong(16)
+                    Color(
+                        red = ((rgb shr 16) and 0xFF) / 255f,
+                        green = ((rgb shr 8) and 0xFF) / 255f,
+                        blue = (rgb and 0xFF) / 255f
+                    )
+                }
+                8 -> {
+                    // #AARRGGBB
+                    val argb = hex.toLong(16)
+                    Color(
+                        red = ((argb shr 16) and 0xFF) / 255f,
+                        green = ((argb shr 8) and 0xFF) / 255f,
+                        blue = (argb and 0xFF) / 255f,
+                        alpha = ((argb shr 24) and 0xFF) / 255f
+                    )
+                }
+                else -> Color.Gray
+            }
+        } else {
+            Color.Gray
+        }
+    } catch (e: Exception) {
+        Color.Gray
     }
 }

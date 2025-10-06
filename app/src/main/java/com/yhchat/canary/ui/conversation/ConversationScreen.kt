@@ -145,7 +145,7 @@ fun ConversationScreen(
         TopAppBar(
             title = {
                 Text(
-                    text = "云湖聊天",
+                    text = "云湖",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
