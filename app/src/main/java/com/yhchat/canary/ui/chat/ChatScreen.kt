@@ -279,9 +279,12 @@ fun ChatScreen(
                             },
                             onAddExpression = viewModel::addExpressionToFavorites,
                             onQuote = { msgId, msgText ->
-                                // 设置引用消息
+                                // 设置引用消息，格式：发送者名称 : 内容
+                                val senderName = message.sender.name
+                                val content = message.content.text ?: ""
+                                val quotedText = "$senderName : $content"
                                 quotedMessageId = msgId
-                                quotedMessageText = msgText
+                                quotedMessageText = quotedText
                             }
                         )
                     }
@@ -662,8 +665,11 @@ private fun MessageItem(
                 showContextMenu = false
             },
             onQuote = {
-                // 设置引用消息
-                onQuote(message.msgId, message.content.quoteMsgText ?: message.content.text ?: "")
+                // 设置引用消息，格式：发送者名称 : 内容
+                val senderName = message.sender.name
+                val content = message.content.text ?: ""
+                val quotedText = "$senderName : $content"
+                onQuote(message.msgId, quotedText)
                 showContextMenu = false
             },
             onRecall = {
