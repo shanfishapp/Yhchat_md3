@@ -30,6 +30,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.material3.*
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.activity.compose.BackHandler
@@ -84,7 +86,12 @@ import org.json.JSONObject
 /**
  * 聊天界面
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class, ExperimentalFoundationApi::class)
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalMaterialApi::class,
+    ExperimentalFoundationApi::class,
+    ExperimentalLayoutApi::class
+)
 @Composable
 fun ChatScreen(
     chatId: String,
@@ -791,6 +798,7 @@ private fun MessageContextMenu(
 /**
  * 发送者姓名和标签组件
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SenderNameAndTags(
     message: ChatMessage,
@@ -869,7 +877,7 @@ private fun SenderNameAndTags(
         // 展开时显示剩余标签（支持换行）
         if (tagsExpanded && tags.size > 2) {
             Spacer(modifier = Modifier.height(4.dp))
-            androidx.compose.foundation.layout.FlowRow(
+            FlowRow(
                 modifier = Modifier,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
