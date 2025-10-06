@@ -104,13 +104,7 @@ fun ConversationScreen(
         listState.HandleScrollBehavior(scrollBehavior = behavior)
     }
     
-    // 防止刷新后滚动到置顶会话组件后面
-    LaunchedEffect(conversations.size) {
-        if (conversations.isNotEmpty() && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset > 0) {
-            // 如果在顶部附近但有偏移，重置到完全顶部
-            listState.scrollToItem(0, 0)
-        }
-    }
+    // 移除自动滚动逻辑，让用户自己控制滚动位置
 
     // 允许返回后重新刷新（移除禁止刷新逻辑）
     
@@ -222,13 +216,10 @@ fun ConversationScreen(
             } else {
                 val pagedConversations by viewModel.pagedConversations.collectAsState()
                 
-                // 计算置顶栏的高度
-                val stickyBarHeight = if (showStickyBar && !stickyData?.sticky.isNullOrEmpty()) 80.dp else 0.dp
-                
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = stickyBarHeight + 8.dp, bottom = 8.dp)
+                    contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
                     items(
                         items = pagedConversations,

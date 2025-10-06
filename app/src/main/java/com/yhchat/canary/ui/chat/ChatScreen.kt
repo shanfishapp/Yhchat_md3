@@ -155,10 +155,10 @@ fun ChatScreen(
         onBackClick()
     }
 
-    // 下拉刷新状态
+    // 下拉刷新状态（刷新最新消息）
     val pullRefreshState = rememberPullRefreshState(
         refreshing = uiState.isRefreshing,
-        onRefresh = { viewModel.loadMoreMessages() }
+        onRefresh = { viewModel.refreshLatestMessages() }
     )
     
     Surface(

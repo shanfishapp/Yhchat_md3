@@ -669,6 +669,68 @@ class ChatViewModel @Inject constructor(
         hasMoreMessages = true
         loadMessages(refresh = true)
     }
+    
+    /**
+     * 刷新最新消息（下拉刷新使用）
+     * 调用 list-msg API 获取最新的消息
+     */
+    fun refreshLatestMessages() {
+        if (currentChatId.isEmpty()) {
+            Log.w(tag, "Chat not initialized")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(isRefreshing = true, error = null)
+
+                // 不带 msgId 参数，获取最新的20条消息
+                val result = messageRepository.getMessages(
+                    chatId = currentChatId,
+                    chatType = currentChatType,
+                    msgCount = 20
+                )
+
+                result.fold(
+                    onSuccess = { newMessages ->
+                        Log.d(tag, "Refreshed ${newMessages.size} latest messages")
+                        
+                        if (newMessages.isNotEmpty()) {
+                            // 合并新消息到现有消息列表
+                            val existingMsgIds = _messages.map { it.msgId }.toSet()
+                            val uniqueNewMessages = newMessages.filter { it.msgId !in existingMsgIds }
+                            
+                            if (uniqueNewMessages.isNotEmpty()) {
+                                // 添加不重复的新消息
+                                _messages.addAll(uniqueNewMessages.sortedBy { it.sendTime })
+                                Log.d(tag, "Added ${uniqueNewMessages.size} new messages")
+                            }
+                            
+                            // 按发送时间重新排序所有消息
+                            val sortedMessages = _messages.sortedBy { it.sendTime }
+                            _messages.clear()
+                            _messages.addAll(sortedMessages)
+                        }
+
+                        _uiState.value = _uiState.value.copy(isRefreshing = false, error = null)
+                    },
+                    onFailure = { exception ->
+                        Log.e(tag, "Failed to refresh latest messages", exception)
+                        _uiState.value = _uiState.value.copy(
+                            isRefreshing = false,
+                            error = "刷新失败: ${exception.message}"
+                        )
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(tag, "Exception refreshing latest messages", e)
+                _uiState.value = _uiState.value.copy(
+                    isRefreshing = false,
+                    error = "刷新异常: ${e.message}"
+                )
+            }
+        }
+    }
 
     /**
      * 获取当前用户ID

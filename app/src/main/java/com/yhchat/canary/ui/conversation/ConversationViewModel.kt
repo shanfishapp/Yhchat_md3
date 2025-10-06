@@ -220,15 +220,18 @@ class ConversationViewModel @Inject constructor(
             if (conversationIndex >= 0) {
                 // 更新现有会话
                 val conversation = currentConversations[conversationIndex]
+                
+                // 计算未读消息数：基于 msgSeq 和上次读取位置
+                val unreadCount = if (conversation.doNotDisturb == 1) {
+                    0  // 免打扰模式下不显示未读
+                } else {
+                    calculateUnreadCount(targetChatId, targetChatType, message.msgSeq)
+                }
+                
                 val updatedConversation = conversation.copy(
                     chatContent = getMessagePreview(message) ?: "[消息]",
                     timestampMs = message.sendTime,
-                    // 如果开启免打扰，不增加未读计数
-                    unreadMessage = if (conversation.doNotDisturb == 1) {
-                        conversation.unreadMessage
-                    } else {
-                        conversation.unreadMessage + 1
-                    }
+                    unreadMessage = unreadCount
                 )
                 currentConversations[conversationIndex] = updatedConversation
                 
@@ -511,6 +514,31 @@ class ConversationViewModel @Inject constructor(
                 _pagedConversations.value = pagedList
             }
         }
+    }
+    
+    /**
+     * 计算未读消息数
+     * @param chatId 会话ID
+     * @param chatType 会话类型
+     * @param latestMsgSeq 最新消息的 msgSeq，如果为null则返回1
+     * @return 未读消息数
+     */
+    private fun calculateUnreadCount(chatId: String, chatType: Int, latestMsgSeq: Long?): Int {
+        if (latestMsgSeq == null) {
+            return 1  // 如果没有 msgSeq，默认显示1条未读
+        }
+        
+        val readPosition = readPositionStore.getReadPosition(chatId, chatType)
+        if (readPosition == null) {
+            // 没有读取位置记录，说明是新会话或第一次收到消息
+            return 1
+        }
+        
+        val lastReadMsgSeq = readPosition.second
+        val unreadCount = (latestMsgSeq - lastReadMsgSeq).toInt()
+        
+        // 确保未读数不为负数
+        return if (unreadCount > 0) unreadCount else 0
     }
 
 /**
