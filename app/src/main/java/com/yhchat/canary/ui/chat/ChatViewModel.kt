@@ -114,8 +114,10 @@ class ChatViewModel @Inject constructor(
                         )
                     }
                     
-                    // 转换为 Map: chatId -> GroupMemberInfo
-                    val membersMap = allMembers.associateBy { it.chatId }
+                    // 转换为 Map: userId -> GroupMemberInfo
+                    val membersMap: Map<String, GroupMemberInfo> = allMembers.associateBy { member ->
+                        member.userId
+                    }
                     _uiState.value = _uiState.value.copy(groupMembers = membersMap)
                     Log.d(tag, "Group members loaded: ${membersMap.size} members")
                 },
