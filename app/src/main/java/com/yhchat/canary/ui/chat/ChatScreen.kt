@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -470,8 +471,12 @@ private fun MessageItem(
         return
     }
     
+    // 使用 key 记住展开状态
+    var tagsExpanded by remember(message.msgId) { mutableStateOf(false) }
+    
     Row(
         modifier = modifier
+            .fillMaxWidth()
             .combinedClickable(
                 onClick = {}, // 单击不做任何事
                 onDoubleClick = {
@@ -488,14 +493,10 @@ private fun MessageItem(
                     showContextMenu = true
                 }
             ),
-        horizontalArrangement = if (isMyMessage) {
-            Arrangement.End
-        } else {
-            Arrangement.Start
-        }
+        horizontalArrangement = if (isMyMessage) Arrangement.End else Arrangement.Start
     ) {
         if (!isMyMessage) {
-            // 发送者头像
+            // 发送者头像（左侧）
             AsyncImage(
                 model = ImageUtils.createAvatarImageRequest(
                     context = LocalContext.current,
@@ -515,57 +516,15 @@ private fun MessageItem(
         }
         
         Column(
-            modifier = Modifier.widthIn(max = 280.dp),
-            horizontalAlignment = if (isMyMessage) {
-                Alignment.End
-            } else {
-                Alignment.Start
-            }
+            horizontalAlignment = if (isMyMessage) Alignment.End else Alignment.Start
         ) {
-            // 发送者姓名和标签（所有消息都显示）
-            Row(
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = message.sender.name,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                // 机器人标签
-                if (message.sender.chatType == 3) {
-                    Surface(
-                        modifier = Modifier,
-                        shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer
-                    ) {
-                        Text(
-                            text = "机器人",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-                
-                // 显示消息发送者的标签
-                message.sender.tag?.take(3)?.forEach { tag ->
-                    Surface(
-                        modifier = Modifier,
-                        shape = RoundedCornerShape(4.dp),
-                        color = parseTagColor(tag.color)
-                    ) {
-                        Text(
-                            text = tag.text,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-            }
+            // 发送者姓名和标签
+            SenderNameAndTags(
+                message = message,
+                isMyMessage = isMyMessage,
+                tagsExpanded = tagsExpanded,
+                onToggleExpand = { tagsExpanded = !tagsExpanded }
+            )
 
             // 消息气泡
             Surface(
@@ -646,7 +605,7 @@ private fun MessageItem(
         if (isMyMessage) {
             Spacer(modifier = Modifier.width(8.dp))
 
-            // 自己的头像
+            // 自己的头像（右侧）
             AsyncImage(
                 model = ImageUtils.createAvatarImageRequest(
                     context = LocalContext.current,
@@ -827,6 +786,110 @@ private fun MessageContextMenu(
             }
         }
     )
+}
+
+/**
+ * 发送者姓名和标签组件
+ */
+@Composable
+private fun SenderNameAndTags(
+    message: ChatMessage,
+    isMyMessage: Boolean,
+    tagsExpanded: Boolean,
+    onToggleExpand: () -> Unit
+) {
+    val tags = message.sender.tag ?: emptyList()
+    val hasMultipleTags = tags.size > 2
+    
+    Column(
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+        horizontalAlignment = if (isMyMessage) Alignment.End else Alignment.Start
+    ) {
+        // 第一行：名称、机器人标签、前两个tag
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = message.sender.name,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium
+            )
+
+            // 机器人标签
+            if (message.sender.chatType == 3) {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Text(
+                        text = "机器人",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            
+            // 显示前两个标签
+            tags.take(2).forEach { tag ->
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = parseTagColor(tag.color)
+                ) {
+                    Text(
+                        text = tag.text,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            
+            // 如果有更多标签，显示展开/收起按钮
+            if (hasMultipleTags) {
+                IconButton(
+                    onClick = onToggleExpand,
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    Icon(
+                        imageVector = if (tagsExpanded) 
+                            Icons.Default.KeyboardArrowUp 
+                        else 
+                            Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (tagsExpanded) "收起标签" else "展开标签",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+        
+        // 展开时显示剩余标签（支持换行）
+        if (tagsExpanded && tags.size > 2) {
+            Spacer(modifier = Modifier.height(4.dp))
+            androidx.compose.foundation.layout.FlowRow(
+                modifier = Modifier,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                tags.drop(2).forEach { tag ->
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = parseTagColor(tag.color)
+                    ) {
+                        Text(
+                            text = tag.text,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**
