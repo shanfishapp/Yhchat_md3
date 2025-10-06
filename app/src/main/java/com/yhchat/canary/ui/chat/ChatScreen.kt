@@ -277,7 +277,12 @@ fun ChatScreen(
                                     onAvatarClick(chatId, name, chatType)
                                 }
                             },
-            onAddExpression = viewModel::addExpressionToFavorites
+                            onAddExpression = viewModel::addExpressionToFavorites,
+                            onQuote = { msgId, msgText ->
+                                // 设置引用消息
+                                quotedMessageId = msgId
+                                quotedMessageText = msgText
+                            }
                         )
                     }
 
@@ -445,7 +450,8 @@ private fun MessageItem(
     modifier: Modifier = Modifier,
     onImageClick: (String) -> Unit = {},
     onAvatarClick: (String, String, Int) -> Unit = { _, _, _ -> },
-    onAddExpression: (String) -> Unit = {}
+    onAddExpression: (String) -> Unit = {},
+    onQuote: (String, String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -657,8 +663,7 @@ private fun MessageItem(
             },
             onQuote = {
                 // 设置引用消息
-                quotedMessageId = message.msgId
-                quotedMessageText = message.content.quoteMsgText ?: message.content.text ?: ""
+                onQuote(message.msgId, message.content.quoteMsgText ?: message.content.text ?: "")
                 showContextMenu = false
             },
             onRecall = {

@@ -256,13 +256,13 @@ private fun UserProfileContent(
                             imageVector = Icons.Default.Star,
                             contentDescription = "VIP",
                             modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onprimary
+                            tint = MaterialTheme.colorScheme.onPrimary
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "VIP",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onprimary,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             fontWeight = FontWeight.Bold
                         )
                     }
