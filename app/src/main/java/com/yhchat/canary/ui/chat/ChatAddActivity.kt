@@ -238,8 +238,10 @@ fun ChatAddScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(16.dp))
-                            OutlinedButton(onClick = { viewModel.loadChatInfo(chatAddInfo) }) {
-                                Text("重试")
+                            chatAddInfo?.let { info ->
+                                OutlinedButton(onClick = { viewModel.loadChatInfo(info) }) {
+                                    Text("重试")
+                                }
                             }
                         }
                     }

@@ -106,3 +106,19 @@ message list_member {
     repeated User user = 2;
 }
 
+// 编辑群聊信息
+message edit_group_send {
+    string group_id = 2; // 目标群聊ID
+    string name = 3; // 群聊名称
+    string introduction = 4; // 群聊简介
+    string avatar_url = 5; // 群聊头像url
+    int32 direct_join = 6; // 进群免审核,1为开启，0为关闭
+    int32 history_msg = 7; // 历史消息,1为开启，0为关闭
+    string category_name = 8; // 分类名
+    int64 category_id = 9; // 分类ID
+    int32 private = 10; // 是否私有,1为私有，0为关闭
+}
+
+message edit_group {
+    Status status = 1;
+}

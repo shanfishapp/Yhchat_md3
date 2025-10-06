@@ -266,7 +266,8 @@ class GroupRepository @Inject constructor() {
                 .setPrivate(if (isPrivate) 1 else 0)
 
             val requestData = requestBuilder.build()
-            val requestBody = requestData.toByteArray().toRequestBody("application/x-protobuf".toMediaTypeOrNull())
+            val requestBytes = requestData.toByteArray()
+            val requestBody = requestBytes.toRequestBody("application/x-protobuf".toMediaTypeOrNull())
 
             val request = Request.Builder()
                 .url("$baseUrl/v1/group/edit-group")
