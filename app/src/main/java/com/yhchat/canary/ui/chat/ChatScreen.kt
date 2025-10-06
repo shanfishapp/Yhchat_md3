@@ -262,6 +262,9 @@ fun ChatScreen(
                         }
                     ) { index ->
                         val message = reversedMessages[index]
+                        // 获取发送者的权限等级（仅群聊）
+                        val memberPermission = uiState.groupMembers[message.sender.chatId]?.permissionLevel
+                        
                         MessageItem(
                             message = message,
                             isMyMessage = viewModel.isMyMessage(message),
@@ -293,7 +296,8 @@ fun ChatScreen(
                                 val quotedText = "$senderName : $content"
                                 quotedMessageId = msgId
                                 quotedMessageText = quotedText
-                            }
+                            },
+                            memberPermission = memberPermission
                         )
                     }
 
@@ -462,7 +466,8 @@ private fun MessageItem(
     onImageClick: (String) -> Unit = {},
     onAvatarClick: (String, String, Int) -> Unit = { _, _, _ -> },
     onAddExpression: (String) -> Unit = {},
-    onQuote: (String, String) -> Unit = { _, _ -> }
+    onQuote: (String, String) -> Unit = { _, _ -> },
+    memberPermission: Int? = null  // 群成员权限等级
 ) {
     val context = LocalContext.current
     val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -533,7 +538,8 @@ private fun MessageItem(
                 message = message,
                 isMyMessage = isMyMessage,
                 tagsExpanded = tagsExpanded,
-                onToggleExpand = { tagsExpanded = !tagsExpanded }
+                onToggleExpand = { tagsExpanded = !tagsExpanded },
+                memberPermission = memberPermission
             )
 
             // 消息气泡
@@ -809,7 +815,8 @@ private fun SenderNameAndTags(
     message: ChatMessage,
     isMyMessage: Boolean,
     tagsExpanded: Boolean,
-    onToggleExpand: () -> Unit
+    onToggleExpand: () -> Unit,
+    memberPermission: Int? = null  // 群成员权限等级：100=群主，2=管理员
 ) {
     val tags = message.sender.tag ?: emptyList()
     val hasMultipleTags = tags.size > 2
@@ -848,6 +855,36 @@ private fun SenderNameAndTags(
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
+                }
+            }
+            
+            // 群主/管理员标签
+            when (memberPermission) {
+                100 -> {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color(0xFFFF9800)  // 橙色表示群主
+                    ) {
+                        Text(
+                            text = "群主",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                2 -> {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color(0xFF2196F3)  // 蓝色表示管理员
+                    ) {
+                        Text(
+                            text = "管理员",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
                 }
             }
             

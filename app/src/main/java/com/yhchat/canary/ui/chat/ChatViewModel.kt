@@ -5,6 +5,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yhchat.canary.data.model.ChatMessage
+import com.yhchat.canary.data.model.GroupMemberInfo
+import com.yhchat.canary.data.repository.GroupRepository
 import com.yhchat.canary.data.repository.MessageRepository
 import com.yhchat.canary.data.repository.TokenRepository
 import com.yhchat.canary.data.websocket.WebSocketManager
@@ -21,14 +23,16 @@ data class ChatUiState(
     val error: String? = null,
     val isConnected: Boolean = false,
     val isRefreshing: Boolean = false,
-    val newMessageReceived: Boolean = false  // 标记是否收到新消息
+    val newMessageReceived: Boolean = false,  // 标记是否收到新消息
+    val groupMembers: Map<String, GroupMemberInfo> = emptyMap()  // 群成员信息：chatId -> GroupMemberInfo
 )
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val messageRepository: MessageRepository,
     private val tokenRepository: TokenRepository,
-    private val webSocketManager: WebSocketManager
+    private val webSocketManager: WebSocketManager,
+    private val groupRepository: GroupRepository
 ) : ViewModel() {
 
     private var currentChatId: String = ""
@@ -65,11 +69,61 @@ class ChatViewModel @Inject constructor(
         oldestMsgSeq = 0
         oldestMsgId = null
         
+        // 如果是群聊，加载群成员信息
+        if (chatType == 2) {
+            loadGroupMembers(chatId)
+        }
+        
         // 开始监听WebSocket消息
         startListeningToWebSocketMessages()
         
         // 加载初始消息
         loadMessages()
+    }
+    
+    /**
+     * 加载群成员信息
+     */
+    private fun loadGroupMembers(groupId: String) {
+        viewModelScope.launch {
+            Log.d(tag, "Loading group members for: $groupId")
+            groupRepository.setTokenRepository(tokenRepository)
+            
+            // 加载群信息
+            groupRepository.getGroupInfo(groupId).fold(
+                onSuccess = { groupInfo ->
+                    Log.d(tag, "Group info loaded, fetching members...")
+                    
+                    // 加载所有成员（分页获取）
+                    val allMembers = mutableListOf<GroupMemberInfo>()
+                    var currentPage = 1
+                    var hasMore = true
+                    
+                    while (hasMore) {
+                        groupRepository.getGroupMembers(groupId, page = currentPage, size = 50).fold(
+                            onSuccess = { members ->
+                                allMembers.addAll(members)
+                                hasMore = members.size >= 50
+                                currentPage++
+                                Log.d(tag, "Loaded ${members.size} members, total: ${allMembers.size}")
+                            },
+                            onFailure = { error ->
+                                Log.e(tag, "Failed to load group members page $currentPage", error)
+                                hasMore = false
+                            }
+                        )
+                    }
+                    
+                    // 转换为 Map: chatId -> GroupMemberInfo
+                    val membersMap = allMembers.associateBy { it.chatId }
+                    _uiState.value = _uiState.value.copy(groupMembers = membersMap)
+                    Log.d(tag, "Group members loaded: ${membersMap.size} members")
+                },
+                onFailure = { error ->
+                    Log.e(tag, "Failed to load group info", error)
+                }
+            )
+        }
     }
     
     /**
