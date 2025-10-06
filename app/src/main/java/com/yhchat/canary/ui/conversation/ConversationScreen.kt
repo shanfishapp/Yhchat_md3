@@ -221,10 +221,14 @@ fun ConversationScreen(
                 }
             } else {
                 val pagedConversations by viewModel.pagedConversations.collectAsState()
+                
+                // 计算置顶栏的高度
+                val stickyBarHeight = if (showStickyBar && !stickyData?.sticky.isNullOrEmpty()) 80.dp else 0.dp
+                
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 8.dp)
+                    contentPadding = PaddingValues(top = stickyBarHeight + 8.dp, bottom = 8.dp)
                 ) {
                     items(
                         items = pagedConversations,
@@ -238,6 +242,9 @@ fun ConversationScreen(
                         ConversationItem(
                             conversation = conversation,
                             onClick = {
+                                // 标记会话为已读
+                                viewModel.markConversationAsRead(chatId, chatType)
+                                
                                 // 跳转到聊天界面（使用最新的会话数据）
                                 val intent = Intent(context, com.yhchat.canary.ui.chat.ChatActivity::class.java)
                                 intent.putExtra("chatId", chatId)

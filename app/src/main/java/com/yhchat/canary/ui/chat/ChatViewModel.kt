@@ -11,6 +11,7 @@ import com.yhchat.canary.data.repository.MessageRepository
 import com.yhchat.canary.data.repository.TokenRepository
 import com.yhchat.canary.data.websocket.WebSocketManager
 import com.yhchat.canary.data.websocket.MessageEvent
+import com.yhchat.canary.data.local.ReadPositionStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,7 +33,8 @@ class ChatViewModel @Inject constructor(
     private val messageRepository: MessageRepository,
     private val tokenRepository: TokenRepository,
     private val webSocketManager: WebSocketManager,
-    private val groupRepository: GroupRepository
+    private val groupRepository: GroupRepository,
+    private val readPositionStore: ReadPositionStore
 ) : ViewModel() {
 
     private var currentChatId: String = ""
@@ -77,8 +79,17 @@ class ChatViewModel @Inject constructor(
         // 开始监听WebSocket消息
         startListeningToWebSocketMessages()
         
-        // 加载初始消息
-        loadMessages()
+        // 检查是否有上次读取位置
+        val readPosition = readPositionStore.getReadPosition(chatId, chatType)
+        if (readPosition != null) {
+            // 从上次读取位置加载消息
+            Log.d(tag, "Found read position: msgId=${readPosition.first}, msgSeq=${readPosition.second}")
+            loadMessagesFromPosition(readPosition.first)
+        } else {
+            // 没有读取位置，加载最新消息
+            Log.d(tag, "No read position found, loading latest messages")
+            loadMessages()
+        }
     }
     
     /**
@@ -308,6 +319,69 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 从指定位置加载消息（用于恢复上次阅读位置）
+     */
+    private fun loadMessagesFromPosition(msgId: String) {
+        if (currentChatId.isEmpty()) {
+            Log.w(tag, "Chat not initialized")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+
+                // 加载指定消息及前后20条消息
+                val result = messageRepository.getMessages(
+                    chatId = currentChatId,
+                    chatType = currentChatType,
+                    msgCount = 40,  // 加载更多消息以提供上下文
+                    msgId = msgId
+                )
+
+                result.fold(
+                    onSuccess = { newMessages ->
+                        Log.d(tag, "Loaded ${newMessages.size} messages from position $msgId")
+                        
+                        _messages.clear()
+                        _messages.addAll(newMessages.sortedBy { it.sendTime })
+
+                        // 更新最旧消息的序列号和ID
+                        if (newMessages.isNotEmpty()) {
+                            oldestMsgSeq = newMessages.minOfOrNull { it.msgSeq ?: 0L } ?: 0L
+                            val oldestMessage = newMessages.minByOrNull { it.sendTime }
+                            if (oldestMessage != null) {
+                                oldestMsgId = oldestMessage.msgId
+                            }
+                        }
+
+                        hasMoreMessages = newMessages.size >= 40
+
+                        _uiState.value = _uiState.value.copy(isLoading = false, error = null)
+                    },
+                    onFailure = { exception ->
+                        Log.e(tag, "Failed to load messages from position", exception)
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = "加载消息失败: ${exception.message}"
+                        )
+                        // 失败则加载最新消息
+                        loadMessages()
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(tag, "Exception loading messages from position", e)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "加载消息异常: ${e.message}"
+                )
+                // 异常则加载最新消息
+                loadMessages()
+            }
+        }
+    }
+    
     /**
      * 加载消息列表
      */
@@ -542,6 +616,50 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
+     * 保存当前读取位置（退出聊天时调用）
+     */
+    fun saveCurrentReadPosition() {
+        if (currentChatId.isEmpty() || _messages.isEmpty()) {
+            return
+        }
+        
+        // 取最新的消息作为读取位置
+        val latestMessage = _messages.maxByOrNull { it.sendTime }
+        if (latestMessage != null && latestMessage.msgSeq != null) {
+            readPositionStore.saveReadPosition(
+                chatId = currentChatId,
+                chatType = currentChatType,
+                msgId = latestMessage.msgId,
+                msgSeq = latestMessage.msgSeq!!
+            )
+            Log.d(tag, "Saved read position: msgId=${latestMessage.msgId}, msgSeq=${latestMessage.msgSeq}")
+        }
+    }
+    
+    /**
+     * 获取当前会话的未读消息数
+     * @return 未读消息数，如果无法计算则返回null
+     */
+    fun getUnreadCount(): Int? {
+        if (currentChatId.isEmpty()) {
+            return null
+        }
+        
+        val readPosition = readPositionStore.getReadPosition(currentChatId, currentChatType)
+        if (readPosition == null || _messages.isEmpty()) {
+            return null
+        }
+        
+        // 取最新消息的 msgSeq
+        val latestMsgSeq = _messages.maxOfOrNull { it.msgSeq ?: 0L } ?: return null
+        val lastReadMsgSeq = readPosition.second
+        
+        // 计算未读数
+        val unreadCount = (latestMsgSeq - lastReadMsgSeq).toInt()
+        return if (unreadCount > 0) unreadCount else 0
+    }
+    
+    /**
      * 刷新消息
      */
     fun refreshMessages() {
@@ -604,5 +722,15 @@ class ChatViewModel @Inject constructor(
                 Log.e(tag, "Failed to report button click", e)
             }
         }
+    }
+    
+    /**
+     * ViewModel被清理时保存读取位置
+     */
+    override fun onCleared() {
+        super.onCleared()
+        // 保存当前读取位置，防止用户从后台直接结束应用
+        saveCurrentReadPosition()
+        Log.d(tag, "ChatViewModel cleared, read position saved")
     }
 }

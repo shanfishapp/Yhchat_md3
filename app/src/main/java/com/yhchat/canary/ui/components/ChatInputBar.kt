@@ -61,7 +61,7 @@ fun ChatInputBar(
         shadowElevation = 4.dp,
         tonalElevation = 2.dp,
         shape = RoundedCornerShape(20.dp),
-        color = Color.Transparent
+        color = MaterialTheme.colorScheme.surface
     ) {
         Column {
             // 引用消息显示框

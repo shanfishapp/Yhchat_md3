@@ -10,8 +10,10 @@ import com.yhchat.canary.data.repository.ConversationRepository
 import com.yhchat.canary.data.repository.TokenRepository
 import com.yhchat.canary.data.repository.CacheRepository
 import com.yhchat.canary.data.repository.UserRepository
+import com.yhchat.canary.data.repository.MessageRepository
 import com.yhchat.canary.data.websocket.WebSocketManager
 import com.yhchat.canary.data.websocket.MessageEvent
+import com.yhchat.canary.data.local.ReadPositionStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -30,7 +32,9 @@ class ConversationViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
     private val cacheRepository: CacheRepository,
     private val webSocketManager: WebSocketManager,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val messageRepository: MessageRepository,
+    private val readPositionStore: ReadPositionStore
 ) : ViewModel() {
 
     // 分页参数
@@ -442,6 +446,70 @@ class ConversationViewModel @Inject constructor(
                 .getOrNull()?.sticky?.any { it.chatId == chatId } == true
         } catch (e: Exception) {
             false
+        }
+    }
+    
+    /**
+     * 标记会话为已读（获取最新消息并保存读取位置）
+     */
+    fun markConversationAsRead(chatId: String, chatType: Int) {
+        viewModelScope.launch {
+            try {
+                // 获取该会话的最新消息
+                val result = messageRepository.getMessages(
+                    chatId = chatId,
+                    chatType = chatType,
+                    msgCount = 1  // 只获取最新的一条消息
+                )
+                
+                result.fold(
+                    onSuccess = { messages ->
+                        if (messages.isNotEmpty()) {
+                            val latestMessage = messages.first()
+                            // 保存读取位置为最新消息
+                            if (latestMessage.msgSeq != null) {
+                                readPositionStore.saveReadPosition(
+                                    chatId = chatId,
+                                    chatType = chatType,
+                                    msgId = latestMessage.msgId,
+                                    msgSeq = latestMessage.msgSeq!!
+                                )
+                                Log.d("ConversationViewModel", "Marked as read: chatId=$chatId, msgSeq=${latestMessage.msgSeq}")
+                                
+                                // 更新本地会话列表的未读计数为0
+                                updateLocalUnreadCount(chatId, 0)
+                            }
+                        }
+                    },
+                    onFailure = { error ->
+                        Log.e("ConversationViewModel", "Failed to mark as read: ${error.message}")
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e("ConversationViewModel", "Exception marking as read", e)
+            }
+        }
+    }
+    
+    /**
+     * 更新本地会话的未读计数
+     */
+    private fun updateLocalUnreadCount(chatId: String, count: Int) {
+        val currentConversations = _conversations.value.toMutableList()
+        val index = currentConversations.indexOfFirst { it.chatId == chatId }
+        
+        if (index >= 0) {
+            val updatedConversation = currentConversations[index].copy(unreadMessage = count)
+            currentConversations[index] = updatedConversation
+            _conversations.value = currentConversations
+            
+            // 同步更新分页数据
+            val pagedList = _pagedConversations.value.toMutableList()
+            val pagedIndex = pagedList.indexOfFirst { it.chatId == chatId }
+            if (pagedIndex >= 0) {
+                pagedList[pagedIndex] = updatedConversation
+                _pagedConversations.value = pagedList
+            }
         }
     }
 

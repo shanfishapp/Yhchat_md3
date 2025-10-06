@@ -127,6 +127,13 @@ fun ChatScreen(
         viewModel.initChat(chatId, chatType, userId)
     }
     
+    // 退出时保存读取位置
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.saveCurrentReadPosition()
+        }
+    }
+    
     // 监听滚动状态，当不在底部时显示"回到最新消息"按钮
     LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) {
         // 当用户滚动查看历史消息时（不在最新消息位置），显示回到底部按钮
@@ -380,12 +387,7 @@ fun ChatScreen(
         }
 
         // 底部输入栏
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            tonalElevation = 8.dp,
-            shadowElevation = 8.dp
-        ) {
-            ChatInputBar(
+        ChatInputBar(
                 text = inputText,
                 onTextChange = { inputText = it },
                 onSendMessage = {
@@ -431,15 +433,14 @@ fun ChatScreen(
                     quotedMessageId = null
                     quotedMessageText = null
                 },
-                modifier = Modifier.padding(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = 8.dp,
-                    bottom = 16.dp // 增加底部间距，避免粘在最底部
-                )
+            modifier = Modifier.padding(
+                start = 16.dp,
+                end = 16.dp,
+                top = 8.dp,
+                bottom = 16.dp // 增加底部间距，避免粘在最底部
             )
+        )
         }
-    }
     }
     
     // 图片预览器
@@ -1009,7 +1010,7 @@ private fun MessageContentView(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 120.dp, max = 400.dp)
+                            .heightIn(min = 120.dp, max = 440.dp)
                     ) {
                     HtmlWebView(
                         htmlContent = htmlContent,
