@@ -101,7 +101,10 @@ fun ChatScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ChatViewModel = viewModel(),
-    onAvatarClick: (String, String, Int, Int) -> Unit = { _, _, _, _ -> }  // 添加第4个参数：当前用户权限
+    onAvatarClick: (String, String, Int, Int) -> Unit = { _, _, _, _ -> },  // 添加第4个参数：当前用户权限
+    onImagePickerClick: () -> Unit = {},  // 图片选择器点击回调
+    imageUriToSend: android.net.Uri? = null,  // 待发送的图片URI
+    onImageSent: () -> Unit = {}  // 图片发送完成回调
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -133,6 +136,24 @@ fun ChatScreen(
     // 初始化聊天
     LaunchedEffect(chatId, chatType, userId) {
         viewModel.initChat(chatId, chatType, userId)
+    }
+    
+    // 处理图片发送
+    LaunchedEffect(imageUriToSend) {
+        imageUriToSend?.let { uri ->
+            android.util.Log.d("ChatScreen", "收到待发送的图片URI: $uri")
+            viewModel.uploadAndSendImage(
+                context = context,
+                imageUri = uri,
+                quoteMsgId = quotedMessageId,
+                quoteMsgText = quotedMessageText
+            )
+            // 清除引用状态
+            quotedMessageId = null
+            quotedMessageText = null
+            // 通知已发送
+            onImageSent()
+        }
     }
     
     // 退出时保存读取位置
@@ -179,10 +200,20 @@ fun ChatScreen(
         // 顶部应用栏
         TopAppBar(
             title = {
-                Text(
-                    text = chatName,
-                    fontWeight = FontWeight.Bold
-                )
+                Column {
+                    Text(
+                        text = chatName,
+                        fontWeight = FontWeight.Bold
+                    )
+                    // 如果是群聊，显示群人数
+                    if (chatType == 2 && uiState.groupMemberCount > 0) {
+                        Text(
+                            text = "${uiState.groupMemberCount} 人",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             },
             navigationIcon = {
                 IconButton(onClick = onBackClick) {
@@ -420,7 +451,8 @@ fun ChatScreen(
                     }
                 },
                 onImageClick = {
-                    // TODO: 实现图片选择功能
+                    // 调用图片选择器
+                    onImagePickerClick()
                 },
                 onFileClick = {
                     // TODO: 实现文件选择功能
@@ -1206,6 +1238,11 @@ private fun MessageContentView(
                 // 表情消息 (包括表情包和个人收藏表情)
                 val context = LocalContext.current
                 val stickerPackId = content.stickerPackId
+                val expressionId = content.expressionId
+                
+                // 判断是个人表情还是表情包
+                val isPersonalExpression = expressionId != null && expressionId != "0"
+                val isStickerPack = stickerPackId != null && stickerPackId != 0L
                 
                 content.imageUrl?.let { imageUrl ->
                     AsyncImage(
@@ -1214,16 +1251,27 @@ private fun MessageContentView(
                             url = imageUrl
                         ),
                         contentDescription = when {
-                            content.expressionId != null && content.expressionId != "0" -> "个人收藏表情"
-                            stickerPackId != null -> "表情包"
+                            isPersonalExpression -> "个人收藏表情"
+                            isStickerPack -> "表情包"
                             else -> "表情"
                         },
                         modifier = Modifier
                             .size(120.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .clickable {
-                                // 点击打开图片预览
-                                onImageClick(imageUrl)
+                                if (isPersonalExpression) {
+                                    // 个人表情：打开图片预览
+                                    onImageClick(imageUrl)
+                                } else if (isStickerPack) {
+                                    // 表情包：跳转到表情包详情
+                                    com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
+                                        context = context,
+                                        stickerPackId = stickerPackId?.toString() ?: ""
+                                    )
+                                } else {
+                                    // 默认：图片预览
+                                    onImageClick(imageUrl)
+                                }
                             },
                         contentScale = ContentScale.Fit
                     )
@@ -1246,8 +1294,16 @@ private fun MessageContentView(
                                 .size(120.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable {
-                                    // 点击打开图片预览
-                                    onImageClick(fullUrl)
+                                    if (isPersonalExpression) {
+                                        onImageClick(fullUrl)
+                                    } else if (isStickerPack) {
+                                        com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
+                                            context = context,
+                                            stickerPackId = stickerPackId?.toString() ?: ""
+                                        )
+                                    } else {
+                                        onImageClick(fullUrl)
+                                    }
                                 },
                             contentScale = ContentScale.Fit
                         )

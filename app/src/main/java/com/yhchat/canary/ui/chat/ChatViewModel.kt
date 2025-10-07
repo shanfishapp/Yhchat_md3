@@ -25,7 +25,8 @@ data class ChatUiState(
     val isConnected: Boolean = false,
     val isRefreshing: Boolean = false,
     val newMessageReceived: Boolean = false,  // 标记是否收到新消息
-    val groupMembers: Map<String, GroupMemberInfo> = emptyMap()  // 群成员信息：chatId -> GroupMemberInfo
+    val groupMembers: Map<String, GroupMemberInfo> = emptyMap(),  // 群成员信息：chatId -> GroupMemberInfo
+    val groupMemberCount: Int = 0  // 群成员总数
 )
 
 @HiltViewModel
@@ -34,7 +35,8 @@ class ChatViewModel @Inject constructor(
     private val tokenRepository: TokenRepository,
     private val webSocketManager: WebSocketManager,
     private val groupRepository: GroupRepository,
-    private val readPositionStore: ReadPositionStore
+    private val readPositionStore: ReadPositionStore,
+    private val apiService: com.yhchat.canary.data.api.ApiService
 ) : ViewModel() {
 
     private var currentChatId: String = ""
@@ -95,7 +97,7 @@ class ChatViewModel @Inject constructor(
             // 加载群信息
             groupRepository.getGroupInfo(groupId).fold(
                 onSuccess = { groupInfo ->
-                    Log.d(tag, "Group info loaded, fetching members...")
+                    Log.d(tag, "Group info loaded, member count: ${groupInfo.memberCount}, fetching members...")
                     
                     // 加载所有成员（分页获取）
                     val allMembers = mutableListOf<GroupMemberInfo>()
@@ -121,7 +123,10 @@ class ChatViewModel @Inject constructor(
                     val membersMap: Map<String, GroupMemberInfo> = allMembers.associateBy { member ->
                         member.userId
                     }
-                    _uiState.value = _uiState.value.copy(groupMembers = membersMap)
+                    _uiState.value = _uiState.value.copy(
+                        groupMembers = membersMap,
+                        groupMemberCount = groupInfo.memberCount
+                    )
                     Log.d(tag, "Group members loaded: ${membersMap.size} members")
                 },
                 onFailure = { error ->
@@ -220,6 +225,101 @@ class ChatViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e(tag, "添加表情异常", e)
                 _uiState.value = _uiState.value.copy(error = "添加表情异常: ${e.message}")
+            }
+        }
+    }
+    
+    /**
+     * 上传并发送图片
+     */
+    fun uploadAndSendImage(
+        context: android.content.Context,
+        imageUri: android.net.Uri,
+        quoteMsgId: String? = null,
+        quoteMsgText: String? = null
+    ) {
+        viewModelScope.launch {
+            try {
+                Log.d(tag, "🖼️ 开始上传并发送图片: $imageUri")
+                
+                // 1. 获取七牛上传token
+                val token = tokenRepository.getTokenSync()
+                if (token.isNullOrEmpty()) {
+                    Log.e(tag, "❌ Token为空")
+                    _uiState.value = _uiState.value.copy(error = "未登录")
+                    return@launch
+                }
+                
+                Log.d(tag, "📤 获取七牛上传token...")
+                val tokenResponse = apiService.getQiniuImageToken(token)
+                
+                if (!tokenResponse.isSuccessful || tokenResponse.body()?.code != 1) {
+                    Log.e(tag, "❌ 获取上传token失败: ${tokenResponse.code()}")
+                    _uiState.value = _uiState.value.copy(error = "获取上传token失败")
+                    return@launch
+                }
+                
+                val uploadToken = tokenResponse.body()?.data?.token ?: run {
+                    Log.e(tag, "❌ 上传token为空")
+                    _uiState.value = _uiState.value.copy(error = "获取上传token失败")
+                    return@launch
+                }
+                
+                Log.d(tag, "✅ 获取到上传token: ${uploadToken.take(20)}...")
+                
+                // 2. 上传图片到七牛云
+                Log.d(tag, "📤 开始上传图片到七牛云...")
+                val uploadResult = com.yhchat.canary.utils.ImageUploadUtil.uploadImage(
+                    context = context,
+                    imageUri = imageUri,
+                    uploadToken = uploadToken
+                )
+                
+                uploadResult.fold(
+                    onSuccess = { uploadResponse ->
+                        Log.d(tag, "✅ 图片上传成功！")
+                        Log.d(tag, "   key: ${uploadResponse.key}")
+                        Log.d(tag, "   hash: ${uploadResponse.hash}")
+                        Log.d(tag, "   size: ${uploadResponse.fsize}")
+                        Log.d(tag, "   尺寸: ${uploadResponse.avinfo?.video?.width}x${uploadResponse.avinfo?.video?.height}")
+                        
+                        // 3. 发送图片消息
+                        val width = uploadResponse.avinfo?.video?.width ?: 1080
+                        val height = uploadResponse.avinfo?.video?.height ?: 1920
+                        
+                        Log.d(tag, "📤 发送图片消息...")
+                        val sendResult = messageRepository.sendImageMessage(
+                            chatId = currentChatId,
+                            chatType = currentChatType,
+                            imageKey = uploadResponse.key,
+                            width = width,
+                            height = height,
+                            fileSize = uploadResponse.fsize,
+                            quoteMsgId = quoteMsgId,
+                            quoteMsgText = quoteMsgText
+                        )
+                        
+                        sendResult.fold(
+                            onSuccess = {
+                                Log.d(tag, "✅ 图片消息发送成功！")
+                                // 刷新消息列表
+                                loadMessages(refresh = true)
+                            },
+                            onFailure = { error ->
+                                Log.e(tag, "❌ 发送图片消息失败", error)
+                                _uiState.value = _uiState.value.copy(error = "发送图片失败: ${error.message}")
+                            }
+                        )
+                    },
+                    onFailure = { error ->
+                        Log.e(tag, "❌ 上传图片失败", error)
+                        _uiState.value = _uiState.value.copy(error = "上传图片失败: ${error.message}")
+                    }
+                )
+                
+            } catch (e: Exception) {
+                Log.e(tag, "❌ 上传并发送图片异常", e)
+                _uiState.value = _uiState.value.copy(error = "发送图片失败: ${e.message}")
             }
         }
     }

@@ -338,6 +338,16 @@ interface ApiService {
         @Body request: AddStickerPackRequest
     ): Response<ApiStatus>
     
+    // ========== Misc相关API ==========
+    
+    /**
+     * 获取七牛图片上传token
+     */
+    @GET("v1/misc/qiniu-token")
+    suspend fun getQiniuImageToken(
+        @Header("token") token: String
+    ): Response<QiniuTokenResponse>
+    
 }
 
 /**
@@ -754,4 +764,53 @@ data class FollowBoardRequest(
 data class UnfollowBoardRequest(
     @SerializedName("baId")
     val baId: Int
+)
+
+/**
+ * 七牛上传token响应
+ */
+data class QiniuTokenResponse(
+    @SerializedName("code")
+    val code: Int,
+    
+    @SerializedName("data")
+    val data: QiniuTokenData,
+    
+    @SerializedName("msg")
+    val msg: String
+)
+
+data class QiniuTokenData(
+    @SerializedName("token")
+    val token: String
+)
+
+/**
+ * 七牛上传响应
+ */
+data class QiniuUploadResponse(
+    @SerializedName("key")
+    val key: String,
+    
+    @SerializedName("hash")
+    val hash: String,
+    
+    @SerializedName("fsize")
+    val fsize: Long,
+    
+    @SerializedName("avinfo")
+    val avinfo: QiniuAvInfo? = null
+)
+
+data class QiniuAvInfo(
+    @SerializedName("video")
+    val video: QiniuVideoInfo? = null
+)
+
+data class QiniuVideoInfo(
+    @SerializedName("width")
+    val width: Int = 0,
+    
+    @SerializedName("height")
+    val height: Int = 0
 )

@@ -283,13 +283,17 @@ fun StickerItemView(
     sticker: com.yhchat.canary.data.model.StickerItem,
     onImageClick: (String) -> Unit = {}
 ) {
-    val imageUrl = "https://chat-img.jwznb.com/${sticker.url}"
+    val imageUrl = if (sticker.url.startsWith("http")) {
+        sticker.url
+    } else {
+        "https://chat-img.jwznb.com/${sticker.url}"
+    }
     
     Card(
         modifier = Modifier
             .aspectRatio(1f)
             .clickable {
-                // 点击打开图片预览
+                // 点击打开图片预览器
                 onImageClick(imageUrl)
             },
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)

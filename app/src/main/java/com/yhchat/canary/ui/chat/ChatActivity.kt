@@ -25,6 +25,19 @@ class ChatActivity : ComponentActivity() {
     private var chatType by mutableStateOf(1)
     private var chatName by mutableStateOf("")
     
+    // 图片选择器
+    private val imagePickerLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        uri?.let { selectedUri ->
+            android.util.Log.d("ChatActivity", "图片已选择: $selectedUri")
+            // 通过Intent传递给ChatScreen处理
+            imageUriToSend = selectedUri
+        }
+    }
+    
+    private var imageUriToSend by mutableStateOf<android.net.Uri?>(null)
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
@@ -58,6 +71,19 @@ class ChatActivity : ComponentActivity() {
                                     isGroupAdmin = isGroupAdmin
                                 )
                             }
+                        },
+                        onImagePickerClick = {
+                            // 启动图片选择器
+                            imagePickerLauncher.launch(
+                                androidx.activity.result.PickVisualMediaRequest(
+                                    androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+                                )
+                            )
+                        },
+                        imageUriToSend = imageUriToSend,
+                        onImageSent = {
+                            // 图片发送后清空
+                            imageUriToSend = null
                         }
                     )
                 }

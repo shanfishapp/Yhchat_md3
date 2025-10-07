@@ -207,6 +207,110 @@ class MessageRepository @Inject constructor(
     }
     
     /**
+     * 发送图片消息
+     * 参考Python实现：只需在content.image设置图片key即可
+     */
+    suspend fun sendImageMessage(
+        chatId: String,
+        chatType: Int,
+        imageKey: String,
+        width: Int,
+        height: Int,
+        fileSize: Long,
+        quoteMsgId: String? = null,
+        quoteMsgText: String? = null
+    ): Result<Boolean> {
+        return try {
+            val tokenFlow = tokenRepository.getToken()
+            val token = tokenFlow.first()?.token
+            if (token.isNullOrEmpty()) {
+                Log.e(tag, "❌ Token为空")
+                return Result.failure(Exception("用户未登录"))
+            }
+
+            val msgId = UUID.randomUUID().toString().replace("-", "")
+            
+            Log.d(tag, "📤 ========== 发送图片消息 ==========")
+            Log.d(tag, "📤 msgId: $msgId")
+            Log.d(tag, "📤 chatId: $chatId")
+            Log.d(tag, "📤 chatType: $chatType")
+            Log.d(tag, "📤 imageKey: $imageKey")
+            Log.d(tag, "📤 图片尺寸: ${width}x${height}")
+            Log.d(tag, "📤 文件大小: $fileSize bytes")
+            
+            // 构建protobuf请求 - 根据Python实现，只需设置content.image
+            val contentBuilder = send_message_send.Content.newBuilder()
+                .setImage(imageKey)  // 设置图片key，例如：f812a79eca05dfa884c9e89d54b2bca5.jpg
+            
+            // 添加引用消息文本
+            if (!quoteMsgText.isNullOrEmpty()) {
+                contentBuilder.setQuoteMsgText(quoteMsgText)
+                Log.d(tag, "📤 引用消息: $quoteMsgText")
+            }
+            
+            val requestBuilder = send_message_send.newBuilder()
+                .setMsgId(msgId)
+                .setChatId(chatId)
+                .setChatType(chatType.toLong())
+                .setContent(contentBuilder.build())
+                .setContentType(2) // 图片消息类型为2
+            
+            if (!quoteMsgId.isNullOrEmpty()) {
+                requestBuilder.setQuoteMsgId(quoteMsgId)
+                Log.d(tag, "📤 引用消息ID: $quoteMsgId")
+            }
+            
+            // 添加media信息 - 包含图片的详细元数据
+            val mediaBuilder = send_message_send.Media.newBuilder()
+                .setFileKey(imageKey)
+                .setFileKey2(imageKey) // 据说不写会报错
+                .setFileType("image/jpeg")
+                .setImageWidth(width.toLong())
+                .setImageHeight(height.toLong())
+                .setFileSize(fileSize)
+                .setFileSuffix(imageKey.substringAfterLast("."))
+            
+            requestBuilder.setMedia(mediaBuilder.build())
+            
+            val request = requestBuilder.build()
+            val requestBytes = request.toByteArray()
+            val requestBody = requestBytes.toRequestBody("application/x-protobuf".toMediaType())
+
+            Log.d(tag, "📤 Protobuf请求大小: ${requestBytes.size} bytes")
+            
+            val response = apiService.sendMessage(token, requestBody)
+            
+            Log.d(tag, "📥 服务器响应码: ${response.code()}")
+            
+            if (response.isSuccessful) {
+                response.body()?.let { responseBody ->
+                    val bytes = responseBody.bytes()
+                    val sendResponse = send_message.parseFrom(bytes)
+                    
+                    Log.d(tag, "📥 响应状态码: ${sendResponse.status.code}")
+                    Log.d(tag, "📥 响应消息: ${sendResponse.status.msg}")
+                    
+                    if (sendResponse.status.code == 1) {
+                        Log.d(tag, "✅ ========== 图片消息发送成功！ ==========")
+                        Result.success(true)
+                    } else {
+                        Log.e(tag, "❌ 发送失败: ${sendResponse.status.msg}")
+                        Result.failure(Exception(sendResponse.status.msg))
+                    }
+                } ?: Result.failure(Exception("响应体为空"))
+            } else {
+                val errorBody = response.errorBody()?.string()
+                Log.e(tag, "❌ HTTP错误: ${response.code()}, 错误详情: $errorBody")
+                Result.failure(Exception("发送失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "❌ 发送图片消息异常", e)
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+    
+    /**
      * 将Proto消息转换为应用内消息模型
      */
     private fun convertProtoToMessage(protoMsg: Msg, chatId: String, chatType: Int): ChatMessage {
