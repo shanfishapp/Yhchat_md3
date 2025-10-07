@@ -64,17 +64,11 @@ fun ImageViewer(
 ) {
     val context = LocalContext.current
     
-    // 缩放和位移状态
+    // 缩放和位移状态 - 支持无限缩放
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
     var rotation by remember { mutableFloatStateOf(0f) }
-    
-    // 动画状态
-    val animatedScale by animateFloatAsState(
-        targetValue = scale,
-        label = "scale"
-    )
     
     Dialog(
         onDismissRequest = onDismiss,
@@ -101,8 +95,8 @@ fun ImageViewer(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer(
-                        scaleX = animatedScale,
-                        scaleY = animatedScale,
+                        scaleX = scale,
+                        scaleY = scale,
                         translationX = offsetX,
                         translationY = offsetY,
                         rotationZ = rotation
@@ -110,28 +104,13 @@ fun ImageViewer(
                     .pointerInput(Unit) {
                         detectTransformGestures(
                             onGesture = { _, pan, zoom, rotate ->
-                                scale = (scale * zoom).coerceIn(0.5f, 3f)
+                                // 支持无限缩放，从0.1到20倍
+                                scale = (scale * zoom).coerceIn(0.1f, 20f)
                                 rotation += rotate
                                 
-                                // 修复拖拽范围限制的bug
-                                val maxX = (size.width * (scale - 1)) / 2
-                                val maxY = (size.height * (scale - 1)) / 2
-                                
-                                // 只有当maxX和maxY为正数时才限制拖拽范围
-                                if (maxX > 0 && maxY > 0) {
-                                    offsetX = (offsetX + pan.x).coerceIn(-maxX, maxX)
-                                    offsetY = (offsetY + pan.y).coerceIn(-maxY, maxY)
-                                } else {
-                                    // 当缩放比例小于等于1时，允许自由拖拽，但逐渐回到中心位置
-                                    offsetX += pan.x
-                                    offsetY += pan.y
-                                    
-                                    // 当scale <= 1时，逐渐将offset归零
-                                    if (scale <= 1f) {
-                                        offsetX = offsetX * 0.9f
-                                        offsetY = offsetY * 0.9f
-                                    }
-                                }
+                                // 跟手拖动 - 根据缩放比例动态调整拖动范围
+                                offsetX += pan.x
+                                offsetY += pan.y
                             }
                         )
                     }
@@ -188,8 +167,8 @@ fun ImageViewer(
                     // 下载按钮
                     FilledIconButton(
                         onClick = {
-                            // 实现下载功能
-                            downloadImage(context, imageUrl)
+                            // 实现下载功能，包含权限处理
+                            saveImageWithPermission(context, imageUrl)
                         },
                         colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
@@ -198,14 +177,15 @@ fun ImageViewer(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Download,
-                            contentDescription = "下载"
+                            contentDescription = "保存"
                         )
                     }
                     
                     // 分享按钮
                     FilledIconButton(
                         onClick = {
-                            // TODO: 实现分享功能
+                            // 实现分享功能
+                            shareImage(context, imageUrl)
                         },
                         colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
@@ -539,81 +519,149 @@ fun AdvancedImageViewer(
 }
 
 /**
- * 下载图片到指定目录
+ * 保存图片 - 包含权限处理
  */
-private fun downloadImage(context: Context, imageUrl: String) {
-    // 检查权限
-    if (context is Activity) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                ActivityCompat.requestPermissions(
-                    context,
-                    arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                    1001
-                )
-                Toast.makeText(context, "请授予存储权限以下载图片", Toast.LENGTH_SHORT).show()
-                return
+private fun saveImageWithPermission(context: Context, imageUrl: String) {
+    if (context !is ComponentActivity) return
+    
+    // Android 13及以上不需要WRITE_EXTERNAL_STORAGE权限
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        // Android 13+直接保存
+        downloadImageToGallery(context, imageUrl)
+    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        // Android 6-12需要检查存储权限
+        if (ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            // 有权限，直接保存
+            downloadImageToGallery(context, imageUrl)
+        } else {
+            // 没有权限，跳转到设置页面
+            Toast.makeText(context, "需要存储权限才能保存图片，请在设置中授予权限", Toast.LENGTH_LONG).show()
+            val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            intent.data = Uri.fromParts("package", context.packageName, null)
+            context.startActivity(intent)
+        }
+    } else {
+        // Android 6以下直接保存
+        downloadImageToGallery(context, imageUrl)
+    }
+}
+
+/**
+ * 下载图片到相册
+ */
+private fun downloadImageToGallery(context: Context, imageUrl: String) {
+    CoroutineScope(Dispatchers.IO).launch {
+        try {
+            // 创建目标目录
+            val picturesDir = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                "云湖"
+            )
+            if (!picturesDir.exists()) {
+                picturesDir.mkdirs()
+            }
+            
+            // 获取文件名
+            var fileName = imageUrl.substringAfterLast("/", "image_${System.currentTimeMillis()}.jpg")
+                .substringBefore("?")
+            
+            // 确保文件名有合适的扩展名
+            if (!fileName.contains(".")) {
+                fileName += ".jpg"
+            }
+            
+            // 如果文件已存在，添加序号
+            var targetFile = File(picturesDir, fileName)
+            var counter = 1
+            val baseName = fileName.substringBeforeLast(".")
+            val extension = fileName.substringAfterLast(".", "jpg")
+            while (targetFile.exists()) {
+                targetFile = File(picturesDir, "${baseName}_$counter.$extension")
+                counter++
+            }
+            
+            // 下载图片（带Referer头）
+            val url = URL(imageUrl)
+            val connection = url.openConnection() as java.net.HttpURLConnection
+            connection.setRequestProperty("Referer", "https://myapp.jwznb.com")
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
+            connection.connect()
+            
+            connection.inputStream.use { input ->
+                FileOutputStream(targetFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            
+            // 通知系统媒体扫描
+            val mediaScanIntent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+            mediaScanIntent.data = Uri.fromFile(targetFile)
+            context.sendBroadcast(mediaScanIntent)
+            
+            // 在主线程显示成功提示
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "图片已保存到相册", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "保存失败: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
-        
-        // 在后台线程执行下载
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                // 创建目标目录
-                val picturesDir = File(
-                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
-                    "yhchat_canary"
-                )
-                if (!picturesDir.exists()) {
-                    picturesDir.mkdirs()
+    }
+}
+
+/**
+ * 分享图片
+ */
+private fun shareImage(context: Context, imageUrl: String) {
+    CoroutineScope(Dispatchers.IO).launch {
+        try {
+            // 下载图片到缓存
+            val cacheDir = context.cacheDir
+            val fileName = "share_${System.currentTimeMillis()}.jpg"
+            val tempFile = File(cacheDir, fileName)
+            
+            val url = URL(imageUrl)
+            val connection = url.openConnection() as java.net.HttpURLConnection
+            connection.setRequestProperty("Referer", "https://myapp.jwznb.com")
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
+            connection.connect()
+            
+            connection.inputStream.use { input ->
+                FileOutputStream(tempFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            
+            // 使用FileProvider获取URI
+            val contentUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                tempFile
+            )
+            
+            // 创建分享Intent
+            withContext(Dispatchers.Main) {
+                val shareIntent = Intent().apply {
+                    action = Intent.ACTION_SEND
+                    putExtra(Intent.EXTRA_STREAM, contentUri)
+                    type = "image/*"
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
                 
-                // 获取文件名
-                var fileName = imageUrl.substringAfterLast("/", "image_${System.currentTimeMillis()}.jpg")
-                    .substringBefore("?", "image_${System.currentTimeMillis()}.jpg")
-                
-                // 确保文件名有合适的扩展名
-                if (!fileName.contains(".")) {
-                    fileName += ".jpg"
-                }
-                
-                // 如果文件已存在，添加序号
-                var targetFile = File(picturesDir, fileName)
-                var counter = 1
-                val baseName = fileName.substringBeforeLast(".")
-                val extension = fileName.substringAfterLast(".", "jpg")
-                while (targetFile.exists()) {
-                    targetFile = File(picturesDir, "${baseName}_$counter.$extension")
-                    counter++
-                }
-                
-                // 下载图片
-                val url = URL(imageUrl)
-                url.openStream().use { input ->
-                    FileOutputStream(targetFile).use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                
-                // 通知系统媒体扫描
-                val mediaScanIntent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
-                val contentUri = Uri.fromFile(targetFile)
-                mediaScanIntent.data = contentUri
-                context.sendBroadcast(mediaScanIntent)
-                
-                // 在主线程显示成功提示
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "图片已保存到: ${targetFile.absolutePath}", Toast.LENGTH_LONG).show()
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "下载失败: ${e.message ?: "未知错误"}", Toast.LENGTH_SHORT).show()
-                }
+                // 使用Intent选择器
+                val chooserIntent = Intent.createChooser(shareIntent, "分享图片")
+                context.startActivity(chooserIntent)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "分享失败: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }

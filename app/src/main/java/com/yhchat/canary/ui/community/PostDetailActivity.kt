@@ -67,6 +67,8 @@ import io.noties.markwon.MarkwonConfiguration
 import io.noties.markwon.SoftBreakAddsNewLinePlugin
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
+import com.yhchat.canary.ui.components.ImageViewer
+import com.yhchat.canary.ui.components.MarkdownText
 
 /**
  * 文章详情Activity
@@ -124,6 +126,9 @@ fun PostContentCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    var showImageViewer by remember { mutableStateOf(false) }
+    var currentImageUrl by remember { mutableStateOf("") }
+    
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -191,9 +196,13 @@ fun PostContentCard(
         
         // 文章内容 - 支持Markdown和HTML
         if (post.contentType == 2) {
-            // Markdown 内容 - 使用Markwon渲染
-            MarkdownContent(
+            // Markdown 内容 - 使用统一的MarkdownText组件
+            MarkdownText(
                 markdown = post.content,
+                onImageClick = { imageUrl ->
+                    currentImageUrl = imageUrl
+                    showImageViewer = true
+                },
                 modifier = Modifier.fillMaxWidth()
             )
         } else {
@@ -290,6 +299,14 @@ fun PostContentCard(
                 )
             }
         }
+    }
+    
+    // 图片预览器
+    if (showImageViewer) {
+        ImageViewer(
+            imageUrl = currentImageUrl,
+            onDismiss = { showImageViewer = false }
+        )
     }
 }
 

@@ -207,6 +207,71 @@ class MessageRepository @Inject constructor(
     }
     
     /**
+     * 撤回消息
+     * 使用protobuf的recall_msg_send
+     */
+    suspend fun recallMessage(
+        chatId: String,
+        chatType: Int,
+        msgId: String
+    ): Result<Boolean> {
+        return try {
+            val tokenFlow = tokenRepository.getToken()
+            val token = tokenFlow.first()?.token
+            if (token.isNullOrEmpty()) {
+                Log.e(tag, "❌ Token为空")
+                return Result.failure(Exception("用户未登录"))
+            }
+            
+            Log.d(tag, "📤 ========== 撤回消息 ==========")
+            Log.d(tag, "📤 msgId: $msgId")
+            Log.d(tag, "📤 chatId: $chatId")
+            Log.d(tag, "📤 chatType: $chatType")
+            
+            // 构建protobuf请求
+            val request = recall_msg_send.newBuilder()
+                .setMsgId(msgId)
+                .setChatId(chatId)
+                .setChatType(chatType.toLong())
+                .build()
+            
+            val requestBody = request.toByteArray().toRequestBody("application/x-protobuf".toMediaType())
+            
+            Log.d(tag, "📤 发送撤回请求...")
+            
+            val response = apiService.recallMessage(token, requestBody)
+            
+            Log.d(tag, "📥 服务器响应码: ${response.code()}")
+            
+            if (response.isSuccessful) {
+                response.body()?.let { responseBody ->
+                    val bytes = responseBody.bytes()
+                    val recallResponse = recall_msg.parseFrom(bytes)
+                    
+                    Log.d(tag, "📥 响应状态码: ${recallResponse.status.code}")
+                    Log.d(tag, "📥 响应消息: ${recallResponse.status.msg}")
+                    
+                    if (recallResponse.status.code == 1) {
+                        Log.d(tag, "✅ ========== 消息撤回成功！ ==========")
+                        Result.success(true)
+                    } else {
+                        Log.e(tag, "❌ 撤回失败: ${recallResponse.status.msg}")
+                        Result.failure(Exception(recallResponse.status.msg))
+                    }
+                } ?: Result.failure(Exception("响应体为空"))
+            } else {
+                val errorBody = response.errorBody()?.string()
+                Log.e(tag, "❌ HTTP错误: ${response.code()}, 错误详情: $errorBody")
+                Result.failure(Exception("撤回失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "❌ 撤回消息异常", e)
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+    
+    /**
      * 发送图片消息
      * 参考Python实现：只需在content.image设置图片key即可
      */

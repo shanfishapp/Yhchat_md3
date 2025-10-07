@@ -1,6 +1,13 @@
 package com.yhchat.canary.ui.components
 
+import android.text.Spannable
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.TextPaint
 import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
+import android.text.style.ImageSpan
+import android.view.View
 import android.widget.TextView
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -32,14 +39,15 @@ fun MarkdownText(
     markdown: String,
     modifier: Modifier = Modifier,
     textColor: Color = MaterialTheme.colorScheme.onSurface,
-    backgroundColor: Color = Color.Transparent
+    backgroundColor: Color = Color.Transparent,
+    onImageClick: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val isDarkTheme = isSystemInDarkTheme()
     val textColorInt = textColor.toArgb()
     val backgroundColorInt = backgroundColor.toArgb()
     
-    val markwon = remember(context, isDarkTheme, textColorInt) {
+    val markwon = remember(context, isDarkTheme, textColorInt, onImageClick) {
         Markwon.builder(context)
             .usePlugin(SoftBreakAddsNewLinePlugin.create())  // 支持软换行（单个回车换行）
             .usePlugin(HtmlPlugin.create())
@@ -47,8 +55,12 @@ fun MarkdownText(
             .usePlugin(object : AbstractMarkwonPlugin() {
                 override fun configureConfiguration(builder: MarkwonConfiguration.Builder) {
                     builder.linkResolver { view, link ->
-                        // 使用统一的链接处理器
-                        if (UnifiedLinkHandler.isHandleableLink(link)) {
+                        // 检查是否是图片链接
+                        if (onImageClick != null && (link.endsWith(".jpg") || link.endsWith(".jpeg") || 
+                            link.endsWith(".png") || link.endsWith(".gif") || link.endsWith(".webp"))) {
+                            onImageClick(link)
+                        } else if (UnifiedLinkHandler.isHandleableLink(link)) {
+                            // 使用统一的链接处理器
                             UnifiedLinkHandler.handleLink(context, link)
                         } else {
                             // 使用默认浏览器打开其他链接
@@ -86,6 +98,55 @@ fun MarkdownText(
             textView.setBackgroundColor(backgroundColorInt)
             val spanned = markwon.toMarkdown(markdown)
             markwon.setParsedMarkdown(textView, spanned)
+            
+            // 为图片添加点击事件
+            if (onImageClick != null) {
+                val text = textView.text
+                if (text is Spanned) {
+                    val spannable: Spannable = if (text is Spannable) {
+                        text
+                    } else {
+                        SpannableStringBuilder(text)
+                    }
+
+                    if (textView.text !== spannable) {
+                        textView.text = spannable
+                    }
+
+                    val imageSpans = spannable.getSpans(0, spannable.length, ImageSpan::class.java)
+
+                    imageSpans.forEach { span ->
+                        val start = spannable.getSpanStart(span)
+                        val end = spannable.getSpanEnd(span)
+                        val imageUrl = span.source
+
+                        if (!imageUrl.isNullOrEmpty()) {
+                            spannable.getSpans(start, end, ClickableSpan::class.java).forEach { existingSpan ->
+                                spannable.removeSpan(existingSpan)
+                            }
+
+                            val clickableSpan = object : ClickableSpan() {
+                                override fun onClick(widget: View) {
+                                    onImageClick(imageUrl)
+                                }
+
+                                override fun updateDrawState(ds: TextPaint) {
+                                    super.updateDrawState(ds)
+                                    ds.isUnderlineText = false
+                                }
+                            }
+
+                            spannable.setSpan(
+                                clickableSpan,
+                                start,
+                                end,
+                                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                            )
+                        }
+                    }
+                    textView.movementMethod = LinkMovementMethod.getInstance()
+                }
+            }
         }
     )
 }

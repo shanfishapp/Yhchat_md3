@@ -103,6 +103,7 @@ fun ChatScreen(
     viewModel: ChatViewModel = viewModel(),
     onAvatarClick: (String, String, Int, Int) -> Unit = { _, _, _, _ -> },  // 添加第4个参数：当前用户权限
     onImagePickerClick: () -> Unit = {},  // 图片选择器点击回调
+    onCameraClick: () -> Unit = {},  // 相机点击回调
     imageUriToSend: android.net.Uri? = null,  // 待发送的图片URI
     onImageSent: () -> Unit = {}  // 图片发送完成回调
 ) {
@@ -343,6 +344,10 @@ fun ChatScreen(
                                 quotedMessageId = msgId
                                 quotedMessageText = quotedText
                             },
+                            onRecall = { msgId ->
+                                // 撤回消息
+                                viewModel.recallMessage(msgId)
+                            },
                             memberPermission = memberPermission
                         )
                     }
@@ -461,7 +466,8 @@ fun ChatScreen(
                     viewModel.sendDraftInput(draftText)
                 },
                 onCameraClick = {
-                    // TODO: 实现相机拍照功能
+                    // 调用相机拍照
+                    onCameraClick()
                 },
                 selectedMessageType = selectedMessageType,
                 onMessageTypeChange = { newType ->
@@ -508,6 +514,7 @@ private fun MessageItem(
     onAvatarClick: (String, String, Int) -> Unit = { _, _, _ -> },
     onAddExpression: (String) -> Unit = {},
     onQuote: (String, String) -> Unit = { _, _ -> },
+    onRecall: (String) -> Unit = {},  // 撤回消息
     memberPermission: Int? = null  // 群成员权限等级
 ) {
     val context = LocalContext.current
@@ -715,8 +722,8 @@ private fun MessageItem(
                 showContextMenu = false
             },
             onRecall = {
-                // TODO: 实现撤回功能
-                Toast.makeText(context, "撤回功能开发中", Toast.LENGTH_SHORT).show()
+                // 撤回消息
+                onRecall(message.msgId)
                 showContextMenu = false
             },
             onAddExpression = if (message.contentType == 7) {
@@ -1094,6 +1101,7 @@ private fun MessageContentView(
                     ) {
                     HtmlWebView(
                         htmlContent = htmlContent,
+                        onImageClick = onImageClick,
                         modifier = Modifier
                             .fillMaxWidth()
                             .pointerInput(Unit) {
@@ -1219,6 +1227,7 @@ private fun MessageContentView(
                             MaterialTheme.colorScheme.onSurface
                         },
                         backgroundColor = Color.Transparent, // 使用透明背景，继承消息气泡背景
+                        onImageClick = onImageClick,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }

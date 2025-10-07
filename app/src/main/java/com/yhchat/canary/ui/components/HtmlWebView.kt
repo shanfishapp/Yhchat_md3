@@ -5,6 +5,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import android.webkit.JavascriptInterface
 import android.net.Uri
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,7 +27,8 @@ import com.yhchat.canary.utils.UnifiedLinkHandler
 @Composable
 fun HtmlWebView(
     htmlContent: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onImageClick: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val isDarkTheme = isSystemInDarkTheme()
@@ -65,6 +67,7 @@ fun HtmlWebView(
                 img {
                     max-width: 100%;
                     height: auto;
+                    cursor: pointer;
                 }
                 a {
                     color: ${String.format("#%06X", linkColor and 0xFFFFFF)} !important;
@@ -103,6 +106,18 @@ fun HtmlWebView(
                     color: ${String.format("#%06X", textColor and 0xFFFFFF)} !important;
                 }
             </style>
+            <script>
+                // 图片点击处理
+                document.addEventListener('click', function(e) {
+                    if (e.target.tagName === 'IMG') {
+                        e.preventDefault();
+                        var imgSrc = e.target.src;
+                        if (window.ImageClickHandler) {
+                            window.ImageClickHandler.onImageClick(imgSrc);
+                        }
+                    }
+                }, true);
+            </script>
         </head>
         <body>
             $htmlContent
@@ -188,6 +203,16 @@ fun HtmlWebView(
                     }
                 }
                 setBackgroundColor(backgroundColor)
+                
+                // 添加JavaScript接口
+                if (onImageClick != null) {
+                    addJavascriptInterface(object {
+                        @JavascriptInterface
+                        fun onImageClick(imageUrl: String) {
+                            onImageClick(imageUrl)
+                        }
+                    }, "ImageClickHandler")
+                }
             }
         },
         update = { webView: WebView ->

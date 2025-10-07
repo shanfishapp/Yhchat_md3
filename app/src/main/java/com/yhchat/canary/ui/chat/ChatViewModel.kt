@@ -701,6 +701,45 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
+     * 撤回消息
+     */
+    fun recallMessage(msgId: String) {
+        viewModelScope.launch {
+            try {
+                Log.d(tag, "开始撤回消息: $msgId")
+                
+                val result = messageRepository.recallMessage(
+                    chatId = currentChatId,
+                    chatType = currentChatType,
+                    msgId = msgId
+                )
+                
+                result.fold(
+                    onSuccess = {
+                        Log.d(tag, "消息撤回成功: $msgId")
+                        // 找到并更新消息，将其标记为已撤回
+                        val index = _messages.indexOfFirst { it.msgId == msgId }
+                        if (index != -1) {
+                            val message = _messages[index]
+                            _messages[index] = message.copy(
+                                msgDeleteTime = System.currentTimeMillis()
+                            )
+                            Log.d(tag, "更新消息为撤回状态")
+                        }
+                    },
+                    onFailure = { error ->
+                        Log.e(tag, "消息撤回失败: ${error.message}", error)
+                        _uiState.value = _uiState.value.copy(error = error.message)
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(tag, "撤回消息异常", e)
+                _uiState.value = _uiState.value.copy(error = e.message)
+            }
+        }
+    }
+    
+    /**
      * 清除错误状态
      */
     fun clearError() {

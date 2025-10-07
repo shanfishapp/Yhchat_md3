@@ -115,11 +115,14 @@ interface ApiService {
         @Body request: okhttp3.RequestBody
     ): Response<okhttp3.ResponseBody>
     
+    /**
+     * 撤回消息 - 使用protobuf
+     */
     @POST("v1/msg/recall-msg")
     suspend fun recallMessage(
         @Header("token") token: String,
-        @Body request: RecallMessageRequest
-    ): Response<ApiStatus>
+        @Body request: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
     
     @POST("v1/msg/recall-msg-batch")
     suspend fun recallMessagesBatch(

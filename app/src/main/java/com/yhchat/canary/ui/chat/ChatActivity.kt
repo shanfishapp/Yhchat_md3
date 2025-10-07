@@ -31,8 +31,20 @@ class ChatActivity : ComponentActivity() {
     ) { uri ->
         uri?.let { selectedUri ->
             android.util.Log.d("ChatActivity", "图片已选择: $selectedUri")
-            // 通过Intent传递给ChatScreen处理
             imageUriToSend = selectedUri
+        }
+    }
+    
+    // 相机拍照
+    private var cameraImageUri by mutableStateOf<android.net.Uri?>(null)
+    private val cameraLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            cameraImageUri?.let { uri ->
+                android.util.Log.d("ChatActivity", "拍照成功: $uri")
+                imageUriToSend = uri
+            }
         }
     }
     
@@ -80,10 +92,21 @@ class ChatActivity : ComponentActivity() {
                                 )
                             )
                         },
+                        onCameraClick = {
+                            // 启动相机拍照
+                            val photoFile = java.io.File(cacheDir, "camera_${System.currentTimeMillis()}.jpg")
+                            cameraImageUri = androidx.core.content.FileProvider.getUriForFile(
+                                this@ChatActivity,
+                                "${packageName}.fileprovider",
+                                photoFile
+                            )
+                            cameraLauncher.launch(cameraImageUri)
+                        },
                         imageUriToSend = imageUriToSend,
                         onImageSent = {
                             // 图片发送后清空
                             imageUriToSend = null
+                            cameraImageUri = null
                         }
                     )
                 }
