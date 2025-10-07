@@ -56,11 +56,11 @@ jobs:
         run: chmod +x ./gradlew
       
       - name: Build Release APK
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleDebug
  
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
          name: app-release
-         path: app/build/outputs/apk/release/app-release-unsigned.apk
+         path: app/build/outputs/apk/release/app-debug.apk
