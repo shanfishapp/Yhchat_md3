@@ -316,8 +316,7 @@ fun ChatScreen(
                             message = message,
                             isMyMessage = viewModel.isMyMessage(message),
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .animateItemPlacement(),
+                                .fillMaxWidth(),
                             onImageClick = { imageUrl ->
                                 currentImageUrl = imageUrl
                                 showImageViewer = true

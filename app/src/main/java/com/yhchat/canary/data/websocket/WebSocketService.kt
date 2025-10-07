@@ -93,9 +93,17 @@ class WebSocketService @Inject constructor(
      * 连接WebSocket
      */
     suspend fun connect(userId: String, platform: String = "windows") {
-        if (isConnected) {
+        if (isConnected && webSocket != null) {
             Log.d(tag, "Already connected")
             return
+        }
+        
+        // 确保清理旧连接
+        if (webSocket != null) {
+            Log.d(tag, "Cleaning up old WebSocket connection")
+            webSocket?.close(1000, "Reconnecting")
+            webSocket = null
+            cleanup()
         }
 
         val token = tokenRepository.getTokenSync()

@@ -83,6 +83,14 @@ class FriendRepository @Inject constructor(
                     Log.d(tag, "📥 响应消息: ${addressBook.status.msg}")
                     Log.d(tag, "📥 分组数量: ${addressBook.dataCount}")
                     
+                    // 详细日志：打印每个分组的数据
+                    addressBook.dataList.forEachIndexed { index, group ->
+                        Log.d(tag, "📥 分组[$index] 名称: ${group.listName}, 成员数量: ${group.dataCount}")
+                        group.dataList.forEachIndexed { itemIndex, item ->
+                            Log.d(tag, "  ↳ 成员[$itemIndex] ID: ${item.chatId}, 名称: ${item.name}")
+                        }
+                    }
+                    
                     if (addressBook.status.code == 1) {
                         Log.d(tag, "✅ ========== 通讯录获取成功！ ==========")
                         Result.success(addressBook)

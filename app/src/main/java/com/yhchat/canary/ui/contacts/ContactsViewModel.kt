@@ -76,16 +76,21 @@ class ContactsViewModel @Inject constructor(
                 
                 result.fold(
                     onSuccess = { data ->
-                        Log.d(tag, "✅ 通讯录加载成功")
+                        Log.d(tag, "✅ 通讯录加载成功，总分组数: ${data.dataCount}")
                         
                         // 解析protobuf数据
                         val friends = mutableListOf<Contact>()
                         val groups = mutableListOf<Contact>()
                         val bots = mutableListOf<Contact>()
                         
+                        Log.d(tag, "开始解析分组数据...")
+                        data.dataList.forEachIndexed { index, group ->
+                            Log.d(tag, "处理分组[$index]: ${group.listName}, 成员数: ${group.dataCount}")
+                        }
+                        
                         data.dataList.forEach { group ->
                             when (group.listName) {
-                                "用户" -> {
+                                "好友", "用户" -> {
                                     group.dataList.forEach { item ->
                                         friends.add(
                                             Contact(

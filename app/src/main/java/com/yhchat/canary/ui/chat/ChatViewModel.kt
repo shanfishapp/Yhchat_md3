@@ -87,47 +87,22 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
-     * 加载群成员信息
+     * 加载群成员信息（仅加载群信息以获取人数，不加载所有成员）
      */
     private fun loadGroupMembers(groupId: String) {
         viewModelScope.launch {
-            Log.d(tag, "Loading group members for: $groupId")
+            Log.d(tag, "Loading group info for member count: $groupId")
             groupRepository.setTokenRepository(tokenRepository)
             
-            // 加载群信息
+            // 只加载群信息以获取成员总数
             groupRepository.getGroupInfo(groupId).fold(
                 onSuccess = { groupInfo ->
-                    Log.d(tag, "Group info loaded, member count: ${groupInfo.memberCount}, fetching members...")
+                    Log.d(tag, "Group info loaded, member count: ${groupInfo.memberCount}")
                     
-                    // 加载所有成员（分页获取）
-                    val allMembers = mutableListOf<GroupMemberInfo>()
-                    var currentPage = 1
-                    var hasMore = true
-                    
-                    while (hasMore) {
-                        groupRepository.getGroupMembers(groupId, page = currentPage, size = 50).fold(
-                            onSuccess = { members ->
-                                allMembers.addAll(members)
-                                hasMore = members.size >= 50
-                                currentPage++
-                                Log.d(tag, "Loaded ${members.size} members, total: ${allMembers.size}")
-                            },
-                            onFailure = { error ->
-                                Log.e(tag, "Failed to load group members page $currentPage", error)
-                                hasMore = false
-                            }
-                        )
-                    }
-                    
-                    // 转换为 Map: userId -> GroupMemberInfo
-                    val membersMap: Map<String, GroupMemberInfo> = allMembers.associateBy { member ->
-                        member.userId
-                    }
+                    // 只更新成员总数，不加载所有成员列表
                     _uiState.value = _uiState.value.copy(
-                        groupMembers = membersMap,
                         groupMemberCount = groupInfo.memberCount
                     )
-                    Log.d(tag, "Group members loaded: ${membersMap.size} members")
                 },
                 onFailure = { error ->
                     Log.e(tag, "Failed to load group info", error)
