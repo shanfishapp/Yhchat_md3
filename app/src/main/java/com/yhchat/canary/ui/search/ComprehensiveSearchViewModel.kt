@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 class ComprehensiveSearchViewModel(application: Application) : AndroidViewModel(application) {
     
     private val webApiService = RepositoryFactory.webApiService
-    private val friendRepository = RepositoryFactory.friendRepository
+    private val friendRepository = RepositoryFactory.getFriendRepository(application)
     private val tokenRepository = RepositoryFactory.getTokenRepository(application)
     
     private val _uiState = MutableStateFlow(ComprehensiveSearchUiState())

@@ -165,9 +165,9 @@ message button_report_send {
 
 // 撤回消息
 message recall_msg_send {
-    string msg_id = 2; // 信息ID
-    string chat_id = 3; // 信息所属对象ID
-    int64 chat_type = 4; // 信息所属对象类型, 1-用户 2-群聊 3-机器人
+    string msg_id = 2; // 消息息ID
+    string chat_id = 3; // 消息所属对象ID
+    int64 chat_type = 4; // 消息所属对象类型, 1-用户 2-群聊 3-机器人
 }
 
 message recall_msg {
@@ -176,9 +176,9 @@ message recall_msg {
 
 // 批量撤回消息
 message recall_msg_batch_send {
-    repeated string msg_id = 2; // 信息ID
-    string chat_id = 3; // 信息所属对象ID
-    int64 chat_type = 4; // 信息所属对象类型, 1-用户 2-群聊 3-机器人
+    repeated string msg_id = 2; // 消息ID
+    string chat_id = 3; // 消息所属对象ID
+    int64 chat_type = 4; // 消息所属对象类型, 1-用户 2-群聊 3-机器人
 }
 
 message recall_msg_batch {

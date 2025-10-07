@@ -109,8 +109,8 @@ fun ImageViewer(
                                 rotation += rotate
                                 
                                 // 跟手拖动 - 根据缩放比例动态调整拖动范围
-                                offsetX += pan.x
-                                offsetY += pan.y
+                                    offsetX += pan.x
+                                    offsetY += pan.y
                             }
                         )
                     }
@@ -530,9 +530,9 @@ private fun saveImageWithPermission(context: Context, imageUrl: String) {
         downloadImageToGallery(context, imageUrl)
     } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
         // Android 6-12需要检查存储权限
-        if (ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            if (ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE
             ) == PackageManager.PERMISSION_GRANTED
         ) {
             // 有权限，直接保存
@@ -554,61 +554,61 @@ private fun saveImageWithPermission(context: Context, imageUrl: String) {
  * 下载图片到相册
  */
 private fun downloadImageToGallery(context: Context, imageUrl: String) {
-    CoroutineScope(Dispatchers.IO).launch {
-        try {
-            // 创建目标目录
-            val picturesDir = File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // 创建目标目录
+                val picturesDir = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
                 "云湖"
-            )
-            if (!picturesDir.exists()) {
-                picturesDir.mkdirs()
-            }
-            
-            // 获取文件名
-            var fileName = imageUrl.substringAfterLast("/", "image_${System.currentTimeMillis()}.jpg")
+                )
+                if (!picturesDir.exists()) {
+                    picturesDir.mkdirs()
+                }
+                
+                // 获取文件名
+                var fileName = imageUrl.substringAfterLast("/", "image_${System.currentTimeMillis()}.jpg")
                 .substringBefore("?")
-            
-            // 确保文件名有合适的扩展名
-            if (!fileName.contains(".")) {
-                fileName += ".jpg"
-            }
-            
-            // 如果文件已存在，添加序号
-            var targetFile = File(picturesDir, fileName)
-            var counter = 1
-            val baseName = fileName.substringBeforeLast(".")
-            val extension = fileName.substringAfterLast(".", "jpg")
-            while (targetFile.exists()) {
-                targetFile = File(picturesDir, "${baseName}_$counter.$extension")
-                counter++
-            }
-            
+                
+                // 确保文件名有合适的扩展名
+                if (!fileName.contains(".")) {
+                    fileName += ".jpg"
+                }
+                
+                // 如果文件已存在，添加序号
+                var targetFile = File(picturesDir, fileName)
+                var counter = 1
+                val baseName = fileName.substringBeforeLast(".")
+                val extension = fileName.substringAfterLast(".", "jpg")
+                while (targetFile.exists()) {
+                    targetFile = File(picturesDir, "${baseName}_$counter.$extension")
+                    counter++
+                }
+                
             // 下载图片（带Referer头）
-            val url = URL(imageUrl)
+                val url = URL(imageUrl)
             val connection = url.openConnection() as java.net.HttpURLConnection
             connection.setRequestProperty("Referer", "https://myapp.jwznb.com")
             connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
             connection.connect()
             
             connection.inputStream.use { input ->
-                FileOutputStream(targetFile).use { output ->
-                    input.copyTo(output)
+                    FileOutputStream(targetFile).use { output ->
+                        input.copyTo(output)
+                    }
                 }
-            }
-            
-            // 通知系统媒体扫描
-            val mediaScanIntent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+                
+                // 通知系统媒体扫描
+                val mediaScanIntent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
             mediaScanIntent.data = Uri.fromFile(targetFile)
-            context.sendBroadcast(mediaScanIntent)
-            
-            // 在主线程显示成功提示
-            withContext(Dispatchers.Main) {
+                context.sendBroadcast(mediaScanIntent)
+                
+                // 在主线程显示成功提示
+                withContext(Dispatchers.Main) {
                 Toast.makeText(context, "图片已保存到相册", Toast.LENGTH_SHORT).show()
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            withContext(Dispatchers.Main) {
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) {
                 Toast.makeText(context, "保存失败: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }

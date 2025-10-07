@@ -52,9 +52,7 @@ object RepositoryFactory {
         CommunityRepository(apiService)
     }
 
-    val friendRepository: FriendRepository by lazy {
-        FriendRepository(apiService)
-    }
+    // FriendRepository需要通过函数创建，因为需要context来获取tokenRepository
 
     val botRepository: BotRepository by lazy {
         BotRepository(apiService, webApiService)
@@ -71,7 +69,7 @@ object RepositoryFactory {
      * 获取好友仓库实例
      */
     fun getFriendRepository(context: Context): FriendRepository {
-        return friendRepository
+        return FriendRepository(apiService, getTokenRepository(context))
     }
     
     /**

@@ -128,7 +128,7 @@ fun UserProfileScreen(
     var showGagMenu by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
-    
+
     // 初始化时加载用户资料
     LaunchedEffect(userId) {
         println("UserProfileScreen: 开始加载用户资料, userId = $userId, initialUserName = $initialUserName")

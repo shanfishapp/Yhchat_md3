@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 class BotInfoViewModel(application: Application) : AndroidViewModel(application) {
     
     private val botRepository = RepositoryFactory.provideBotRepository()
-    private val friendRepository = RepositoryFactory.friendRepository
+    private val friendRepository = RepositoryFactory.getFriendRepository(application)
     private val tokenRepository = RepositoryFactory.getTokenRepository(application)
     
     private val _uiState = MutableStateFlow(BotInfoUiState())

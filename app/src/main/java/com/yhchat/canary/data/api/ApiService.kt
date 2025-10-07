@@ -297,6 +297,15 @@ interface ApiService {
         @Body request: AddFriendRequest
     ): Response<ApiStatus>
     
+    /**
+     * 获取所有聊天对象（通讯录）- 使用protobuf
+     */
+    @POST("v1/friend/address-book-list")
+    suspend fun getAddressBookList(
+        @Header("token") token: String,
+        @Body request: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
+    
     // ========== 表情相关API ==========
     
     /**

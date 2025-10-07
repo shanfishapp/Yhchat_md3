@@ -186,6 +186,11 @@
             
         <!-- 综合搜索 Activity -->
 
+        <activity
+            android:name=".ui.search.SearchActivity"
+            android:exported="false"
+            android:label="搜索"
+            android:theme="@style/Theme.YhchatCanary" />
 
         <activity
             android:name=".ui.search.ComprehensiveSearchActivity"

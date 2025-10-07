@@ -84,3 +84,26 @@ message edit_avatar_send {
 message edit_avatar {
     Status status = 1;
 }
+
+// 获取所有聊天对象（通讯录）
+message address_book_list_send {
+    string number = 2;
+}
+
+message address_book_list {
+    Status status = 1;
+    repeated Data data = 2;
+
+    message Data {
+        string list_name = 1; // 聊天对象列表名称，为"用户"，"我加入的群聊"，"机器人"
+        repeated Data_list data = 2;
+
+        message Data_list {
+            string chat_id = 1; // 聊天对象ID
+            string name = 2; // 聊天对象名称
+            string avatar_url = 3; // 聊天对象头像url
+            int32 permisson_level = 4; // 群权限等级(普通用户无此项(数值为0或无此项),群主100,管理员2),只有群列表才有此项
+            bool noDisturb = 5; // 免打扰
+        }
+    }
+}
