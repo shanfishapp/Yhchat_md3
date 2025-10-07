@@ -308,6 +308,190 @@ class GroupRepository @Inject constructor() {
             Result.failure(e)
         }
     }
+    
+    /**
+     * 设置消息类型限制
+     * POST /v1/group/msg-type-limit
+     */
+    suspend fun setMessageTypeLimit(
+        groupId: String,
+        messageTypes: String  // 例如: "1,2,3,4"
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        Log.d(tag, "🚫 Setting message type limit for group: $groupId, types: $messageTypes")
+        val token = tokenRepository?.getTokenSync()
+        if (token.isNullOrEmpty()) {
+            Log.e(tag, "❌ No token available")
+            return@withContext Result.failure(Exception("未登录"))
+        }
+
+        return@withContext try {
+            val requestBody = """{"groupId":"$groupId","type":"$messageTypes"}"""
+                .toRequestBody("application/json".toMediaTypeOrNull())
+
+            val request = Request.Builder()
+                .url("$baseUrl/v1/group/msg-type-limit")
+                .addHeader("token", token)
+                .post(requestBody)
+                .build()
+
+            Log.d(tag, "📤 Sending message type limit request...")
+            val response = client.newCall(request).execute()
+
+            if (response.isSuccessful) {
+                val responseText = response.body?.string()
+                Log.d(tag, "✅ Message type limit set successfully: $responseText")
+                Result.success(true)
+            } else {
+                Log.e(tag, "❌ HTTP error: ${response.code}")
+                Result.failure(Exception("设置消息类型限制失败: ${response.code}"))
+            }
+        } catch (e: IOException) {
+            Log.e(tag, "Network error", e)
+            Result.failure(e)
+        } catch (e: Exception) {
+            Log.e(tag, "Unknown error", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 踢出群成员
+     * POST /v1/group/remove-member
+     */
+    suspend fun removeMember(
+        groupId: String,
+        userId: String
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        Log.d(tag, "👢 Removing member from group: $groupId, userId: $userId")
+        val token = tokenRepository?.getTokenSync()
+        if (token.isNullOrEmpty()) {
+            Log.e(tag, "❌ No token available")
+            return@withContext Result.failure(Exception("未登录"))
+        }
+
+        return@withContext try {
+            val requestBody = """{"groupId":"$groupId","userId":"$userId"}"""
+                .toRequestBody("application/json".toMediaTypeOrNull())
+
+            val request = Request.Builder()
+                .url("$baseUrl/v1/group/remove-member")
+                .addHeader("token", token)
+                .post(requestBody)
+                .build()
+
+            Log.d(tag, "📤 Sending remove member request...")
+            val response = client.newCall(request).execute()
+
+            if (response.isSuccessful) {
+                val responseText = response.body?.string()
+                Log.d(tag, "✅ Member removed successfully: $responseText")
+                Result.success(true)
+            } else {
+                Log.e(tag, "❌ HTTP error: ${response.code}")
+                Result.failure(Exception("踢出用户失败: ${response.code}"))
+            }
+        } catch (e: IOException) {
+            Log.e(tag, "Network error", e)
+            Result.failure(e)
+        } catch (e: Exception) {
+            Log.e(tag, "Unknown error", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 禁言群成员
+     * POST /v1/group/gag-member
+     * @param gagTime 禁言时间: 0-取消禁言, 600-10分钟, 3600-1小时, 21600-6小时, 43200-12小时, 1-永久禁言
+     */
+    suspend fun gagMember(
+        groupId: String,
+        userId: String,
+        gagTime: Int
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        Log.d(tag, "🔇 Gagging member in group: $groupId, userId: $userId, gagTime: $gagTime")
+        val token = tokenRepository?.getTokenSync()
+        if (token.isNullOrEmpty()) {
+            Log.e(tag, "❌ No token available")
+            return@withContext Result.failure(Exception("未登录"))
+        }
+
+        return@withContext try {
+            val requestBody = """{"groupId":"$groupId","userId":"$userId","gag":$gagTime}"""
+                .toRequestBody("application/json".toMediaTypeOrNull())
+
+            val request = Request.Builder()
+                .url("$baseUrl/v1/group/gag-member")
+                .addHeader("token", token)
+                .post(requestBody)
+                .build()
+
+            Log.d(tag, "📤 Sending gag member request...")
+            val response = client.newCall(request).execute()
+
+            if (response.isSuccessful) {
+                val responseText = response.body?.string()
+                Log.d(tag, "✅ Member gagged successfully: $responseText")
+                Result.success(true)
+            } else {
+                Log.e(tag, "❌ HTTP error: ${response.code}")
+                Result.failure(Exception("禁言用户失败: ${response.code}"))
+            }
+        } catch (e: IOException) {
+            Log.e(tag, "Network error", e)
+            Result.failure(e)
+        } catch (e: Exception) {
+            Log.e(tag, "Unknown error", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 设置管理员（上任/卸任）
+     * POST /v1/group/manage-setting
+     * @param userLevel 用户等级: 0-普通成员, 2-管理员
+     */
+    suspend fun setMemberRole(
+        groupId: String,
+        userId: String,
+        userLevel: Int
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        Log.d(tag, "⚙️ Setting member role in group: $groupId, userId: $userId, userLevel: $userLevel")
+        val token = tokenRepository?.getTokenSync()
+        if (token.isNullOrEmpty()) {
+            Log.e(tag, "❌ No token available")
+            return@withContext Result.failure(Exception("未登录"))
+        }
+
+        return@withContext try {
+            val requestBody = """{"groupId":"$groupId","userId":"$userId","userLevel":$userLevel}"""
+                .toRequestBody("application/json".toMediaTypeOrNull())
+
+            val request = Request.Builder()
+                .url("$baseUrl/v1/group/manage-setting")
+                .addHeader("token", token)
+                .post(requestBody)
+                .build()
+
+            Log.d(tag, "📤 Sending set member role request...")
+            val response = client.newCall(request).execute()
+
+            if (response.isSuccessful) {
+                val responseText = response.body?.string()
+                Log.d(tag, "✅ Member role set successfully: $responseText")
+                Result.success(true)
+            } else {
+                Log.e(tag, "❌ HTTP error: ${response.code}")
+                Result.failure(Exception("设置成员角色失败: ${response.code}"))
+            }
+        } catch (e: IOException) {
+            Log.e(tag, "Network error", e)
+            Result.failure(e)
+        } catch (e: Exception) {
+            Log.e(tag, "Unknown error", e)
+            Result.failure(e)
+        }
+    }
 }
 
 

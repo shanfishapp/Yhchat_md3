@@ -29,7 +29,11 @@ data class GroupSettingsUiState(
     val editedHistoryMsg: Boolean = false,
     val editedPrivate: Boolean = false,
     val editedCategoryName: String = "",
-    val editedCategoryId: Long = 0L
+    val editedCategoryId: Long = 0L,
+    // 消息类型限制对话框
+    val showMessageTypeLimitDialog: Boolean = false,
+    val selectedMessageTypes: Set<Int> = emptySet(),
+    val isSettingMessageTypeLimit: Boolean = false
 )
 
 @HiltViewModel
@@ -204,5 +208,79 @@ class GroupSettingsViewModel @Inject constructor(
         // 这里需要获取当前用户ID，暂时返回true用于测试
         // TODO: 实现真正的权限检查
         return groupInfo.permissionLevel == 100 || groupInfo.permissionLevel == 2
+    }
+    
+    /**
+     * 显示消息类型限制对话框
+     */
+    fun showMessageTypeLimitDialog() {
+        val groupInfo = _uiState.value.groupInfo ?: return
+        // 解析当前的消息类型限制
+        val currentTypes = if (groupInfo.limitedMsgType.isNotEmpty()) {
+            groupInfo.limitedMsgType.split(",").mapNotNull { it.toIntOrNull() }.toSet()
+        } else {
+            emptySet()
+        }
+        _uiState.value = _uiState.value.copy(
+            showMessageTypeLimitDialog = true,
+            selectedMessageTypes = currentTypes
+        )
+    }
+    
+    /**
+     * 隐藏消息类型限制对话框
+     */
+    fun dismissMessageTypeLimitDialog() {
+        _uiState.value = _uiState.value.copy(
+            showMessageTypeLimitDialog = false,
+            selectedMessageTypes = emptySet()
+        )
+    }
+    
+    /**
+     * 切换消息类型选择
+     */
+    fun toggleMessageType(type: Int) {
+        val current = _uiState.value.selectedMessageTypes
+        val updated = if (current.contains(type)) {
+            current - type
+        } else {
+            current + type
+        }
+        _uiState.value = _uiState.value.copy(selectedMessageTypes = updated)
+    }
+    
+    /**
+     * 确认设置消息类型限制
+     */
+    fun confirmMessageTypeLimit() {
+        val groupInfo = _uiState.value.groupInfo ?: return
+        val selectedTypes = _uiState.value.selectedMessageTypes
+        
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSettingMessageTypeLimit = true)
+            
+            val typeString = selectedTypes.sorted().joinToString(",")
+            Log.d(tag, "Setting message type limit: $typeString")
+            
+            groupRepository.setMessageTypeLimit(groupInfo.groupId, typeString).fold(
+                onSuccess = {
+                    Log.d(tag, "✅ Message type limit set successfully")
+                    _uiState.value = _uiState.value.copy(
+                        isSettingMessageTypeLimit = false,
+                        showMessageTypeLimitDialog = false
+                    )
+                    // 重新加载群聊信息
+                    loadGroupInfo(groupInfo.groupId)
+                },
+                onFailure = { error ->
+                    Log.e(tag, "❌ Failed to set message type limit", error)
+                    _uiState.value = _uiState.value.copy(
+                        isSettingMessageTypeLimit = false,
+                        saveError = error.message ?: "设置消息类型限制失败"
+                    )
+                }
+            )
+        }
     }
 }

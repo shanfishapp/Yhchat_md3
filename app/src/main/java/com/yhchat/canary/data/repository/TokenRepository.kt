@@ -85,6 +85,13 @@ class TokenRepository @Inject constructor(
     }
     
     /**
+     * 同步获取用户ID
+     */
+    fun getUserIdSync(): String? {
+        return secureStorage?.getUserId()
+    }
+    
+    /**
      * 清除Token
      */
     suspend fun clearToken() {

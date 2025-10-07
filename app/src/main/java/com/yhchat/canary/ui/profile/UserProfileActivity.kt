@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -51,14 +52,24 @@ class UserProfileActivity : ComponentActivity() {
     companion object {
         private const val EXTRA_USER_ID = "extra_user_id"
         private const val EXTRA_USER_NAME = "extra_user_name"
+        private const val EXTRA_GROUP_ID = "extra_group_id"
+        private const val EXTRA_IS_GROUP_ADMIN = "extra_is_group_admin"
 
         /**
          * 启动用户资料Activity
          */
-        fun start(context: Context, userId: String, userName: String? = null) {
+        fun start(
+            context: Context, 
+            userId: String, 
+            userName: String? = null,
+            groupId: String? = null,
+            isGroupAdmin: Boolean = false
+        ) {
             val intent = Intent(context, UserProfileActivity::class.java).apply {
                 putExtra(EXTRA_USER_ID, userId)
                 putExtra(EXTRA_USER_NAME, userName)
+                groupId?.let { putExtra(EXTRA_GROUP_ID, it) }
+                putExtra(EXTRA_IS_GROUP_ADMIN, isGroupAdmin)
             }
             context.startActivity(intent)
         }
@@ -70,6 +81,8 @@ class UserProfileActivity : ComponentActivity() {
 
         val userId = intent.getStringExtra(EXTRA_USER_ID) ?: ""
         val initialUserName = intent.getStringExtra(EXTRA_USER_NAME)
+        val groupId = intent.getStringExtra(EXTRA_GROUP_ID)
+        val isGroupAdmin = intent.getBooleanExtra(EXTRA_IS_GROUP_ADMIN, false)
 
         if (userId.isEmpty()) {
             finish()
@@ -81,6 +94,8 @@ class UserProfileActivity : ComponentActivity() {
                 UserProfileScreen(
                     userId = userId,
                     initialUserName = initialUserName,
+                    groupId = groupId,
+                    isGroupAdmin = isGroupAdmin,
                     onBackClick = { finish() },
                     onShowToast = { message ->
                         Toast.makeText(this@UserProfileActivity, message, Toast.LENGTH_SHORT).show()
@@ -99,6 +114,8 @@ class UserProfileActivity : ComponentActivity() {
 fun UserProfileScreen(
     userId: String,
     initialUserName: String? = null,
+    groupId: String? = null,
+    isGroupAdmin: Boolean = false,
     onBackClick: () -> Unit,
     onShowToast: (String) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -107,11 +124,44 @@ fun UserProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val userProfile by viewModel.userProfile.collectAsState()
-
+    var showMemberMenu by remember { mutableStateOf(false) }
+    var showGagMenu by remember { mutableStateOf(false) }
+    
+    val context = LocalContext.current
+    
     // 初始化时加载用户资料
     LaunchedEffect(userId) {
         println("UserProfileScreen: 开始加载用户资料, userId = $userId, initialUserName = $initialUserName")
         viewModel.loadUserProfile(userId)
+    }
+    
+    // 如果在群聊环境，加载群信息和目标用户信息
+    LaunchedEffect(groupId, userId) {
+        groupId?.let { gId ->
+            viewModel.loadGroupInfoAndMemberInfo(gId, userId)
+        }
+    }
+    
+    // 获取目标用户的权限等级
+    val targetUserPermission = uiState.targetUserPermission
+    
+    // 群聊管理操作处理
+    val handleRemoveMember = {
+        if (groupId != null) {
+            viewModel.removeMemberFromGroup(groupId, userId)
+        }
+    }
+    
+    val handleGagMember = { gagTime: Int ->
+        if (groupId != null) {
+            viewModel.gagMemberInGroup(groupId, userId, gagTime)
+        }
+    }
+    
+    val handleSetMemberRole = { userLevel: Int ->
+        if (groupId != null) {
+            viewModel.setMemberRole(groupId, userId, userLevel)
+        }
     }
 
     // 监听添加好友成功状态
@@ -152,6 +202,65 @@ fun UserProfileScreen(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "返回"
                     )
+                }
+            },
+            actions = {
+                // 群聊管理菜单（在群聊环境下都显示，权限由后端控制）
+                if (groupId != null) {
+                    Box {
+                        IconButton(onClick = { showMemberMenu = true }) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "更多操作"
+                            )
+                        }
+                        
+                        DropdownMenu(
+                            expanded = showMemberMenu,
+                            onDismissRequest = { showMemberMenu = false }
+                        ) {
+                            // 根据目标用户权限显示上任/卸任管理员
+                            if (targetUserPermission == 2) {
+                                // 目标是管理员，显示卸任选项
+                                DropdownMenuItem(
+                                    text = { Text("卸任管理员") },
+                                    onClick = {
+                                        showMemberMenu = false
+                                        handleSetMemberRole(0)
+                                    },
+                                    enabled = !uiState.isProcessingMemberAction
+                                )
+                            } else if (targetUserPermission == 0) {
+                                // 目标是普通成员，显示上任选项
+                                DropdownMenuItem(
+                                    text = { Text("设为管理员") },
+                                    onClick = {
+                                        showMemberMenu = false
+                                        handleSetMemberRole(2)
+                                    },
+                                    enabled = !uiState.isProcessingMemberAction
+                                )
+                            }
+                            
+                            // 踢出和禁言（都显示，由后端控制权限）
+                            DropdownMenuItem(
+                                text = { Text("踢出群聊") },
+                                onClick = {
+                                    showMemberMenu = false
+                                    handleRemoveMember()
+                                },
+                                enabled = !uiState.isProcessingMemberAction
+                            )
+                            DropdownMenuItem(
+                                text = { Text("禁言") },
+                                onClick = {
+                                    showMemberMenu = false
+                                    showGagMenu = true
+                                },
+                                enabled = !uiState.isProcessingMemberAction
+                            )
+                        }
+                    }
                 }
             }
         )
@@ -218,6 +327,19 @@ fun UserProfileScreen(
                 onRemarkChange = { viewModel.updateFriendRemark(it) },
                 onConfirm = { viewModel.confirmAddFriend() },
                 onDismiss = { viewModel.dismissAddFriendDialog() }
+            )
+        }
+        
+        // 禁言对话框
+        if (showGagMenu) {
+            GagMemberDialog(
+                userName = initialUserName ?: "该用户",
+                isLoading = uiState.isProcessingMemberAction,
+                onConfirm = { gagTime ->
+                    handleGagMember(gagTime)
+                    showGagMenu = false
+                },
+                onDismiss = { showGagMenu = false }
             )
         }
         }
@@ -309,7 +431,7 @@ private fun UserHomepageContent(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .background(
-                                MaterialTheme.colorScheme.tertiary,
+                                MaterialTheme.colorScheme.primary,
                                 RoundedCornerShape(16.dp)
                             )
                             .padding(horizontal = 12.dp, vertical = 4.dp)
@@ -318,13 +440,13 @@ private fun UserHomepageContent(
                             imageVector = Icons.Default.Star,
                             contentDescription = "VIP",
                             modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onTertiary
+                            tint = MaterialTheme.colorScheme.onPrimary
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "VIP",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onTertiary,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -554,6 +676,58 @@ private fun AddFriendDialog(
                 }
             }
         },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isLoading
+            ) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+/**
+ * 禁言成员对话框
+ */
+@Composable
+private fun GagMemberDialog(
+    userName: String,
+    isLoading: Boolean,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val gagOptions = listOf(
+        0 to "取消禁言",
+        600 to "禁言10分钟",
+        3600 to "禁言1小时",
+        21600 to "禁言6小时",
+        43200 to "禁言12小时",
+        1 to "永久禁言"
+    )
+    
+    AlertDialog(
+        onDismissRequest = if (!isLoading) onDismiss else { {} },
+        title = { Text("禁言 $userName") },
+        text = {
+            Column {
+                Text("选择禁言时长：", style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                gagOptions.forEach { (gagTime, label) ->
+                    TextButton(
+                        onClick = {
+                            onConfirm(gagTime)
+                        },
+                        enabled = !isLoading,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(label, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        },
+        confirmButton = {},
         dismissButton = {
             TextButton(
                 onClick = onDismiss,

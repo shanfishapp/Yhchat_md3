@@ -46,9 +46,17 @@ class ChatActivity : ComponentActivity() {
                         chatName = chatName,
                         userId = "",
                         onBackClick = { finish() },
-                        onAvatarClick = { userId, userName, chatType ->
+                        onAvatarClick = { userId, userName, chatType, currentUserPermission ->
                             if (chatType != 3) {
-                                com.yhchat.canary.ui.profile.UserProfileActivity.start(this@ChatActivity, userId, userName)
+                                // 如果是群聊环境，传递群聊信息和当前用户权限
+                                val isGroupAdmin = currentUserPermission >= 2
+                                com.yhchat.canary.ui.profile.UserProfileActivity.start(
+                                    context = this@ChatActivity, 
+                                    userId = userId, 
+                                    userName = userName,
+                                    groupId = if (this@ChatActivity.chatType == 2) this@ChatActivity.chatId else null,
+                                    isGroupAdmin = isGroupAdmin
+                                )
                             }
                         }
                     )

@@ -158,8 +158,17 @@ class MainActivity : ComponentActivity() {
                                 onBackClick = {
                                     currentScreen = "conversation"
                                 },
-                                onAvatarClick = { userId, userName, chatType ->
-                                    UserProfileActivity.start(this@MainActivity, userId, userName)
+                                onAvatarClick =
+                                    { userId, userName, chatType, currentUserPermission ->
+                                    val isGroupAdmin = currentUserPermission >= 2
+                                    val groupId = if (chatType == 2) currentChatId else null
+                                    UserProfileActivity.start(
+                                        this@MainActivity,
+                                        userId,
+                                        userName,
+                                        groupId,
+                                        isGroupAdmin
+                                    )
                                 },
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -274,8 +283,16 @@ class MainActivity : ComponentActivity() {
                                     onBackClick = {
                                         currentScreen = "conversation"
                                     },
-                                    onAvatarClick = { userId, userName, _ ->
-                                        UserProfileActivity.start(this@MainActivity, userId, userName)
+                                    onAvatarClick = { userId, userName, chatType, currentUserPermission ->
+                                        val isGroupAdmin = currentUserPermission >= 2
+                                        val groupId = if (chatType == 2) currentChatId else null
+                                        UserProfileActivity.start(
+                                            this@MainActivity,
+                                            userId,
+                                            userName,
+                                            groupId,
+                                            isGroupAdmin
+                                        )
                                     },
                                     modifier = Modifier.fillMaxSize()
                                 )

@@ -193,5 +193,103 @@ class GroupInfoViewModel @Inject constructor(
     fun updateNewCategoryName(name: String) {
         _uiState.value = _uiState.value.copy(newCategoryName = name)
     }
+    
+    /**
+     * 踢出群成员
+     */
+    fun removeMember(groupId: String, userId: String) {
+        viewModelScope.launch {
+            Log.d(tag, "Removing member: groupId=$groupId, userId=$userId")
+            
+            groupRepository.removeMember(groupId, userId).fold(
+                onSuccess = {
+                    Log.d(tag, "✅ Member removed successfully")
+                    android.widget.Toast.makeText(
+                        android.app.Application().applicationContext,
+                        "已踢出该成员",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                    // 重新加载群成员列表
+                    loadGroupMembers(groupId)
+                },
+                onFailure = { error ->
+                    Log.e(tag, "❌ Failed to remove member", error)
+                    _uiState.value = _uiState.value.copy(
+                        error = error.message ?: "踢出成员失败"
+                    )
+                }
+            )
+        }
+    }
+    
+    /**
+     * 禁言群成员
+     */
+    fun gagMember(groupId: String, userId: String, gagTime: Int) {
+        viewModelScope.launch {
+            Log.d(tag, "Gagging member: groupId=$groupId, userId=$userId, gagTime=$gagTime")
+            
+            groupRepository.gagMember(groupId, userId, gagTime).fold(
+                onSuccess = {
+                    val message = when (gagTime) {
+                        0 -> "已取消禁言"
+                        600 -> "已禁言10分钟"
+                        3600 -> "已禁言1小时"
+                        21600 -> "已禁言6小时"
+                        43200 -> "已禁言12小时"
+                        1 -> "已永久禁言"
+                        else -> "禁言设置成功"
+                    }
+                    Log.d(tag, "✅ Member gagged successfully: $message")
+                    android.widget.Toast.makeText(
+                        android.app.Application().applicationContext,
+                        message,
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                    // 重新加载群成员列表
+                    loadGroupMembers(groupId)
+                },
+                onFailure = { error ->
+                    Log.e(tag, "❌ Failed to gag member", error)
+                    _uiState.value = _uiState.value.copy(
+                        error = error.message ?: "禁言操作失败"
+                    )
+                }
+            )
+        }
+    }
+    
+    /**
+     * 设置成员角色（上任/卸任管理员）
+     */
+    fun setMemberRole(groupId: String, userId: String, userLevel: Int) {
+        viewModelScope.launch {
+            Log.d(tag, "Setting member role: groupId=$groupId, userId=$userId, userLevel=$userLevel")
+            
+            groupRepository.setMemberRole(groupId, userId, userLevel).fold(
+                onSuccess = {
+                    val message = when (userLevel) {
+                        0 -> "已卸任管理员"
+                        2 -> "已设为管理员"
+                        else -> "角色设置成功"
+                    }
+                    Log.d(tag, "✅ Member role set successfully: $message")
+                    android.widget.Toast.makeText(
+                        android.app.Application().applicationContext,
+                        message,
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                    // 重新加载群成员列表
+                    loadGroupMembers(groupId)
+                },
+                onFailure = { error ->
+                    Log.e(tag, "❌ Failed to set member role", error)
+                    _uiState.value = _uiState.value.copy(
+                        error = error.message ?: "设置角色失败"
+                    )
+                }
+            )
+        }
+    }
 }
 

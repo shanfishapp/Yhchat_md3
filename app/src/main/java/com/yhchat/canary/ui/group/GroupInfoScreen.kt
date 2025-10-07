@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
@@ -115,7 +116,11 @@ fun GroupInfoScreenRoot(
                             isLoadingMembers = uiState.isLoadingMembers,
                             isLoadingMoreMembers = uiState.isLoadingMoreMembers,
                             hasMoreMembers = uiState.hasMoreMembers,
+                            currentUserPermission = uiState.groupInfo!!.permissionLevel.toInt(),
                             onLoadMore = { viewModel.loadMoreMembers(groupId) },
+                            onRemoveMember = { userId -> viewModel.removeMember(groupId, userId) },
+                            onGagMember = { userId, gagTime -> viewModel.gagMember(groupId, userId, gagTime) },
+                            onSetMemberRole = { userId, userLevel -> viewModel.setMemberRole(groupId, userId, userLevel) },
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -133,7 +138,11 @@ private fun GroupInfoContent(
     isLoadingMembers: Boolean,
     isLoadingMoreMembers: Boolean,
     hasMoreMembers: Boolean,
+    currentUserPermission: Int = 0,
     onLoadMore: () -> Unit,
+    onRemoveMember: (String) -> Unit = {},
+    onGagMember: (String, Int) -> Unit = { _, _ -> },
+    onSetMemberRole: (String, Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -258,7 +267,14 @@ private fun GroupInfoContent(
         } else {
             // 显示成员列表
             items(members) { member ->
-                MemberItem(member = member)
+                MemberItem(
+                    member = member,
+                    currentUserPermission = currentUserPermission,
+                    groupId = groupId,
+                    onRemoveMember = onRemoveMember,
+                    onGagMember = onGagMember,
+                    onSetMemberRole = onSetMemberRole
+                )
             }
             
             // 加载更多指示器
@@ -328,8 +344,20 @@ private fun InfoRow(label: String, value: String) {
 }
 
 @Composable
-private fun MemberItem(member: GroupMemberInfo) {
+private fun MemberItem(
+    member: GroupMemberInfo,
+    currentUserPermission: Int = 0,
+    groupId: String = "",
+    onRemoveMember: ((String) -> Unit)? = null,
+    onGagMember: ((String, Int) -> Unit)? = null,
+    onSetMemberRole: ((String, Int) -> Unit)? = null
+) {
     val context = LocalContext.current
+    var showMenu by remember { mutableStateOf(false) }
+    var showGagDialog by remember { mutableStateOf(false) }
+    
+    // 判断是否显示管理菜单：除了群主外的所有成员都显示
+    val showAdminMenu = member.permissionLevel < 100
     
     Card(
         modifier = Modifier
@@ -436,7 +464,72 @@ private fun MemberItem(member: GroupMemberInfo) {
                     )
                 }
             }
+            
+            // 管理菜单（除了群主外的所有成员都显示）
+            if (showAdminMenu) {
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "管理"
+                        )
+                    }
+                    
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        // 根据成员权限显示上任/卸任管理员
+                        if (member.permissionLevel == 2) {
+                            // 管理员，显示卸任选项
+                            DropdownMenuItem(
+                                text = { Text("卸任管理员") },
+                                onClick = {
+                                    showMenu = false
+                                    onSetMemberRole?.invoke(member.userId, 0)
+                                }
+                            )
+                        } else if (member.permissionLevel == 0) {
+                            // 普通成员，显示上任选项
+                            DropdownMenuItem(
+                                text = { Text("设为管理员") },
+                                onClick = {
+                                    showMenu = false
+                                    onSetMemberRole?.invoke(member.userId, 2)
+                                }
+                            )
+                        }
+                        
+                        DropdownMenuItem(
+                            text = { Text("踢出群聊") },
+                            onClick = {
+                                showMenu = false
+                                onRemoveMember?.invoke(member.userId)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("禁言") },
+                            onClick = {
+                                showMenu = false
+                                showGagDialog = true
+                            }
+                        )
+                    }
+                }
+            }
         }
+    }
+    
+    // 禁言对话框
+    if (showGagDialog) {
+        GroupMemberGagDialog(
+            memberName = member.name,
+            onConfirm = { gagTime ->
+                onGagMember?.invoke(member.userId, gagTime)
+                showGagDialog = false
+            },
+            onDismiss = { showGagDialog = false }
+        )
     }
 }
 
@@ -470,6 +563,51 @@ fun EditCategoryDialog(
         },
         dismissButton = {
             OutlinedButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+/**
+ * 群成员禁言对话框
+ */
+@Composable
+private fun GroupMemberGagDialog(
+    memberName: String,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val gagOptions = listOf(
+        0 to "取消禁言",
+        600 to "禁言10分钟",
+        3600 to "禁言1小时",
+        21600 to "禁言6小时",
+        43200 to "禁言12小时",
+        1 to "永久禁言"
+    )
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("禁言 $memberName") },
+        text = {
+            Column {
+                Text("选择禁言时长：", style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                gagOptions.forEach { (gagTime, label) ->
+                    TextButton(
+                        onClick = { onConfirm(gagTime) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(label, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
                 Text("取消")
             }
         }

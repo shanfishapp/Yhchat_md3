@@ -101,11 +101,19 @@ fun ChatScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ChatViewModel = viewModel(),
-    onAvatarClick: (String, String, Int) -> Unit = { _, _, _ -> }
+    onAvatarClick: (String, String, Int, Int) -> Unit = { _, _, _, _ -> }  // 添加第4个参数：当前用户权限
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val messages = viewModel.messages
+    
+    // 获取当前用户的权限等级
+    val currentUserPermission = if (chatType == 2) {
+        // 群聊时，从groupMembers中获取当前用户权限
+        viewModel.getCurrentUserPermission()
+    } else {
+        0
+    }
     var inputText by remember { mutableStateOf("") }
     var selectedMessageType by remember { mutableStateOf(1) } // 1-文本, 3-Markdown, 8-HTML
     val listState = rememberLazyListState()
@@ -292,7 +300,7 @@ fun ChatScreen(
                                     context.startActivity(intent)
                                 } else {
                                     // 用户头像点击，传递给外部处理（UserProfileActivity）
-                                    onAvatarClick(chatId, name, chatType)
+                                    onAvatarClick(chatId, name, chatType, currentUserPermission)
                                 }
                             },
                             onAddExpression = viewModel::addExpressionToFavorites,
@@ -387,7 +395,7 @@ fun ChatScreen(
         }
 
         // 底部输入栏
-        ChatInputBar(
+            ChatInputBar(
                 text = inputText,
                 onTextChange = { inputText = it },
                 onSendMessage = {
@@ -433,14 +441,14 @@ fun ChatScreen(
                     quotedMessageId = null
                     quotedMessageText = null
                 },
-            modifier = Modifier.padding(
+                modifier = Modifier.padding(
                 start = 16.dp,
                 end = 16.dp,
-                top = 8.dp,
-                bottom = 16.dp // 增加底部间距，避免粘在最底部
+                    top = 8.dp,
+                    bottom = 16.dp // 增加底部间距，避免粘在最底部
+                )
             )
-        )
-        }
+    }
     }
     
     // 图片预览器
@@ -478,6 +486,16 @@ private fun MessageItem(
     if (message.msgDeleteTime != null) {
         // 撤回消息显示
         RecallMessageItem(
+            message = message,
+            modifier = modifier
+        )
+        return
+    }
+    
+    // 检查是否为tip消息（类型9）
+    if (message.contentType == 9) {
+        // Tip消息显示
+        TipMessageItem(
             message = message,
             modifier = modifier
         )
@@ -973,6 +991,36 @@ private fun RecallMessageItem(
         ) {
             Text(
                 text = "${message.sender.name} 在 ${formatRecallTime(message.msgDeleteTime!!)} 撤回了一条消息",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Tip消息项（类型9）
+ */
+@Composable
+private fun TipMessageItem(
+    message: ChatMessage,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Surface(
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .widthIn(max = 280.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            tonalElevation = 1.dp
+        ) {
+            Text(
+                text = message.content.text ?: "系统提示",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

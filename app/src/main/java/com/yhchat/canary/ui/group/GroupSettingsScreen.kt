@@ -1,5 +1,6 @@
 package com.yhchat.canary.ui.group
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -266,6 +267,54 @@ private fun GroupSettingsContent(
             }
         }
         
+        // 消息类型限制（仅管理员/群主可见）
+        if (isAdminOrOwner) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "消息管理",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        // 消息类型限制
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = !uiState.isEditing) { 
+                                    viewModel.showMessageTypeLimitDialog() 
+                                },
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "消息类型限制",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = if (groupInfo.limitedMsgType.isEmpty()) "未设置限制" else "已限制 ${groupInfo.limitedMsgType.split(",").size} 种消息类型",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "设置",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        
         // 群聊详细信息（只读）
         item {
             Card(
@@ -329,6 +378,17 @@ private fun GroupSettingsContent(
             }
         }
     }
+    
+    // 消息类型限制对话框
+    if (uiState.showMessageTypeLimitDialog) {
+        MessageTypeLimitDialog(
+            selectedTypes = uiState.selectedMessageTypes,
+            isLoading = uiState.isSettingMessageTypeLimit,
+            onToggleType = viewModel::toggleMessageType,
+            onConfirm = viewModel::confirmMessageTypeLimit,
+            onDismiss = viewModel::dismissMessageTypeLimitDialog
+        )
+    }
 }
 
 @Composable
@@ -385,4 +445,91 @@ private fun SettingTextItem(
             fontWeight = FontWeight.Medium
         )
     }
+}
+
+/**
+ * 消息类型限制对话框
+ */
+@Composable
+private fun MessageTypeLimitDialog(
+    selectedTypes: Set<Int>,
+    isLoading: Boolean,
+    onToggleType: (Int) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val messageTypes = listOf(
+        1 to "文本消息",
+        2 to "图片消息",
+        3 to "Markdown消息",
+        4 to "文件消息",
+        6 to "帖子消息",
+        7 to "表情消息",
+        8 to "HTML消息",
+        10 to "视频消息",
+        11 to "语音消息",
+        13 to "语音通话"
+    )
+    
+    AlertDialog(
+        onDismissRequest = if (!isLoading) onDismiss else { {} },
+        title = { Text("消息类型限制") },
+        text = {
+            LazyColumn {
+                item {
+                    Text(
+                        text = "选择要限制的消息类型：",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+                
+                items(messageTypes.size) { index ->
+                    val (type, name) = messageTypes[index]
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !isLoading) { onToggleType(type) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = selectedTypes.contains(type),
+                            onCheckedChange = { onToggleType(type) },
+                            enabled = !isLoading
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = name,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("确定")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isLoading
+            ) {
+                Text("取消")
+            }
+        }
+    )
 }

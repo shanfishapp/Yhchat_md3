@@ -738,6 +738,14 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
+     * 获取当前用户的权限等级
+     */
+    fun getCurrentUserPermission(): Int {
+        val currentUser = _uiState.value.groupMembers[currentUserId]
+        return currentUser?.permissionLevel ?: 0
+    }
+    
+    /**
      * 检查消息是否正在流式接收中
      */
     fun isMessageStreaming(msgId: String): Boolean {
