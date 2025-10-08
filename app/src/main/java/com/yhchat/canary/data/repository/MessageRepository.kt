@@ -272,6 +272,80 @@ class MessageRepository @Inject constructor(
     }
     
     /**
+     * 编辑消息
+     * 使用protobuf的edit_message_send
+     */
+    suspend fun editMessage(
+        chatId: String,
+        chatType: Int,
+        msgId: String,
+        content: String,
+        contentType: Int
+    ): Result<Boolean> {
+        return try {
+            val tokenFlow = tokenRepository.getToken()
+            val token = tokenFlow.first()?.token
+            if (token.isNullOrEmpty()) {
+                Log.e(tag, "❌ Token为空")
+                return Result.failure(Exception("用户未登录"))
+            }
+            
+            Log.d(tag, "📤 ========== 编辑消息 ==========")
+            Log.d(tag, "📤 msgId: $msgId")
+            Log.d(tag, "📤 chatId: $chatId")
+            Log.d(tag, "📤 chatType: $chatType")
+            Log.d(tag, "📤 contentType: $contentType")
+            Log.d(tag, "📤 content: ${content.take(100)}...")
+            
+            // 构建protobuf请求
+            val contentBuilder = edit_message_send.Content.newBuilder()
+                .setText(content)
+            
+            val request = edit_message_send.newBuilder()
+                .setMsgId(msgId)
+                .setChatId(chatId)
+                .setChatType(chatType)
+                .setContent(contentBuilder.build())
+                .setContentType(contentType.toLong())
+                .build()
+            
+            val requestBody = request.toByteArray().toRequestBody("application/x-protobuf".toMediaType())
+            
+            Log.d(tag, "📤 发送编辑请求...")
+            
+            val response = apiService.editMessage(token, requestBody)
+            
+            Log.d(tag, "📥 服务器响应码: ${response.code()}")
+            
+            if (response.isSuccessful) {
+                response.body()?.let { responseBody ->
+                    val bytes = responseBody.bytes()
+                    val editResponse = edit_message.parseFrom(bytes)
+                    
+                    Log.d(tag, "📥 响应状态码: ${editResponse.status.code}")
+                    Log.d(tag, "📥 响应消息: ${editResponse.status.msg}")
+                    
+                    if (editResponse.status.code == 1) {
+                        Log.d(tag, "✅ ========== 消息编辑成功！ ==========")
+                        Result.success(true)
+                    } else {
+                        Log.e(tag, "❌ 编辑失败: ${editResponse.status.msg}")
+                        Result.failure(Exception(editResponse.status.msg))
+                    }
+                } ?: Result.failure(Exception("响应体为空"))
+            } else {
+                val errorBody = response.errorBody()?.string()
+                Log.e(tag, "❌ HTTP错误: ${response.code()}, 错误详情: $errorBody")
+                Result.failure(Exception("编辑失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "❌ 编辑消息异常", e)
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+    
+    /**
      * 发送图片消息
      * 参考Python实现：只需在content.image设置图片key即可
      */

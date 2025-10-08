@@ -16,6 +16,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.GroupAdd
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import kotlinx.coroutines.launch
@@ -91,6 +95,9 @@ fun ConversationScreen(
     var showConversationMenu by remember { mutableStateOf(false) }
     var selectedConversation by remember { mutableStateOf<Conversation?>(null) }
     var isSelectedConversationSticky by remember { mutableStateOf(false) }
+    
+    // 添加菜单 BottomSheet 状态
+    var showAddMenuBottomSheet by remember { mutableStateOf(false) }
 
     // 监听列表滚动位置，控制置顶栏显示
     LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) {
@@ -146,9 +153,7 @@ fun ConversationScreen(
             },
             actions = {
                 IconButton(onClick = {
-                    // 跳转到综合搜索页面
-                    val intent = Intent(context, ComprehensiveSearchActivity::class.java)
-                    context.startActivity(intent)
+                    showAddMenuBottomSheet = true
                 }) {
                     Icon(
                         imageVector = Icons.Default.Add,
@@ -315,6 +320,123 @@ fun ConversationScreen(
                     viewModel.deleteConversation(conversation.chatId)
                 }
             }
+        )
+    }
+    
+    // 添加菜单 BottomSheet
+    if (showAddMenuBottomSheet) {
+        androidx.compose.material3.ModalBottomSheet(
+            onDismissRequest = { showAddMenuBottomSheet = false },
+            sheetState = androidx.compose.material3.rememberModalBottomSheetState()
+        ) {
+            AddMenuBottomSheetContent(
+                onAddUserGroupBot = {
+                    showAddMenuBottomSheet = false
+                    val intent = Intent(context, ComprehensiveSearchActivity::class.java)
+                    context.startActivity(intent)
+                },
+                onCreateGroupBot = {
+                    showAddMenuBottomSheet = false
+                    // TODO: 创建群聊/机器人功能
+                    android.widget.Toast.makeText(context, "创建群聊/机器人功能待实现", android.widget.Toast.LENGTH_SHORT).show()
+                },
+                onScan = {
+                    showAddMenuBottomSheet = false
+                    // TODO: 扫一扫功能
+                    android.widget.Toast.makeText(context, "扫一扫功能待实现", android.widget.Toast.LENGTH_SHORT).show()
+                },
+                onSendFile = {
+                    showAddMenuBottomSheet = false
+                    // TODO: 传文件功能
+                    android.widget.Toast.makeText(context, "传文件功能待实现", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
+    }
+}
+
+/**
+ * 添加菜单 BottomSheet 内容
+ */
+@Composable
+private fun AddMenuBottomSheetContent(
+    onAddUserGroupBot: () -> Unit,
+    onCreateGroupBot: () -> Unit,
+    onScan: () -> Unit,
+    onSendFile: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 32.dp)
+    ) {
+        Text(
+            text = "添加",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+        )
+        
+        HorizontalDivider()
+        
+        // 添加用户/群聊/机器人
+        androidx.compose.material3.ListItem(
+            headlineContent = { Text("添加用户/群聊/机器人") },
+            supportingContent = { Text("通过ID搜索并添加好友、群聊或机器人", style = MaterialTheme.typography.bodySmall) },
+            leadingContent = {
+                Icon(
+                    imageVector = Icons.Default.PersonAdd,
+                    contentDescription = "添加",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            modifier = Modifier.clickable(onClick = onAddUserGroupBot)
+        )
+        
+        // 创建群聊/机器人
+        androidx.compose.material3.ListItem(
+            headlineContent = { Text("创建群聊/机器人") },
+            supportingContent = { Text("创建新的群聊或机器人", style = MaterialTheme.typography.bodySmall) },
+            leadingContent = {
+                Icon(
+                    imageVector = Icons.Default.GroupAdd,
+                    contentDescription = "创建",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            modifier = Modifier.clickable(onClick = onCreateGroupBot)
+        )
+        
+        // 扫一扫
+        androidx.compose.material3.ListItem(
+            headlineContent = { Text("扫一扫") },
+            supportingContent = { Text("扫描二维码添加好友或加入群聊", style = MaterialTheme.typography.bodySmall) },
+            leadingContent = {
+                Icon(
+                    imageVector = Icons.Default.QrCodeScanner,
+                    contentDescription = "扫一扫",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            modifier = Modifier.clickable(onClick = onScan)
+        )
+        
+        // 传文件
+        androidx.compose.material3.ListItem(
+            headlineContent = { Text("传文件") },
+            supportingContent = { Text("快速发送文件到指定联系人", style = MaterialTheme.typography.bodySmall) },
+            leadingContent = {
+                Icon(
+                    imageVector = Icons.Default.AttachFile,
+                    contentDescription = "传文件",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            modifier = Modifier.clickable(onClick = onSendFile)
         )
     }
 }

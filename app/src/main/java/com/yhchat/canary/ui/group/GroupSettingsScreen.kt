@@ -286,7 +286,7 @@ private fun GroupSettingsContent(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable(enabled = !uiState.isEditing) { 
+                                .clickable { 
                                     viewModel.showMessageTypeLimitDialog() 
                                 },
                             horizontalArrangement = Arrangement.SpaceBetween,

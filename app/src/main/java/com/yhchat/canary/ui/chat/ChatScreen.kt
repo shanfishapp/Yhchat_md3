@@ -134,6 +134,10 @@ fun ChatScreen(
     var quotedMessageId by remember { mutableStateOf<String?>(null) }
     var quotedMessageText by remember { mutableStateOf<String?>(null) }
     
+    // 编辑消息状态
+    var showEditDialog by remember { mutableStateOf(false) }
+    var messageToEdit by remember { mutableStateOf<ChatMessage?>(null) }
+    
     // 初始化聊天
     LaunchedEffect(chatId, chatType, userId) {
         viewModel.initChat(chatId, chatType, userId)
@@ -347,6 +351,11 @@ fun ChatScreen(
                                 // 撤回消息
                                 viewModel.recallMessage(msgId)
                             },
+                            onEdit = { message ->
+                                // 编辑消息
+                                messageToEdit = message
+                                showEditDialog = true
+                            },
                             memberPermission = memberPermission
                         )
                     }
@@ -498,6 +507,28 @@ fun ChatScreen(
             }
         )
     }
+    
+    // 消息编辑对话框
+    if (showEditDialog && messageToEdit != null) {
+        MessageEditDialog(
+            message = messageToEdit!!,
+            onDismiss = {
+                showEditDialog = false
+                messageToEdit = null
+            },
+            onConfirm = { content, contentType ->
+                viewModel.editMessage(
+                    chatId = chatId,
+                    chatType = chatType,
+                    msgId = messageToEdit!!.msgId,
+                    content = content,
+                    contentType = contentType
+                )
+                showEditDialog = false
+                messageToEdit = null
+            }
+        )
+    }
 }
 
 /**
@@ -514,6 +545,7 @@ private fun MessageItem(
     onAddExpression: (String) -> Unit = {},
     onQuote: (String, String) -> Unit = { _, _ -> },
     onRecall: (String) -> Unit = {},  // 撤回消息
+    onEdit: (ChatMessage) -> Unit = {},  // 编辑消息
     memberPermission: Int? = null  // 群成员权限等级
 ) {
     val context = LocalContext.current
@@ -725,6 +757,13 @@ private fun MessageItem(
                 onRecall(message.msgId)
                 showContextMenu = false
             },
+            onEdit = if (message.contentType in listOf(1, 3, 8) && isMyMessage) {
+                {
+                    // 编辑消息
+                    onEdit(message)
+                    showContextMenu = false
+                }
+            } else null,
             onAddExpression = if (message.contentType == 7) {
                 {
                     // 添加表情到个人收藏
@@ -752,6 +791,7 @@ private fun MessageContextMenu(
     onCopyAll: () -> Unit,
     onQuote: () -> Unit,
     onRecall: () -> Unit,
+    onEdit: (() -> Unit)? = null,
     onAddExpression: (() -> Unit)? = null
 ) {
     AlertDialog(
@@ -804,6 +844,28 @@ private fun MessageContextMenu(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text("引用")
+                    }
+                }
+                
+                // 编辑消息（仅对文本、Markdown、HTML消息显示）
+                if (onEdit != null && message.contentType in listOf(1, 3, 8)) {
+                    TextButton(
+                        onClick = onEdit,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Start,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "编辑",
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("编辑")
+                        }
                     }
                 }
                 
@@ -2138,4 +2200,104 @@ private fun parseTagColor(colorString: String): Color {
     } catch (e: Exception) {
         Color.Gray
     }
+}
+
+/**
+ * 消息编辑对话框
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MessageEditDialog(
+    message: ChatMessage,
+    onDismiss: () -> Unit,
+    onConfirm: (String, Int) -> Unit  // content, contentType
+) {
+    var editedContent by remember { mutableStateOf(message.content.text ?: "") }
+    var selectedContentType by remember { mutableStateOf(message.contentType) }
+    var expanded by remember { mutableStateOf(false) }
+    
+    val contentTypeOptions = listOf(
+        1 to "文本",
+        3 to "Markdown", 
+        8 to "HTML"
+    )
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "编辑消息",
+                style = MaterialTheme.typography.titleMedium
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 消息类型选择器
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded }
+                ) {
+                    OutlinedTextField(
+                        value = contentTypeOptions.find { it.first == selectedContentType }?.second ?: "文本",
+                        onValueChange = { },
+                        readOnly = true,
+                        label = { Text("消息类型") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                    )
+                    
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        contentTypeOptions.forEach { (type, name) ->
+                            DropdownMenuItem(
+                                text = { Text(name) },
+                                onClick = {
+                                    selectedContentType = type
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                
+                // 消息内容输入框
+                OutlinedTextField(
+                    value = editedContent,
+                    onValueChange = { editedContent = it },
+                    label = { Text("消息内容") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp),
+                    maxLines = 5,
+                    singleLine = false
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (editedContent.isNotBlank()) {
+                        onConfirm(editedContent.trim(), selectedContentType)
+                    }
+                },
+                enabled = editedContent.isNotBlank()
+            ) {
+                Text("确定")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }

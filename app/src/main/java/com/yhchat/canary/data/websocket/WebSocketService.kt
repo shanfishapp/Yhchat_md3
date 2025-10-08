@@ -75,8 +75,9 @@ class WebSocketService @Inject constructor(
 
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(0, TimeUnit.SECONDS) // 禁用读取超时，依赖心跳机制
         .writeTimeout(10, TimeUnit.SECONDS)
+        .pingInterval(30, TimeUnit.SECONDS) // OkHttp 自动 ping/pong 帧
         .retryOnConnectionFailure(true)
         .build()
 
@@ -98,12 +99,14 @@ class WebSocketService @Inject constructor(
             return
         }
         
-        // 确保清理旧连接
-        if (webSocket != null) {
+        // 确保完全清理旧连接
+        webSocket?.let { oldSocket ->
             Log.d(tag, "Cleaning up old WebSocket connection")
-            webSocket?.close(1000, "Reconnecting")
-            webSocket = null
             cleanup()
+            oldSocket.close(1000, "Reconnecting")
+            webSocket = null
+            // 等待旧连接完全关闭
+            delay(500)
         }
 
         val token = tokenRepository.getTokenSync()
@@ -154,17 +157,19 @@ class WebSocketService @Inject constructor(
 
                 override fun onMessage(webSocket: WebSocket, bytes: okio.ByteString) {
                     try {
-                        Log.d(tag, "Received binary message: ${bytes.hex()}")
+                        Log.d(tag, "📩 Received binary message (${bytes.size} bytes)")
                         handleBinaryMessage(bytes.toByteArray())
                     } catch (e: Exception) {
-                        Log.e(tag, "Error handling binary message", e)
+                        Log.e(tag, "❌ Error handling binary message", e)
+                        // 不要因为解析错误而断开连接，继续接收下一条消息
                     }
                 }
                 
                 override fun onMessage(webSocket: WebSocket, text: String) {
                     try {
-                        Log.d(tag, "Received text message: $text")
-                        // 文本消息通常是登录响应等，暂不处理
+                        Log.d(tag, "Received text message (unexpected): $text")
+                        // WebSocket 应该只返回二进制 protobuf 消息，不应该有文本消息
+                        // 如果收到文本消息，可能是服务器错误或连接问题
                     } catch (e: Exception) {
                         Log.e(tag, "Error handling text message", e)
                     }
@@ -191,7 +196,10 @@ class WebSocketService @Inject constructor(
                 }
                 
                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                    Log.e(tag, "WebSocket failure", t)
+                    Log.e(tag, "❌ WebSocket failure: ${t.javaClass.simpleName} - ${t.message}", t)
+                    if (response != null) {
+                        Log.e(tag, "Response code: ${response.code}, message: ${response.message}")
+                    }
                     cleanup()
                     
                     scope.launch {
@@ -199,6 +207,7 @@ class WebSocketService @Inject constructor(
                         
                         // 自动重连
                         if (shouldReconnect) {
+                            Log.d(tag, "⏳ Will reconnect in 5 seconds...")
                             delay(5000)
                             connect(userId, platform)
                         }
@@ -294,9 +303,14 @@ class WebSocketService @Inject constructor(
             Log.d(tag, "Message command: $cmd, seq: $seq")
             
             when (cmd) {
+                "login_ack" -> {
+                    Log.d(tag, "✅ Received login_ack (binary protobuf)")
+                    // 登录响应，连接已完全建立（如果服务器有发送的话）
+                }
+                
                 "heartbeat_ack" -> {
-                    Log.d(tag, "Received heartbeat ack")
-                    // 心跳响应，不需要特殊处理
+                    Log.d(tag, "✅ Received heartbeat_ack")
+                    // 心跳响应，连接正常
                 }
                 
                 "push_message" -> {
@@ -579,6 +593,7 @@ class WebSocketService @Inject constructor(
     private fun cleanup() {
         isConnected = false
         heartbeatJob?.cancel()
+        heartbeatJob = null
     }
 
     /**

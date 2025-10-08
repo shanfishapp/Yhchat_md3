@@ -184,3 +184,22 @@ message recall_msg_batch_send {
 message recall_msg_batch {
     Status status = 1;
 }
+
+// 编辑消息
+message edit_message_send {
+    string msg_id = 2;
+    string chat_id = 3;
+    int32 chat_type = 4;
+    Content content = 5;
+    message Content {
+        string text = 1;
+        string buttons = 2;
+        string quote_msg_text = 8;
+    }
+    int64 content_type = 6; // 信息类别，1-文本，3-markdown，8-html
+    string quote_msg_id = 8; // 引用信息ID
+}
+
+message edit_message {
+    Status status = 1;
+}

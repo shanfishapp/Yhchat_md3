@@ -124,6 +124,15 @@ interface ApiService {
         @Body request: okhttp3.RequestBody
     ): Response<okhttp3.ResponseBody>
     
+    /**
+     * 编辑消息 - 使用protobuf
+     */
+    @POST("v1/msg/edit-message")
+    suspend fun editMessage(
+        @Header("token") token: String,
+        @Body request: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
+    
     @POST("v1/msg/recall-msg-batch")
     suspend fun recallMessagesBatch(
         @Header("token") token: String,

@@ -87,22 +87,43 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
-     * 加载群成员信息（仅加载群信息以获取人数，不加载所有成员）
+     * 加载群成员信息（加载群信息和部分成员以显示权限标签）
      */
     private fun loadGroupMembers(groupId: String) {
         viewModelScope.launch {
-            Log.d(tag, "Loading group info for member count: $groupId")
+            Log.d(tag, "Loading group info and members for: $groupId")
             groupRepository.setTokenRepository(tokenRepository)
             
-            // 只加载群信息以获取成员总数
+            // 加载群信息以获取成员总数
             groupRepository.getGroupInfo(groupId).fold(
                 onSuccess = { groupInfo ->
                     Log.d(tag, "Group info loaded, member count: ${groupInfo.memberCount}")
                     
-                    // 只更新成员总数，不加载所有成员列表
+                    // 只加载前2页成员（共100人）用于显示权限标签，避免加载所有成员
+                    val membersToLoad = minOf(100, groupInfo.memberCount)
+                    val pages = (membersToLoad + 49) / 50  // 向上取整
+                    val allMembers = mutableListOf<GroupMemberInfo>()
+                    
+                    for (page in 1..pages) {
+                        groupRepository.getGroupMembers(groupId, page = page, size = 50).fold(
+                            onSuccess = { members ->
+                                allMembers.addAll(members)
+                                Log.d(tag, "Loaded page $page: ${members.size} members, total: ${allMembers.size}")
+                            },
+                            onFailure = { error ->
+                                Log.e(tag, "Failed to load group members page $page", error)
+                            }
+                        )
+                    }
+                    
+                    // 转换为 Map: userId -> GroupMemberInfo
+                    val membersMap: Map<String, GroupMemberInfo> = allMembers.associateBy { it.userId }
+                    
                     _uiState.value = _uiState.value.copy(
+                        groupMembers = membersMap,
                         groupMemberCount = groupInfo.memberCount
                     )
+                    Log.d(tag, "Group members loaded: ${membersMap.size} members (for permission display)")
                 },
                 onFailure = { error ->
                     Log.e(tag, "Failed to load group info", error)
@@ -709,6 +730,55 @@ class ChatViewModel @Inject constructor(
                 )
             } catch (e: Exception) {
                 Log.e(tag, "撤回消息异常", e)
+                _uiState.value = _uiState.value.copy(error = e.message)
+            }
+        }
+    }
+    
+    /**
+     * 编辑消息
+     */
+    fun editMessage(
+        chatId: String,
+        chatType: Int,
+        msgId: String,
+        content: String,
+        contentType: Int
+    ) {
+        viewModelScope.launch {
+            try {
+                Log.d(tag, "开始编辑消息: $msgId")
+                
+                val result = messageRepository.editMessage(
+                    chatId = chatId,
+                    chatType = chatType,
+                    msgId = msgId,
+                    content = content,
+                    contentType = contentType
+                )
+                
+                result.fold(
+                    onSuccess = {
+                        Log.d(tag, "消息编辑成功: $msgId")
+                        // 找到并更新消息内容
+                        val index = _messages.indexOfFirst { it.msgId == msgId }
+                        if (index != -1) {
+                            val message = _messages[index]
+                            _messages[index] = message.copy(
+                                content = message.content.copy(text = content),
+                                contentType = contentType,
+                                editTime = System.currentTimeMillis()
+                            )
+                            Log.d(tag, "更新消息内容")
+                        }
+                    },
+                    onFailure = { error ->
+                        Log.e(tag, "消息编辑失败: ${error.message}", error)
+                        _uiState.value = _uiState.value.copy(error = error.message)
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(tag, "编辑消息异常", e)
                 _uiState.value = _uiState.value.copy(error = e.message)
             }
         }
