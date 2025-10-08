@@ -122,6 +122,28 @@ fun SettingsScreen(
                 )
             }
             
+            // 显示设置
+            item {
+                DisplaySettingsCard(context = context)
+            }
+            
+            // 关于应用
+            item {
+                SettingsCard(
+                    title = "关于",
+                    items = listOf(
+                        SettingsItem(
+                            icon = Icons.Default.Info,
+                            title = "应用详情",
+                            subtitle = "查看应用版本和开发者信息",
+                            onClick = {
+                                AppInfoActivity.start(context)
+                            }
+                        )
+                    )
+                )
+            }
+            
             // 账户设置
             item {
                 SettingsCard(
@@ -167,6 +189,168 @@ fun SettingsScreen(
                     ) {
                         Text("取消")
                     }
+                }
+            )
+        }
+    }
+}
+
+/**
+ * 显示设置卡片
+ */
+@Composable
+private fun DisplaySettingsCard(
+    context: Context,
+    modifier: Modifier = Modifier
+) {
+    val prefs = remember { 
+        context.getSharedPreferences("display_settings", Context.MODE_PRIVATE) 
+    }
+    
+    var showStickyConversations by remember { 
+        mutableStateOf(prefs.getBoolean("show_sticky_conversations", true)) 
+    }
+    
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "显示设置",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            
+            // 置顶会话显示开关
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PushPin,
+                        contentDescription = "置顶会话",
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    
+                    Spacer(modifier = Modifier.width(16.dp))
+                    
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "显示置顶会话",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "在会话列表中显示置顶的会话",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    Switch(
+                        checked = showStickyConversations,
+                        onCheckedChange = { checked ->
+                            showStickyConversations = checked
+                            prefs.edit().putBoolean("show_sticky_conversations", checked).apply()
+                        }
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // WebSocket 连接开关
+            WebSocketSettingItem(context = context)
+        }
+    }
+}
+
+/**
+ * WebSocket 设置项
+ */
+@Composable
+private fun WebSocketSettingItem(
+    context: Context,
+    modifier: Modifier = Modifier
+) {
+    val prefs = remember { 
+        context.getSharedPreferences("display_settings", Context.MODE_PRIVATE) 
+    }
+    
+    var disableWebSocket by remember { 
+        mutableStateOf(prefs.getBoolean("disable_websocket", false)) 
+    }
+    
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.CloudOff,
+                contentDescription = "禁用 WebSocket",
+                modifier = Modifier.size(24.dp),
+                tint = if (disableWebSocket) 
+                    MaterialTheme.colorScheme.error 
+                else 
+                    MaterialTheme.colorScheme.primary
+            )
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "禁用 WebSocket",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (disableWebSocket) "已禁用实时消息推送，需重启应用生效" else "启用实时消息推送",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (disableWebSocket) 
+                        MaterialTheme.colorScheme.error 
+                    else 
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            Switch(
+                checked = disableWebSocket,
+                onCheckedChange = { checked ->
+                    disableWebSocket = checked
+                    prefs.edit().putBoolean("disable_websocket", checked).apply()
                 }
             )
         }

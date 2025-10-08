@@ -126,6 +126,13 @@
             android:exported="false"
             android:label="导航栏管理"
             android:theme="@style/Theme.YhchatCanary" />
+            
+        <!-- 应用详情 Activity -->
+        <activity
+            android:name=".ui.settings.AppInfoActivity"
+            android:exported="false"
+            android:label="应用详情"
+            android:theme="@style/Theme.YhchatCanary" />
 
         <!-- 用户资料 Activity -->
         <activity
@@ -182,6 +189,27 @@
             android:name=".ui.bot.BotInfoActivity"
             android:exported="false"
             android:label="机器人信息"
+            android:theme="@style/Theme.YhchatCanary" />
+            
+        <!-- 机器人详细信息 Activity -->
+        <activity
+            android:name=".ui.bot.BotDetailActivity"
+            android:exported="false"
+            android:label="机器人详细信息"
+            android:theme="@style/Theme.YhchatCanary" />
+        
+        <!-- 机器人管理 Activity -->
+        <activity
+            android:name=".ui.bot.BotManagementActivity"
+            android:exported="false"
+            android:label="机器人管理"
+            android:theme="@style/Theme.YhchatCanary" />
+        
+        <!-- 机器人编辑 Activity -->
+        <activity
+            android:name=".ui.bot.BotEditActivity"
+            android:exported="false"
+            android:label="编辑机器人"
             android:theme="@style/Theme.YhchatCanary" />
             
         <!-- 综合搜索 Activity -->

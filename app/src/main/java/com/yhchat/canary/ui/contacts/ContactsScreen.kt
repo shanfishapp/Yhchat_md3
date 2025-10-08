@@ -60,7 +60,7 @@ fun ContactsScreen(
         }
     ) { paddingValues ->
         Box(
-            modifier = modifier
+        modifier = modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
@@ -75,12 +75,12 @@ fun ContactsScreen(
                     // 错误提示
                     Column(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
                             text = uiState.error ?: "加载失败",
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodyLarge
@@ -171,6 +171,32 @@ fun ContactsScreen(
                                             putExtra("chatId", contact.chatId)
                                             putExtra("chatType", 3)
                                             putExtra("chatName", contact.name)
+                                        }
+                                        context.startActivity(intent)
+                                    }
+                                )
+                            }
+                        }
+                        
+                        // 我创建的机器人分组
+                        item {
+                            ContactGroupHeader(
+                                title = "我创建的机器人",
+                                count = uiState.myBots.size,
+                                isExpanded = uiState.myBotsExpanded,
+                                onToggle = { viewModel.toggleMyBotsExpanded() }
+                            )
+                        }
+                        
+                        if (uiState.myBotsExpanded) {
+                            items(uiState.myBots) { contact ->
+                                ContactItem(
+                                    contact = contact,
+                                    onClick = {
+                                        // 打开机器人管理界面
+                                        val intent = Intent(context, com.yhchat.canary.ui.bot.BotManagementActivity::class.java).apply {
+                                            putExtra("botId", contact.chatId)
+                                            putExtra("botName", contact.name)
                                         }
                                         context.startActivity(intent)
                                     }

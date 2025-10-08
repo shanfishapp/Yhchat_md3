@@ -138,9 +138,20 @@ fun ChatScreen(
     var showEditDialog by remember { mutableStateOf(false) }
     var messageToEdit by remember { mutableStateOf<ChatMessage?>(null) }
     
+    // 机器人看板展开状态
+    var showBotBoard by remember { mutableStateOf(false) }
+    
     // 初始化聊天
     LaunchedEffect(chatId, chatType, userId) {
         viewModel.initChat(chatId, chatType, userId)
+    }
+    
+    // 如果是机器人聊天，加载机器人信息和看板
+    LaunchedEffect(chatId, chatType) {
+        if (chatType == 3) {
+            viewModel.loadBotInfo(chatId)
+            viewModel.loadBotBoard(chatId, chatType)
+        }
     }
     
     // 处理图片发送
@@ -218,6 +229,17 @@ fun ChatScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    // 如果是机器人，显示使用人数
+                    if (chatType == 3) {
+                        val botInfo = uiState.botInfo
+                        if (botInfo != null) {
+                            Text(
+                                text = "${botInfo.data.headcount} 人使用",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             },
             navigationIcon = {
@@ -245,11 +267,136 @@ fun ChatScreen(
                         )
                     }
                 }
+                // 机器人信息菜单（只在机器人聊天时显示）
+                if (chatType == 3) {
+                    IconButton(onClick = {
+                        android.util.Log.d("ChatScreen", "Opening bot detail: chatId=$chatId, chatName=$chatName")
+                        com.yhchat.canary.ui.bot.BotDetailActivity.start(
+                            context = context,
+                            botId = chatId,
+                            botName = chatName,
+                            chatType = chatType
+                        )
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "机器人信息"
+                        )
+                    }
+                }
             },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer
             )
         )
+        
+        // 机器人看板按钮和内容（只在机器人聊天时显示）
+        if (chatType == 3) {
+            val botBoard = uiState.botBoard
+            if (botBoard != null && botBoard.board.content.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                // 展开/收起按钮
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showBotBoard = !showBotBoard }
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "看板",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "机器人看板",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Icon(
+                        imageVector = if (showBotBoard) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (showBotBoard) "收起" else "展开",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                // 看板内容（展开时显示）
+                AnimatedVisibility(
+                    visible = showBotBoard,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp)
+                        ) {
+                            when (botBoard.board.contentType) {
+                                1 -> { // 文本
+                                    Text(
+                                        text = botBoard.board.content,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                3 -> { // Markdown
+                                    MarkdownText(
+                                        markdown = botBoard.board.content,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        onImageClick = { url ->
+                                            currentImageUrl = url
+                                            showImageViewer = true
+                                        }
+                                    )
+                                }
+                                8 -> { // HTML
+                                    HtmlWebView(
+                                        htmlContent = botBoard.board.content,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = 300.dp),
+                                        onImageClick = { url ->
+                                            currentImageUrl = url
+                                            showImageViewer = true
+                                        }
+                                    )
+                                }
+                                else -> {
+                                    Text(
+                                        text = botBoard.board.content,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            }
+        }
+        
         // 错误信息
         uiState.error?.let { error ->
             Card(

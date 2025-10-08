@@ -26,7 +26,9 @@ data class ChatUiState(
     val isRefreshing: Boolean = false,
     val newMessageReceived: Boolean = false,  // 标记是否收到新消息
     val groupMembers: Map<String, GroupMemberInfo> = emptyMap(),  // 群成员信息：chatId -> GroupMemberInfo
-    val groupMemberCount: Int = 0  // 群成员总数
+    val groupMemberCount: Int = 0,  // 群成员总数
+    val botInfo: yh_bot.Bot.bot_info? = null,  // 机器人信息
+    val botBoard: yh_bot.Bot.board? = null  // 机器人看板
 )
 
 @HiltViewModel
@@ -36,7 +38,8 @@ class ChatViewModel @Inject constructor(
     private val webSocketManager: WebSocketManager,
     private val groupRepository: GroupRepository,
     private val readPositionStore: ReadPositionStore,
-    private val apiService: com.yhchat.canary.data.api.ApiService
+    private val apiService: com.yhchat.canary.data.api.ApiService,
+    private val botRepository: com.yhchat.canary.data.repository.BotRepository
 ) : ViewModel() {
 
     private var currentChatId: String = ""
@@ -789,6 +792,40 @@ class ChatViewModel @Inject constructor(
      */
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+    
+    /**
+     * 加载机器人信息
+     */
+    fun loadBotInfo(botId: String) {
+        viewModelScope.launch {
+            botRepository.getBotInfo(botId).fold(
+                onSuccess = { botInfo ->
+                    _uiState.value = _uiState.value.copy(botInfo = botInfo)
+                    Log.d(tag, "机器人信息加载成功: ${botInfo.data.name}")
+                },
+                onFailure = { error ->
+                    Log.e(tag, "加载机器人信息失败", error)
+                }
+            )
+        }
+    }
+    
+    /**
+     * 加载机器人看板
+     */
+    fun loadBotBoard(chatId: String, chatType: Int) {
+        viewModelScope.launch {
+            botRepository.getBotBoard(chatId, chatType).fold(
+                onSuccess = { board ->
+                    _uiState.value = _uiState.value.copy(botBoard = board)
+                    Log.d(tag, "机器人看板加载成功")
+                },
+                onFailure = { error ->
+                    Log.e(tag, "加载机器人看板失败", error)
+                }
+            )
+        }
     }
     
     /**

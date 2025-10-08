@@ -1,6 +1,8 @@
 package com.yhchat.canary.ui.conversation
 
+import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -73,6 +75,28 @@ fun ConversationScreen(
     val conversations by viewModel.conversations.collectAsState()
     val stickyData by viewModel.stickyData.collectAsState()
     val stickyLoading by viewModel.stickyLoading.collectAsState()
+    
+    // 读取显示置顶会话的设置
+    val context = LocalContext.current
+    val prefs = remember { 
+        context.getSharedPreferences("display_settings", Context.MODE_PRIVATE) 
+    }
+    var showStickyConversations by remember { 
+        mutableStateOf(prefs.getBoolean("show_sticky_conversations", true)) 
+    }
+    
+    // 监听设置变化
+    DisposableEffect(Unit) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "show_sticky_conversations") {
+                showStickyConversations = prefs.getBoolean("show_sticky_conversations", true)
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
 
     // 列表状态
     val listState = rememberLazyListState()
@@ -86,7 +110,6 @@ fun ConversationScreen(
     // 下拉刷新状态
     val swipeRefreshState =
         rememberSwipeRefreshState(isRefreshing = refreshing)
-    val context = LocalContext.current
     
     // 协程作用域
     val coroutineScope = rememberCoroutineScope()
@@ -121,8 +144,13 @@ fun ConversationScreen(
     }
     
     // 启动WebSocket连接（只在第一次或token/userId变化时执行）
-    LaunchedEffect(token, userId) {
-        if (token.isNotEmpty() && userId.isNotEmpty()) {
+    // 检查是否禁用了 WebSocket
+    val isWebSocketDisabled = remember { 
+        prefs.getBoolean("disable_websocket", false) 
+    }
+    
+    LaunchedEffect(token, userId, isWebSocketDisabled) {
+        if (token.isNotEmpty() && userId.isNotEmpty() && !isWebSocketDisabled) {
             viewModel.startWebSocket(userId)
         }
     }
@@ -185,9 +213,9 @@ fun ConversationScreen(
             }
         }
         
-        // 置顶会话（根据滚动状态显示/隐藏，带动画效果）
+        // 置顶会话（根据滚动状态和设置显示/隐藏，带动画效果）
         AnimatedVisibility(
-            visible = showStickyBar && !stickyData?.sticky.isNullOrEmpty(),
+            visible = showStickyBar && showStickyConversations && !stickyData?.sticky.isNullOrEmpty(),
             enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
             exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
         ) {

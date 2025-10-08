@@ -69,6 +69,17 @@ data class LoginRequest(
 )
 
 /**
+ * 基础响应
+ */
+data class BaseResponse(
+    @SerializedName("code")
+    val code: Int,
+    
+    @SerializedName("msg")
+    val message: String
+)
+
+/**
  * 登录响应
  */
 data class LoginResponse(
@@ -773,6 +784,47 @@ data class BotInfo(
     
     @SerializedName("private")
     val isPrivate: Int
+)
+
+/**
+ * 我创建的机器人列表响应
+ */
+data class MyBotListResponse(
+    @SerializedName("code")
+    val code: Int,
+    
+    @SerializedName("data")
+    val data: MyBotListData,
+    
+    @SerializedName("message")
+    val message: String?
+)
+
+data class MyBotListData(
+    @SerializedName("botsTotal")
+    val botsTotal: Int,
+    
+    @SerializedName("list")
+    val list: MyBotList
+)
+
+data class MyBotList(
+    @SerializedName("bots")
+    val bots: List<CreatedBot>
+)
+
+data class CreatedBot(
+    @SerializedName("botId")
+    val botId: String,
+    
+    @SerializedName("nickname")
+    val nickname: String,
+    
+    @SerializedName("avatarUrl")
+    val avatarUrl: String,
+    
+    @SerializedName("introduction")
+    val introduction: String
 )
 
 /**

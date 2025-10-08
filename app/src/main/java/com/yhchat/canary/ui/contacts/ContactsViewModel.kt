@@ -42,15 +42,18 @@ data class ContactsUiState(
     val friends: List<Contact> = emptyList(),
     val groups: List<Contact> = emptyList(),
     val bots: List<Contact> = emptyList(),
-    val friendsExpanded: Boolean = true,
-    val groupsExpanded: Boolean = true,
-    val botsExpanded: Boolean = true
+    val myBots: List<Contact> = emptyList(),  // 我创建的机器人
+    val friendsExpanded: Boolean = false,  // 默认不展开
+    val groupsExpanded: Boolean = false,  // 默认不展开
+    val botsExpanded: Boolean = false,  // 默认不展开
+    val myBotsExpanded: Boolean = false  // 默认不展开
 )
 
 @HiltViewModel
 class ContactsViewModel @Inject constructor(
     private val friendRepository: FriendRepository,
-    private val tokenRepository: TokenRepository
+    private val tokenRepository: TokenRepository,
+    private val botRepository: com.yhchat.canary.data.repository.BotRepository
 ) : ViewModel() {
     
     private val tag = "ContactsViewModel"
@@ -187,6 +190,56 @@ class ContactsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             botsExpanded = !_uiState.value.botsExpanded
         )
+    }
+    
+    /**
+     * 切换"我创建的机器人"展开状态
+     */
+    fun toggleMyBotsExpanded() {
+        val newExpanded = !_uiState.value.myBotsExpanded
+        _uiState.value = _uiState.value.copy(
+            myBotsExpanded = newExpanded
+        )
+        
+        // 如果展开且还没有加载数据，则加载
+        if (newExpanded && _uiState.value.myBots.isEmpty()) {
+            loadMyBots()
+        }
+    }
+    
+    /**
+     * 加载我创建的机器人列表
+     */
+    private fun loadMyBots() {
+        viewModelScope.launch {
+            try {
+                Log.d(tag, "开始加载我创建的机器人列表...")
+                
+                val result = botRepository.getMyBotList()
+                
+                result.fold(
+                    onSuccess = { botList ->
+                        Log.d(tag, "✅ 我创建的机器人列表加载成功，共 ${botList.size} 个")
+                        
+                        val myBots = botList.map { bot ->
+                            Contact(
+                                chatId = bot.botId,
+                                name = bot.nickname,
+                                avatarUrl = bot.avatarUrl,
+                                chatType = 3
+                            )
+                        }
+                        
+                        _uiState.value = _uiState.value.copy(myBots = myBots)
+                    },
+                    onFailure = { error ->
+                        Log.e(tag, "❌ 加载我创建的机器人列表失败", error)
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(tag, "加载我创建的机器人列表异常", e)
+            }
+        }
     }
     
     /**

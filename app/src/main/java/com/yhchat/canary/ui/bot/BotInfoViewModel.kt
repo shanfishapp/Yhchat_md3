@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 
 class BotInfoViewModel(application: Application) : AndroidViewModel(application) {
     
-    private val botRepository = RepositoryFactory.provideBotRepository()
+    private val botRepository = RepositoryFactory.getBotRepository(application)
     private val friendRepository = RepositoryFactory.getFriendRepository(application)
     private val tokenRepository = RepositoryFactory.getTokenRepository(application)
     
@@ -23,28 +23,23 @@ class BotInfoViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             
-            try {
-                val token = tokenRepository.getTokenSync() ?: ""
-                if (token.isEmpty()) {
+            val result = botRepository.getBotInfoSimple(botId)
+            
+            result.fold(
+                onSuccess = { botInfo ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = "未登录，请先登录"
+                        botInfo = botInfo,
+                        error = null
                     )
-                    return@launch
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = error.message ?: "获取机器人信息失败"
+                    )
                 }
-                
-                val botInfo = botRepository.getBotInfo(token, botId)
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    botInfo = botInfo,
-                    error = null
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = e.message ?: "获取机器人信息失败"
-                )
-            }
+            )
         }
     }
     

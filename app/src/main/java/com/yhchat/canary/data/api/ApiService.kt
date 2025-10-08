@@ -133,6 +133,43 @@ interface ApiService {
         @Body request: okhttp3.RequestBody
     ): Response<okhttp3.ResponseBody>
     
+    // ========== 机器人相关API（使用protobuf） ==========
+    
+    /**
+     * 获取机器人详细信息 - 使用protobuf
+     */
+    @POST("v1/bot/bot-info")
+    suspend fun getBotInfo(
+        @Header("token") token: String,
+        @Body body: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
+    
+    /**
+     * 获取机器人看板 - 使用protobuf
+     */
+    @POST("v1/bot/board")
+    suspend fun getBotBoard(
+        @Header("token") token: String,
+        @Body body: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
+    
+    /**
+     * 获取我创建的机器人列表
+     */
+    @POST("v1/bot/bot-group-list")
+    suspend fun getMyBotList(
+        @Header("token") token: String
+    ): Response<com.yhchat.canary.data.model.MyBotListResponse>
+    
+    /**
+     * 编辑机器人信息
+     */
+    @POST("v1/bot/web-edit-bot")
+    suspend fun editBot(
+        @Header("token") token: String,
+        @Body request: EditBotRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
     @POST("v1/msg/recall-msg-batch")
     suspend fun recallMessagesBatch(
         @Header("token") token: String,
@@ -834,4 +871,24 @@ data class QiniuVideoInfo(
     
     @SerializedName("height")
     val height: Int = 0
+)
+
+/**
+ * 编辑机器人请求
+ */
+data class EditBotRequest(
+    @SerializedName("botId")
+    val botId: String,
+    
+    @SerializedName("nickname")
+    val nickname: String,
+    
+    @SerializedName("introduction")
+    val introduction: String,
+    
+    @SerializedName("avatarUrl")
+    val avatarUrl: String,
+    
+    @SerializedName("private")
+    val private: Int
 )

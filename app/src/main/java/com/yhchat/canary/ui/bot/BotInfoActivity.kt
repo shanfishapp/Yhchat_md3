@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.lifecycle.ViewModelProvider
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -84,7 +85,10 @@ private fun BotInfoScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var showImageViewer by remember { mutableStateOf(false) }
+    var currentImageUrl by remember { mutableStateOf("") }
     
+    Box(modifier = Modifier.fillMaxSize()) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -174,7 +178,11 @@ private fun BotInfoScreen(
                     botInfo = botInfo,
                     modifier = Modifier.padding(paddingValues),
                     isAdding = uiState.isAdding,
-                    onAddBot = { viewModel.addBot(botId) }
+                    onAddBot = { viewModel.addBot(botId) },
+                    onAvatarClick = { url ->
+                        currentImageUrl = url
+                        showImageViewer = true
+                    }
                 )
             }
         }
@@ -192,6 +200,15 @@ private fun BotInfoScreen(
         }
     }
     }
+    
+    // 图片预览器
+    if (showImageViewer) {
+        com.yhchat.canary.ui.components.ImageViewer(
+            imageUrl = currentImageUrl,
+            onDismiss = { showImageViewer = false }
+        )
+    }
+    }
 }
 
 @Composable
@@ -199,7 +216,8 @@ private fun BotInfoContent(
     botInfo: BotInfo,
     modifier: Modifier = Modifier,
     isAdding: Boolean = false,
-    onAddBot: () -> Unit = {}
+    onAddBot: () -> Unit = {},
+    onAvatarClick: (String) -> Unit = {}
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -240,7 +258,12 @@ private fun BotInfoContent(
                         contentDescription = "机器人头像",
                         modifier = Modifier
                             .size(80.dp)
-                            .clip(CircleShape),
+                            .clip(CircleShape)
+                            .clickable {
+                                if (!avatarUrl.isNullOrBlank()) {
+                                    onAvatarClick(avatarUrl)
+                                }
+                            },
                         contentScale = ContentScale.Crop
                     )
 
