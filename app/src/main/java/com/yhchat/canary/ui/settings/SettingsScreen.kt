@@ -127,6 +127,27 @@ fun SettingsScreen(
                 DisplaySettingsCard(context = context)
             }
             
+            // 个性化设置
+            item {
+                SettingsCard(
+                    title = "个性化",
+                    items = listOf(
+                        SettingsItem(
+                            icon = Icons.Default.Wallpaper,
+                            title = "聊天背景",
+                            subtitle = "设置全局聊天背景",
+                            onClick = {
+                                com.yhchat.canary.ui.background.ChatBackgroundActivity.start(
+                                    context,
+                                    "all",  // 设置全局背景
+                                    "全局"
+                                )
+                            }
+                        )
+                    )
+                )
+            }
+            
             // 关于应用
             item {
                 SettingsCard(
@@ -276,6 +297,11 @@ private fun DisplaySettingsCard(
                     )
                 }
             }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // 字体大小调节
+            FontSizeSettingItem(context = context)
             
             Spacer(modifier = Modifier.height(8.dp))
             
@@ -468,6 +494,100 @@ private fun SettingsItemRow(
         
         if (showDivider) {
             Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
+/**
+ * 字体大小设置项
+ */
+@Composable
+private fun FontSizeSettingItem(
+    context: Context,
+    modifier: Modifier = Modifier
+) {
+    val prefs = remember { 
+        context.getSharedPreferences("display_settings", Context.MODE_PRIVATE) 
+    }
+    
+    var fontScale by remember { 
+        mutableStateOf(prefs.getFloat("font_scale", 100f)) 
+    }
+    
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FormatSize,
+                    contentDescription = "字体大小",
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                
+                Spacer(modifier = Modifier.width(16.dp))
+                
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "字体大小",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "${fontScale.toInt()}% (重启应用生效)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // 滑动条
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "1%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                Slider(
+                    value = fontScale,
+                    onValueChange = { newValue ->
+                        fontScale = newValue
+                        prefs.edit().putFloat("font_scale", newValue).apply()
+                    },
+                    valueRange = 1f..100f,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                Text(
+                    text = "100%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

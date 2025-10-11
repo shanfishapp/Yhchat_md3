@@ -212,6 +212,41 @@
             android:label="编辑机器人"
             android:theme="@style/Theme.YhchatCanary" />
             
+        <!-- 金币商城 Activity -->
+        <activity
+            android:name=".ui.coin.CoinShopActivity"
+            android:exported="false"
+            android:label="金币商城"
+            android:theme="@style/Theme.YhchatCanary" />
+            
+        <!-- 任务中心 Activity -->
+        <activity
+            android:name=".ui.coin.CoinDetailActivity"
+            android:exported="false"
+            android:label="任务中心"
+            android:theme="@style/Theme.YhchatCanary" />
+        
+        <!-- 金币明细 Activity -->
+        <activity
+            android:name=".ui.coin.CoinRecordActivity"
+            android:exported="false"
+            android:label="金币明细"
+            android:theme="@style/Theme.YhchatCanary" />
+            
+        <!-- 聊天背景设置 Activity -->
+        <activity
+            android:name=".ui.background.ChatBackgroundActivity"
+            android:exported="false"
+            android:label="聊天背景"
+            android:theme="@style/Theme.YhchatCanary" />
+            
+        <!-- 群网盘 Activity -->
+        <activity
+            android:name=".ui.disk.GroupDiskActivity"
+            android:exported="false"
+            android:label="群网盘"
+            android:theme="@style/Theme.YhchatCanary" />
+            
         <!-- 综合搜索 Activity -->
 
         <activity

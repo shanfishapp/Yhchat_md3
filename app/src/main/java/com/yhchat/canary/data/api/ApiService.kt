@@ -11,7 +11,7 @@ import retrofit2.http.*
  */
 interface ApiService {
     
-    // 用户相关API
+    // ==================== 用户相关API ====================
     @GET("v1/user/info")
     suspend fun getUserInfo(
         @Header("token") token: String
@@ -194,7 +194,244 @@ interface ApiService {
         @Body request: FileDownloadRecordRequest
     ): Response<Map<String, Any>>
     
-    // 会话相关API
+    // ==================== 表情包相关API ====================
+    /**
+     * 获取个人表情收藏
+     */
+    @POST("v1/expression/list")
+    suspend fun getExpressionList(
+        @Header("token") token: String
+    ): Response<ExpressionListResponse>
+    
+    /**
+     * 添加图片到个人表情收藏
+     */
+    @POST("v1/expression/create")
+    suspend fun addExpression(
+        @Header("token") token: String,
+        @Body request: ExpressionActionRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
+    /**
+     * 删除个人表情收藏中的表情
+     */
+    @POST("v1/expression/delete")
+    suspend fun deleteExpression(
+        @Header("token") token: String,
+        @Body request: ExpressionActionRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
+    /**
+     * 置顶个人表情收藏中的表情
+     */
+    @POST("v1/expression/topping")
+    suspend fun topExpression(
+        @Header("token") token: String,
+        @Body request: ExpressionActionRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
+    /**
+     * 添加已有表情包
+     */
+    @POST("v1/expression/add")
+    suspend fun addExistingExpression(
+        @Header("token") token: String,
+        @Body request: ExpressionActionRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
+    // ==================== 举报相关API ====================
+    /**
+     * 提交举报
+     */
+    @POST("v1/report/create")
+    suspend fun submitReport(
+        @Header("token") token: String,
+        @Body request: ReportRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
+    // ==================== 分享相关API ====================
+    /**
+     * 创建分享链接
+     */
+    @POST("v1/share/create")
+    suspend fun createShareLink(
+        @Header("token") token: String,
+        @Body request: CreateShareRequest
+    ): Response<CreateShareResponse>
+    
+    // ==================== 聊天背景相关API ====================
+    /**
+     * 设置聊天背景
+     */
+    @POST("v1/chat-background/edit")
+    suspend fun setChatBackground(
+        @Header("token") token: String,
+        @Body request: SetChatBackgroundRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
+    /**
+     * 获取背景设置列表
+     */
+    @POST("v1/chat-background/list")
+    suspend fun getChatBackgroundList(
+        @Header("token") token: String
+    ): Response<ChatBackgroundListResponse>
+    
+    // ==================== 贴纸功能相关API ====================
+    /**
+     * 获取收藏表情包
+     */
+    @POST("v1/sticker/list")
+    suspend fun getStickerPackList(
+        @Header("token") token: String
+    ): Response<StickerPackListResponse>
+    
+    /**
+     * 查看表情包详情
+     */
+    @POST("v1/sticker/detail")
+    suspend fun getStickerPackDetail(
+        @Header("token") token: String,
+        @Body request: StickerPackActionRequest
+    ): Response<StickerPackDetailResponse>
+    
+    /**
+     * 添加表情包
+     */
+    @POST("v1/sticker/add")
+    suspend fun addStickerPack(
+        @Header("token") token: String,
+        @Body request: StickerPackActionRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
+    /**
+     * 移除收藏表情包
+     */
+    @POST("v1/sticker/remove-sticker-pack")
+    suspend fun removeStickerPack(
+        @Header("token") token: String,
+        @Body request: StickerPackActionRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
+    /**
+     * 更改收藏表情包的排序
+     */
+    @POST("v1/sticker/sort")
+    suspend fun sortStickerPacks(
+        @Header("token") token: String,
+        @Body request: StickerPackSortRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
+    // ==================== 云盘/文件存储相关API ====================
+    /**
+     * 创建群网盘文件夹
+     */
+    @POST("v1/disk/create-folder")
+    suspend fun createFolder(
+        @Header("token") token: String,
+        @Body request: CreateFolderRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
+    /**
+     * 获取群网盘文件列表
+     */
+    @POST("v1/disk/file-list")
+    suspend fun getFileList(
+        @Header("token") token: String,
+        @Body request: GetFileListRequest
+    ): Response<FileListResponse>
+    
+    /**
+     * 上传文件到群网盘
+     */
+    @POST("v1/disk/upload-file")
+    suspend fun uploadFileToDisk(
+        @Header("token") token: String,
+        @Body request: UploadFileRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
+    /**
+     * 更改文件名
+     */
+    @POST("v1/disk/rename")
+    suspend fun renameFile(
+        @Header("token") token: String,
+        @Body request: RenameFileRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
+    /**
+     * 删除文件
+     */
+    @POST("v1/disk/remove")
+    suspend fun removeFile(
+        @Header("token") token: String,
+        @Body request: RemoveFileRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
+    // ==================== 金币系统相关API ====================
+    /**
+     * 商品获取
+     */
+    @POST("v1/coin/shop/product-recommend")
+    suspend fun getProductList(
+        @Header("token") token: String,
+        @Body request: ProductListRequest
+    ): Response<ProductListResponse>
+    
+    /**
+     * 我的金币任务获取
+     */
+    @POST("v1/coin/task/my-task-info")
+    suspend fun getMyTaskInfo(
+        @Header("token") token: String
+    ): Response<MyTaskInfoResponse>
+    
+    /**
+     * 获取商品详情
+     */
+    @POST("v1/coin/shop/product-detail")
+    suspend fun getProductDetail(
+        @Header("token") token: String,
+        @Body request: ProductDetailRequest
+    ): Response<ProductDetailResponse>
+    
+    /**
+     * 获取金币增减记录
+     */
+    @POST("v1/user/gold-coin-increase-decrease-record")
+    suspend fun getGoldCoinIncreaseDecreaseRecord(
+        @Header("token") token: String,
+        @Body request: GoldCoinRecordRequest
+    ): Response<GoldCoinRecordResponse>
+    
+    /**
+     * 获取打赏记录（文章/评论）
+     */
+    @POST("v1/community/reward-record")
+    suspend fun getRewardRecord(
+        @Header("token") token: String,
+        @Body request: RewardRecordRequest
+    ): Response<RewardRecordResponse>
+    
+    // ==================== VIP会员相关API ====================
+    /**
+     * VIP价格获取
+     */
+    @POST("v1/vip/vip-product-list")
+    suspend fun getVipProductList(
+        @Header("token") token: String,
+        @Body request: VipProductListRequest
+    ): Response<VipProductListResponse>
+    
+    /**
+     * VIP特权获取
+     */
+    @GET("v1/vip/vip-benefits-list")
+    suspend fun getVipBenefitsList(
+        @Header("token") token: String
+    ): Response<VipBenefitsListResponse>
+    
+    // ==================== 会话相关API ====================
     @POST("v1/conversation/list")
     suspend fun listConversations(
         @Header("token") token: String
@@ -335,13 +572,31 @@ interface ApiService {
 
 
     /**
-     * 添加好友/加入群聊
+     * 添加好友/加入群聊/机器人
      */
     @POST("v1/friend/apply")
     suspend fun addFriend(
         @Header("token") token: String,
         @Body request: AddFriendRequest
     ): Response<ApiStatus>
+    
+    /**
+     * 删除好友/群聊/机器人
+     */
+    @POST("v1/friend/delete-friend")
+    suspend fun deleteFriend(
+        @Header("token") token: String,
+        @Body request: DeleteFriendRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
+    /**
+     * 处理好友申请
+     */
+    @POST("v1/friend/agree-apply")
+    suspend fun agreeApply(
+        @Header("token") token: String,
+        @Body request: AgreeApplyRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
     
     /**
      * 获取所有聊天对象（通讯录）- 使用protobuf

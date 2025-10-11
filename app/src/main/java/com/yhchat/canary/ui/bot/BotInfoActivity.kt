@@ -16,6 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Report
+import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -87,6 +89,7 @@ private fun BotInfoScreen(
     val context = LocalContext.current
     var showImageViewer by remember { mutableStateOf(false) }
     var currentImageUrl by remember { mutableStateOf("") }
+    var showReportDialog by remember { mutableStateOf(false) }
     
     Box(modifier = Modifier.fillMaxSize()) {
     Surface(
@@ -114,6 +117,24 @@ private fun BotInfoScreen(
                 },
                 actions = {
                     if (uiState.botInfo != null) {
+                        IconButton(
+                            onClick = { showReportDialog = true }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Report,
+                                contentDescription = "举报机器人"
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                com.yhchat.canary.ui.background.ChatBackgroundActivity.start(context, botId, botName)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Wallpaper,
+                                contentDescription = "聊天背景"
+                            )
+                        }
                         IconButton(
                             onClick = {
                                 viewModel.addBot(botId)
@@ -206,6 +227,19 @@ private fun BotInfoScreen(
         com.yhchat.canary.ui.components.ImageViewer(
             imageUrl = currentImageUrl,
             onDismiss = { showImageViewer = false }
+        )
+    }
+    
+    // 举报对话框
+    if (showReportDialog) {
+        com.yhchat.canary.ui.components.ReportDialog(
+            chatId = botId,
+            chatType = 3,  // 机器人
+            chatName = botName,
+            onDismiss = { showReportDialog = false },
+            onSuccess = {
+                Toast.makeText(context, "举报已提交", Toast.LENGTH_SHORT).show()
+            }
         )
     }
     }

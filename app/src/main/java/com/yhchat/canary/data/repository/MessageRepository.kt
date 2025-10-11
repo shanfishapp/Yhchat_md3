@@ -450,6 +450,96 @@ class MessageRepository @Inject constructor(
     }
     
     /**
+     * 发送表情消息 (contentType=7)
+     * @param expression 表情对象，包含id、url等信息
+     */
+    suspend fun sendExpressionMessage(
+        chatId: String,
+        chatType: Int,
+        expression: com.yhchat.canary.data.model.Expression,
+        quoteMsgId: String? = null,
+        quoteMsgText: String? = null
+    ): Result<Boolean> {
+        return try {
+            val tokenFlow = tokenRepository.getToken()
+            val token = tokenFlow.first()?.token
+            if (token.isNullOrEmpty()) {
+                Log.e(tag, "❌ Token为空")
+                return Result.failure(Exception("用户未登录"))
+            }
+
+            val msgId = UUID.randomUUID().toString().replace("-", "")
+            
+            Log.d(tag, "📤 ========== 发送表情消息 ==========")
+            Log.d(tag, "📤 msgId: $msgId")
+            Log.d(tag, "📤 chatId: $chatId")
+            Log.d(tag, "📤 chatType: $chatType")
+            Log.d(tag, "📤 表情ID: ${expression.id}")
+            Log.d(tag, "📤 表情URL: ${expression.url}")
+            
+            // 构建protobuf请求
+            // 注意：expression.url已经是不带域名的路径，如 "expression/xxx.jpg"
+            val contentBuilder = send_message_send.Content.newBuilder()
+                .setExpressionId(expression.id.toString())  // 个人收藏表情ID
+                .setImage(expression.url)  // 图片路径（不带域名）
+            
+            // 添加引用消息文本
+            if (!quoteMsgText.isNullOrEmpty()) {
+                contentBuilder.setQuoteMsgText(quoteMsgText)
+                Log.d(tag, "📤 引用消息: $quoteMsgText")
+            }
+            
+            val requestBuilder = send_message_send.newBuilder()
+                .setMsgId(msgId)
+                .setChatId(chatId)
+                .setChatType(chatType.toLong())
+                .setContent(contentBuilder.build())
+                .setContentType(7) // 表情消息类型为7
+            
+            if (!quoteMsgId.isNullOrEmpty()) {
+                requestBuilder.setQuoteMsgId(quoteMsgId)
+                Log.d(tag, "📤 引用消息ID: $quoteMsgId")
+            }
+            
+            val request = requestBuilder.build()
+            val requestBytes = request.toByteArray()
+            val requestBody = requestBytes.toRequestBody("application/x-protobuf".toMediaType())
+
+            Log.d(tag, "📤 Protobuf请求大小: ${requestBytes.size} bytes")
+            
+            val response = apiService.sendMessage(token, requestBody)
+            
+            Log.d(tag, "📥 服务器响应码: ${response.code()}")
+            
+            if (response.isSuccessful) {
+                response.body()?.let { responseBody ->
+                    val bytes = responseBody.bytes()
+                    val sendResponse = send_message.parseFrom(bytes)
+                    
+                    Log.d(tag, "📥 响应状态码: ${sendResponse.status.code}")
+                    Log.d(tag, "📥 响应消息: ${sendResponse.status.msg}")
+                    
+                    if (sendResponse.status.code == 1) {
+                        Log.d(tag, "✅ ========== 表情消息发送成功！ ==========")
+                        Result.success(true)
+                    } else {
+                        Log.e(tag, "❌ 发送失败: ${sendResponse.status.msg}")
+                        Result.failure(Exception(sendResponse.status.msg))
+                    }
+                } ?: Result.failure(Exception("响应体为空"))
+            } else {
+                val errorBody = response.errorBody()?.string()
+                Log.e(tag, "❌ HTTP错误: ${response.code()}, 错误详情: $errorBody")
+                Result.failure(Exception("发送失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "❌ 发送表情消息异常", e)
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+    
+    /**
      * 将Proto消息转换为应用内消息模型
      */
     private fun convertProtoToMessage(protoMsg: Msg, chatId: String, chatType: Int): ChatMessage {

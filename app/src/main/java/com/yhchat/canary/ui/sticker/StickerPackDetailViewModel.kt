@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yhchat.canary.data.model.StickerPackDetail
+import com.yhchat.canary.data.model.StickerPackDetailData
 import com.yhchat.canary.data.repository.StickerRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,7 +16,7 @@ import javax.inject.Inject
 data class StickerPackDetailUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
-    val stickerPack: StickerPackDetail? = null
+    val stickerPack: StickerPackDetailData? = null
 )
 
 @HiltViewModel
@@ -36,10 +37,10 @@ class StickerPackDetailViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             
             try {
-                val result = stickerRepository.getStickerPackDetail(stickerPackId)
+                val result = stickerRepository.getStickerPackDetail(stickerPackId.toLong())
                 result.fold(
                     onSuccess = { stickerPack ->
-                        Log.d(tag, "Successfully loaded sticker pack: ${stickerPack.name}")
+                        Log.d(tag, "Successfully loaded sticker pack: ${stickerPack.stickerPack.name}")
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             stickerPack = stickerPack,
@@ -70,7 +71,7 @@ class StickerPackDetailViewModel @Inject constructor(
     fun addStickerPackToFavorites(stickerPackId: String) {
         viewModelScope.launch {
             try {
-                val result = stickerRepository.addStickerPackToFavorites(stickerPackId)
+                val result = stickerRepository.addStickerPack(stickerPackId.toLong())
                 result.fold(
                     onSuccess = {
                         Log.d(tag, "Successfully added sticker pack: $stickerPackId")

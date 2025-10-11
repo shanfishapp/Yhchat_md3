@@ -55,10 +55,12 @@ import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.lazy.LazyItemScope
 import com.yhchat.canary.ui.bot.BotInfoActivity
 import com.yhchat.canary.ui.components.MarkdownText
 import com.yhchat.canary.ui.components.HtmlWebView
 import com.yhchat.canary.ui.components.ChatInputBar
+import com.yhchat.canary.ui.components.GroupMenuBottomSheet
 import com.yhchat.canary.ui.components.ImageUtils
 import com.yhchat.canary.ui.components.ImageViewer
 import com.yhchat.canary.ui.components.LinkText
@@ -141,6 +143,9 @@ fun ChatScreen(
     // 机器人看板展开状态
     var showBotBoard by remember { mutableStateOf(false) }
     
+    // 群聊菜单BottomSheet状态
+    var showGroupMenuSheet by remember { mutableStateOf(false) }
+    
     // 初始化聊天
     LaunchedEffect(chatId, chatType, userId) {
         viewModel.initChat(chatId, chatType, userId)
@@ -152,6 +157,11 @@ fun ChatScreen(
             viewModel.loadBotInfo(chatId)
             viewModel.loadBotBoard(chatId, chatType)
         }
+    }
+    
+    // 加载聊天背景
+    LaunchedEffect(chatId) {
+        viewModel.loadChatBackground(context, chatId)
     }
     
     // 处理图片发送
@@ -187,10 +197,18 @@ fun ChatScreen(
                                    (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset > 100)
     }
     
-    // WebSocket新消息不再自动滚动，用户可以自己滑动查看
+    // WebSocket新消息处理：只在用户完全在底部时才滚动，否则保持当前位置不动
     LaunchedEffect(uiState.newMessageReceived) {
         if (uiState.newMessageReceived) {
-            // 重置新消息标记，但不进行任何滚动操作
+            // 严格检查：只有当用户在最底部且没有滚动时才自动滚动
+            val isExactlyAtBottom = listState.firstVisibleItemIndex == 0 && 
+                                   listState.firstVisibleItemScrollOffset == 0 &&
+                                   !listState.isScrollInProgress
+            if (isExactlyAtBottom) {
+                // 平滑滚动到新消息，不会跳动
+                listState.animateScrollToItem(0)
+            }
+            // 重置新消息标记
             viewModel.resetNewMessageFlag()
         }
     }
@@ -206,13 +224,32 @@ fun ChatScreen(
         onRefresh = { viewModel.refreshLatestMessages() }
     )
     
-    Surface(
-        modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+    // 应用聊天背景
+    Box(
+        modifier = modifier.fillMaxSize()
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
+        // 背景图片
+        if (uiState.chatBackgroundUrl != null) {
+            coil.compose.AsyncImage(
+                model = uiState.chatBackgroundUrl,
+                contentDescription = "聊天背景",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                alpha = 0.3f  // 半透明效果
+            )
+        }
+        
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = if (uiState.chatBackgroundUrl != null) {
+                MaterialTheme.colorScheme.background.copy(alpha = 0.85f)
+            } else {
+                MaterialTheme.colorScheme.background
+            }
         ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
         // 顶部应用栏
         TopAppBar(
             title = {
@@ -254,16 +291,11 @@ fun ChatScreen(
                 // 群聊信息菜单（只在群聊时显示）
                 if (chatType == 2) {
                     IconButton(onClick = {
-                        android.util.Log.d("ChatScreen", "Opening group info: chatId=$chatId, chatName=$chatName")
-                        val intent = Intent(context, com.yhchat.canary.ui.group.GroupInfoActivity::class.java)
-                        intent.putExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_ID, chatId)
-                        intent.putExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_NAME, chatName)
-                        android.util.Log.d("ChatScreen", "Intent extras: groupId=${intent.getStringExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_ID)}, groupName=${intent.getStringExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_NAME)}")
-                        context.startActivity(intent)
+                        showGroupMenuSheet = true
                     }) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
-                            contentDescription = "群聊信息"
+                            contentDescription = "群聊菜单"
                         )
                     }
                 }
@@ -455,8 +487,8 @@ fun ChatScreen(
                     items(
                         count = reversedMessages.size,
                         key = { index -> 
-                            // 使用索引和msgId组合作为key，确保唯一性
-                            "${reversedMessages[index].msgId}_$index"
+                            // 使用msgId作为唯一key，确保稳定性
+                            reversedMessages[index].msgId
                         }
                     ) { index ->
                         val message = reversedMessages[index]
@@ -467,7 +499,15 @@ fun ChatScreen(
                             message = message,
                             isMyMessage = viewModel.isMyMessage(message),
                             modifier = Modifier
-                                .fillMaxWidth(),
+                                .fillMaxWidth()
+                                .animateItem(
+                                    fadeInSpec = tween(durationMillis = 300),
+                                    fadeOutSpec = tween(durationMillis = 300),
+                                    placementSpec = spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessMediumLow
+                                    )
+                                ),
                             onImageClick = { imageUrl ->
                                 currentImageUrl = imageUrl
                                 showImageViewer = true
@@ -634,6 +674,17 @@ fun ChatScreen(
                     quotedMessageId = null
                     quotedMessageText = null
                 },
+                onExpressionClick = { expression ->
+                    // 发送表情消息（contentType=7）
+                    viewModel.sendExpressionMessage(
+                        expression = expression,
+                        quoteMsgId = quotedMessageId,
+                        quoteMsgText = quotedMessageText
+                    )
+                    // 清除引用状态
+                    quotedMessageId = null
+                    quotedMessageText = null
+                },
                 modifier = Modifier.padding(
                 start = 16.dp,
                 end = 16.dp,
@@ -641,8 +692,9 @@ fun ChatScreen(
                     bottom = 16.dp // 增加底部间距，避免粘在最底部
                 )
             )
-    }
-    }
+        }
+        }
+    }  // 闭合Box（聊天背景容器）
     
     // 图片预览器
     if (showImageViewer && currentImageUrl.isNotEmpty()) {
@@ -674,6 +726,15 @@ fun ChatScreen(
                 showEditDialog = false
                 messageToEdit = null
             }
+        )
+    }
+    
+    // 群聊菜单BottomSheet
+    if (showGroupMenuSheet && chatType == 2) {
+        GroupMenuBottomSheet(
+            groupId = chatId,
+            groupName = chatName,
+            onDismiss = { showGroupMenuSheet = false }
         )
     }
 }

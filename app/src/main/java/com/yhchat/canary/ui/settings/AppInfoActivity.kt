@@ -41,7 +41,7 @@ class AppInfoActivity : ComponentActivity() {
     
     companion object {
         // 应用版本信息（开发者可以在这里修改）
-        const val APP_VERSION = "Canary 19.2"
+        const val APP_VERSION = "Canary 19.3"
         const val APP_NAME = "Yhchat Canary"
         const val DEVELOPER_NAME_1 = "Kauid323"
         const val DEVELOPER_NAME_2 = "那狗吧"

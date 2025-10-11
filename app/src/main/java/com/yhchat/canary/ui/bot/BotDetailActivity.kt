@@ -123,6 +123,21 @@ private fun BotDetailScreen(
                             contentDescription = "返回"
                         )
                     }
+                },
+                actions = {
+                    val context = LocalContext.current
+                    IconButton(onClick = {
+                        com.yhchat.canary.ui.background.ChatBackgroundActivity.start(
+                            context, 
+                            botId, 
+                            botName
+                        )
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Wallpaper,
+                            contentDescription = "聊天背景"
+                        )
+                    }
                 }
             )
         }

@@ -12,6 +12,9 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Report
+import androidx.compose.material.icons.filled.Wallpaper
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshotFlow
@@ -37,10 +40,12 @@ fun GroupInfoScreenRoot(
     onBackClick: () -> Unit,
     onSettingsClick: () -> Unit = {},
     onShareClick: () -> Unit = {},
+    onReportClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showShareDialog by remember { mutableStateOf(false) }
     
     LaunchedEffect(groupId) {
         viewModel.loadGroupInfo(groupId)
@@ -60,7 +65,7 @@ fun GroupInfoScreenRoot(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onShareClick) {
+                    IconButton(onClick = { showShareDialog = true }) {
                         Icon(
                             imageVector = Icons.Default.Share,
                             contentDescription = "分享"
@@ -126,6 +131,16 @@ fun GroupInfoScreenRoot(
                     }
                 }
             }
+        }
+        
+        // 分享对话框
+        if (showShareDialog) {
+            com.yhchat.canary.ui.components.ShareDialog(
+                chatId = groupId,
+                chatType = 2,  // 群聊
+                chatName = groupName,
+                onDismiss = { showShareDialog = false }
+            )
         }
     }
 }

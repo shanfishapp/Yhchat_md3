@@ -54,8 +54,10 @@ class GroupInfoActivity : ComponentActivity() {
                             startActivity(intent)
                         },
                         onShareClick = {
-                            // TODO: 实现分享功能
-                            android.widget.Toast.makeText(this, "分享功能待实现", android.widget.Toast.LENGTH_SHORT).show()
+                            // 分享功能已在GroupInfoScreen中集成
+                        },
+                        onReportClick = {
+                            // 举报功能已在GroupInfoScreen中集成
                         }
                     )
                 }

@@ -46,6 +46,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
+        // 应用字体大小设置
+        applyFontScale()
+        
         // 处理 Deep Link
         handleDeepLink()
         
@@ -204,6 +207,10 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.background
+                        ) {
                         Box(modifier = Modifier.fillMaxSize()) {
                             // 主内容区域（全屏显示，不使用paddingValues）
                             val paddingValues = PaddingValues(0.dp)
@@ -339,6 +346,7 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.align(Alignment.BottomCenter)
                             )
                         }
+                        }
                     }
                 }
             }
@@ -357,6 +365,22 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+    
+    /**
+     * 应用字体大小设置
+     */
+    private fun applyFontScale() {
+        val prefs = getSharedPreferences("display_settings", MODE_PRIVATE)
+        val fontScale = prefs.getFloat("font_scale", 100f)
+        
+        // 将百分比转换为系统字体缩放因子 (1-100% -> 0.01-1.0)
+        val scaleFactor = fontScale / 100f
+        
+        // 应用字体缩放
+        val configuration = resources.configuration
+        configuration.fontScale = scaleFactor
+        resources.updateConfiguration(configuration, resources.displayMetrics)
     }
 }
 

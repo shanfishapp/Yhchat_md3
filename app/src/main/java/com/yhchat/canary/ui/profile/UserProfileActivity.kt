@@ -20,6 +20,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Report
+import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -126,6 +128,7 @@ fun UserProfileScreen(
     val userProfile by viewModel.userProfile.collectAsState()
     var showMemberMenu by remember { mutableStateOf(false) }
     var showGagMenu by remember { mutableStateOf(false) }
+    var showReportDialog by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
 
@@ -205,6 +208,24 @@ fun UserProfileScreen(
                 }
             },
             actions = {
+                // 举报按钮
+                IconButton(onClick = { showReportDialog = true }) {
+                    Icon(
+                        imageVector = Icons.Default.Report,
+                        contentDescription = "举报用户"
+                    )
+                }
+                
+                // 聊天背景按钮
+                IconButton(onClick = {
+                    com.yhchat.canary.ui.background.ChatBackgroundActivity.start(context, userId, initialUserName ?: "用户")
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.Wallpaper,
+                        contentDescription = "聊天背景"
+                    )
+                }
+                
                 // 群聊管理菜单（在群聊环境下都显示，权限由后端控制）
                 if (groupId != null) {
                     Box {
@@ -340,6 +361,19 @@ fun UserProfileScreen(
                     showGagMenu = false
                 },
                 onDismiss = { showGagMenu = false }
+            )
+        }
+        
+        // 举报对话框
+        if (showReportDialog) {
+            com.yhchat.canary.ui.components.ReportDialog(
+                chatId = userId,
+                chatType = 1,  // 用户
+                chatName = initialUserName ?: "该用户",
+                onDismiss = { showReportDialog = false },
+                onSuccess = {
+                    onShowToast("举报已提交")
+                }
             )
         }
         }

@@ -28,7 +28,8 @@ data class ChatUiState(
     val groupMembers: Map<String, GroupMemberInfo> = emptyMap(),  // 群成员信息：chatId -> GroupMemberInfo
     val groupMemberCount: Int = 0,  // 群成员总数
     val botInfo: yh_bot.Bot.bot_info? = null,  // 机器人信息
-    val botBoard: yh_bot.Bot.board? = null  // 机器人看板
+    val botBoard: yh_bot.Bot.board? = null,  // 机器人看板
+    val chatBackgroundUrl: String? = null  // 聊天背景图片URL
 )
 
 @HiltViewModel
@@ -642,6 +643,55 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
+     * 发送表情消息（从表情选择器选择）
+     */
+    fun sendExpressionMessage(
+        expression: com.yhchat.canary.data.model.Expression,
+        quoteMsgId: String? = null,
+        quoteMsgText: String? = null
+    ) {
+        if (currentChatId.isEmpty()) {
+            Log.w(tag, "Chat not initialized")
+            return
+        }
+        
+        viewModelScope.launch {
+            try {
+                Log.d(tag, "Sending expression message: id=${expression.id}, url=${expression.url}")
+                
+                // 发送表情类型消息（contentType=7）
+                val result = messageRepository.sendExpressionMessage(
+                    chatId = currentChatId,
+                    chatType = currentChatType,
+                    expression = expression,
+                    quoteMsgId = quoteMsgId,
+                    quoteMsgText = quoteMsgText
+                )
+                
+                result.fold(
+                    onSuccess = { success ->
+                        if (success) {
+                            Log.d(tag, "Expression message sent successfully")
+                            loadMessages(refresh = true)
+                        }
+                    },
+                    onFailure = { exception ->
+                        Log.e(tag, "Failed to send expression message", exception)
+                        _uiState.value = _uiState.value.copy(
+                            error = exception.message ?: "发送表情失败"
+                        )
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(tag, "Error sending expression message", e)
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "发送表情失败"
+                )
+            }
+        }
+    }
+    
+    /**
      * 发送草稿输入（输入框内容变化时调用）
      */
     fun sendDraftInput(inputText: String) {
@@ -825,6 +875,35 @@ class ChatViewModel @Inject constructor(
                     Log.e(tag, "加载机器人看板失败", error)
                 }
             )
+        }
+    }
+    
+    /**
+     * 加载聊天背景
+     */
+    fun loadChatBackground(context: android.content.Context, chatId: String) {
+        viewModelScope.launch {
+            try {
+                val chatBackgroundRepository = com.yhchat.canary.data.di.RepositoryFactory.getChatBackgroundRepository(context)
+                
+                // 获取背景列表
+                chatBackgroundRepository.getChatBackgroundList().fold(
+                    onSuccess = { backgrounds ->
+                        // 查找特定聊天背景，如果没有则查找全局背景
+                        val specificBg = backgrounds.find { it.chatId == chatId }
+                        val globalBg = backgrounds.find { it.chatId == "all" }
+                        val backgroundUrl = specificBg?.imgUrl ?: globalBg?.imgUrl
+                        
+                        _uiState.value = _uiState.value.copy(chatBackgroundUrl = backgroundUrl)
+                        Log.d(tag, "聊天背景加载成功: $backgroundUrl")
+                    },
+                    onFailure = { error ->
+                        Log.e(tag, "加载聊天背景失败", error)
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(tag, "加载聊天背景异常", e)
+            }
         }
     }
     

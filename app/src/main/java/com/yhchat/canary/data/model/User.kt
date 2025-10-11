@@ -1047,26 +1047,6 @@ data class StickerPackDetail(
     val creator: StickerPackCreator
 )
 
-/**
- * 表情包中的表情项
- */
-data class StickerItem(
-    val id: Int,
-    val name: String,
-    val url: String,
-    val stickerPackId: Int,
-    val createBy: String,
-    val createTime: Long
-)
-
-/**
- * 表情包创建者信息
- */
-data class StickerPackCreator(
-    val userId: String,
-    val nickname: String,
-    val avatarUrl: String
-)
 
 // ========== 分享链接相关数据模型 ==========
 

@@ -14,6 +14,14 @@ import com.yhchat.canary.data.repository.CacheRepository
 import com.yhchat.canary.data.repository.NavigationRepository
 import com.yhchat.canary.data.repository.UserRepository
 import com.yhchat.canary.data.repository.DraftRepository
+import com.yhchat.canary.data.repository.ExpressionRepository
+import com.yhchat.canary.data.repository.ReportRepository
+import com.yhchat.canary.data.repository.ShareRepository
+import com.yhchat.canary.data.repository.ChatBackgroundRepository
+import com.yhchat.canary.data.repository.StickerRepository
+import com.yhchat.canary.data.repository.DiskRepository
+import com.yhchat.canary.data.repository.CoinRepository
+import com.yhchat.canary.data.repository.VipRepository
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
@@ -120,4 +128,88 @@ object RepositoryFactory {
             tokenRepository = getTokenRepository(context)
         )
     }
+    
+    /**
+     * 获取表情包仓库实例
+     */
+    fun getExpressionRepository(context: Context): ExpressionRepository {
+        return ExpressionRepository(
+            apiService = apiService,
+            tokenRepository = getTokenRepository(context)
+        )
+    }
+    
+    /**
+     * 获取举报仓库实例
+     */
+    fun getReportRepository(context: Context): ReportRepository {
+        return ReportRepository(
+            apiService = apiService,
+            tokenRepository = getTokenRepository(context)
+        )
+    }
+    
+    /**
+     * 获取分享仓库实例
+     */
+    fun getShareRepository(context: Context): ShareRepository {
+        return ShareRepository(
+            apiService = apiService,
+            tokenRepository = getTokenRepository(context)
+        )
+    }
+    
+    /**
+     * 获取聊天背景仓库实例
+     */
+    fun getChatBackgroundRepository(context: Context): ChatBackgroundRepository {
+        return ChatBackgroundRepository(
+            apiService = apiService,
+            tokenRepository = getTokenRepository(context)
+        )
+    }
+    
+    /**
+     * 获取贴纸仓库实例
+     */
+    fun getStickerRepository(context: Context): StickerRepository {
+        return StickerRepository(
+            apiService = apiService,
+            tokenRepository = getTokenRepository(context)
+        )
+    }
+    
+    /**
+     * 获取云盘仓库实例
+     */
+    fun getDiskRepository(context: Context): DiskRepository {
+        return DiskRepository(
+            apiService = apiService,
+            tokenRepository = getTokenRepository(context)
+        )
+    }
+    
+    /**
+     * 获取金币仓库实例
+     */
+    fun getCoinRepository(context: Context): CoinRepository {
+        return CoinRepository(
+            apiService = apiService,
+            tokenRepository = getTokenRepository(context)
+        )
+    }
+    
+    /**
+     * 获取VIP仓库实例
+     */
+    fun getVipRepository(context: Context): VipRepository {
+        return VipRepository(
+            apiService = apiService,
+            tokenRepository = getTokenRepository(context)
+        )
+    }
+    
+    /**
+     * 获取ApiService实例
+     */
 }

@@ -124,8 +124,9 @@ fun StickerPackDetailScreen(
                     )
                 }
                 uiState.stickerPack != null -> {
+                    val stickerPackData = uiState.stickerPack!!
                     StickerPackDetailContent(
-                        stickerPack = uiState.stickerPack!!,
+                        stickerPackData = stickerPackData,
                         onImageClick = { imageUrl ->
                             currentImageUrl = imageUrl
                             showImageViewer = true
@@ -150,9 +151,11 @@ fun StickerPackDetailScreen(
 
 @Composable
 fun StickerPackDetailContent(
-    stickerPack: com.yhchat.canary.data.model.StickerPackDetail,
+    stickerPackData: com.yhchat.canary.data.model.StickerPackDetailData,
     onImageClick: (String) -> Unit = {}
 ) {
+    val stickerPack = stickerPackData.stickerPack
+    val creator = stickerPackData.user
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -177,28 +180,30 @@ fun StickerPackDetailContent(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 // 创建者信息
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    AsyncImage(
-                        model = stickerPack.creator.avatarUrl,
-                        contentDescription = "创建者头像",
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = stickerPack.creator.nickname,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
+                if (creator != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AsyncImage(
+                            model = creator.avatarUrl,
+                            contentDescription = "创建者头像",
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(16.dp))
                         )
-                        Text(
-                            text = "创建者",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = creator.nickname,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "创建者",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
                 

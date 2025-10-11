@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ArrowForward
@@ -307,13 +308,24 @@ private fun UserProfileContent(
                     )
                 }
 
-                // 云湖币
-                if (userProfile.coin != null && userProfile.coin > 0) {
-                    ProfileInfoItem(
+                // 云湖币（可点击）
+                if (userProfile.coin != null) {
+                    var showCoinMenu by remember { mutableStateOf(false) }
+                    
+                    ProfileInfoItemClickable(
                         icon = Icons.Default.AccountCircle,
                         label = "金币",
-                        value = "%.2f".format(userProfile.coin)
+                        value = "%.2f".format(userProfile.coin),
+                        onClick = {
+                            showCoinMenu = true
+                        }
                     )
+                    
+                    if (showCoinMenu) {
+                        CoinMenuBottomSheet(
+                            onDismiss = { showCoinMenu = false }
+                        )
+                    }
                 }
 
                 // VIP到期时间
@@ -343,6 +355,158 @@ private fun UserProfileContent(
         // 添加底部间距，确保内容不会贴底
         Spacer(modifier = Modifier.height(32.dp))
     }
+}
+
+/**
+ * 金币菜单底部弹窗（MD3风格）
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CoinMenuBottomSheet(
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val sheetState = rememberModalBottomSheetState()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp)
+        ) {
+            Text(
+                text = "金币功能",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+            )
+            
+            // 金币商城
+            CoinMenuItem(
+                icon = Icons.Default.Star,
+                label = "金币商城",
+                onClick = {
+                    val intent = android.content.Intent(context, com.yhchat.canary.ui.coin.CoinShopActivity::class.java)
+                    context.startActivity(intent)
+                    onDismiss()
+                }
+            )
+            
+            // 任务中心
+            CoinMenuItem(
+                icon = Icons.Default.AccountCircle,
+                label = "任务中心",
+                onClick = {
+                    val intent = android.content.Intent(context, com.yhchat.canary.ui.coin.CoinDetailActivity::class.java)
+                    context.startActivity(intent)
+                    onDismiss()
+                }
+            )
+            
+            // 金币明细
+            CoinMenuItem(
+                icon = Icons.Default.ArrowForward,
+                label = "金币明细",
+                onClick = {
+                    val intent = android.content.Intent(context, com.yhchat.canary.ui.coin.CoinRecordActivity::class.java)
+                    context.startActivity(intent)
+                    onDismiss()
+                }
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun CoinMenuItem(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+/**
+ * 可点击的资料项（带右箭头）
+ */
+@Composable
+private fun ProfileInfoItemClickable(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(
+                imageVector = Icons.Default.ArrowForward,
+                contentDescription = "查看详情",
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 32.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    )
 }
 
 @Composable

@@ -2,33 +2,31 @@ package com.yhchat.canary.data.repository
 
 import android.util.Log
 import com.yhchat.canary.data.api.ApiService
-import com.yhchat.canary.data.model.StickerPack
-import com.yhchat.canary.data.model.StickerPackActionRequest
-import com.yhchat.canary.data.model.StickerPackDetailData
-import com.yhchat.canary.data.model.StickerPackSortRequest
+import com.yhchat.canary.data.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 贴纸仓库
+ * 金币系统仓库
  */
 @Singleton
-class StickerRepository @Inject constructor(
+class CoinRepository @Inject constructor(
     private val apiService: ApiService,
     private val tokenRepository: TokenRepository
 ) {
     companion object {
-        private const val TAG = "StickerRepository"
+        private const val TAG = "CoinRepository"
     }
 
     /**
-     * 获取收藏表情包列表
+     * 获取商品列表
      */
-    suspend fun getStickerPackList(): Result<List<StickerPack>> = withContext(Dispatchers.IO) {
+    suspend fun getProductList(
+        size: Int = 100,
+        page: Int = 1
+    ): Result<ProductListData> = withContext(Dispatchers.IO) {
         return@withContext try {
             val token = tokenRepository.getTokenSync()
             if (token.isNullOrEmpty()) {
@@ -36,68 +34,106 @@ class StickerRepository @Inject constructor(
                 return@withContext Result.failure(Exception("未登录"))
             }
 
-            val response = apiService.getStickerPackList(token)
+            val request = ProductListRequest(size = size, page = page)
+            val response = apiService.getProductList(token, request)
             
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null && body.code == 1) {
-                    Log.d(TAG, "✅ 获取贴纸包列表成功: ${body.data.stickerPacks.size}个贴纸包")
-                    Result.success(body.data.stickerPacks)
-                } else {
-                    val error = "获取贴纸包列表失败: ${response.code().toString()}"
-                    Log.e(TAG, error)
-                    Result.failure(Exception(error))
-                }
-            } else {
-                val error = "获取贴纸包列表失败: ${response.code()}"
-                Log.e(TAG, error)
-                Result.failure(Exception(error))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ 获取贴纸包列表异常", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * 查看表情包详情
-     */
-    suspend fun getStickerPackDetail(packId: Long): Result<StickerPackDetailData> = withContext(Dispatchers.IO) {
-        return@withContext try {
-            val token = tokenRepository.getTokenSync()
-            if (token.isNullOrEmpty()) {
-                Log.e(TAG, "Token为空")
-                return@withContext Result.failure(Exception("未登录"))
-            }
-
-            val request = StickerPackActionRequest(id = packId)
-            val response = apiService.getStickerPackDetail(token, request)
-            
-            if (response.isSuccessful) {
-                val body = response.body()
-                if (body != null && body.code == 1) {
-                    Log.d(TAG, "✅ 获取贴纸包详情成功")
+                    Log.d(TAG, "✅ 获取商品列表成功: ${body.data.list.size}个商品")
                     Result.success(body.data)
-                        } else {
-                    val error = "获取贴纸包详情失败: ${response.code().toString()}"
+                } else {
+                    val error = "获取商品列表失败: ${body?.msg}"
                     Log.e(TAG, error)
                     Result.failure(Exception(error))
-                        }
-                    } else {
-                val error = "获取贴纸包详情失败: ${response.code()}"
+                }
+            } else {
+                val error = "获取商品列表失败: ${response.code()}"
                 Log.e(TAG, error)
                 Result.failure(Exception(error))
             }
         } catch (e: Exception) {
-            Log.e(TAG, "❌ 获取贴纸包详情异常", e)
+            Log.e(TAG, "❌ 获取商品列表异常", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * 获取我的金币任务信息
+     */
+    suspend fun getMyTaskInfo(): Result<MyTaskInfo> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val token = tokenRepository.getTokenSync()
+            if (token.isNullOrEmpty()) {
+                Log.e(TAG, "Token为空")
+                return@withContext Result.failure(Exception("未登录"))
+            }
+
+            val response = apiService.getMyTaskInfo(token)
+            
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null && body.code == 1) {
+                    Log.d(TAG, "✅ 获取金币任务信息成功")
+                    Result.success(body.data)
+                } else {
+                    val error = "获取金币任务信息失败: ${body?.msg}"
+                    Log.e(TAG, error)
+                    Result.failure(Exception(error))
+                }
+            } else {
+                val error = "获取金币任务信息失败: ${response.code()}"
+                Log.e(TAG, error)
+                Result.failure(Exception(error))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ 获取金币任务信息异常", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * 获取商品详情
+     */
+    suspend fun getProductDetail(productId: Long): Result<Product> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val token = tokenRepository.getTokenSync()
+            if (token.isNullOrEmpty()) {
+                Log.e(TAG, "Token为空")
+                return@withContext Result.failure(Exception("未登录"))
+            }
+
+            val request = ProductDetailRequest(id = productId)
+            val response = apiService.getProductDetail(token, request)
+            
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null && body.code == 1) {
+                    Log.d(TAG, "✅ 获取商品详情成功")
+                    Result.success(body.data.product)
+                } else {
+                    val error = "获取商品详情失败: ${body?.msg}"
+                    Log.e(TAG, error)
+                    Result.failure(Exception(error))
+                }
+            } else {
+                val error = "获取商品详情失败: ${response.code()}"
+                Log.e(TAG, error)
+                Result.failure(Exception(error))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ 获取商品详情异常", e)
             Result.failure(e)
         }
     }
     
     /**
-     * 添加表情包
+     * 获取金币增减记录
      */
-    suspend fun addStickerPack(packId: Long): Result<Boolean> = withContext(Dispatchers.IO) {
+    suspend fun getCoinIncreaseDecreaseRecord(
+        size: Int = 20,
+        page: Int = 1
+    ): Result<List<GoldCoinRecord>> = withContext(Dispatchers.IO) {
         return@withContext try {
             val token = tokenRepository.getTokenSync()
             if (token.isNullOrEmpty()) {
@@ -105,34 +141,38 @@ class StickerRepository @Inject constructor(
                 return@withContext Result.failure(Exception("未登录"))
             }
 
-            val request = StickerPackActionRequest(id = packId)
-            val response = apiService.addStickerPack(token, request)
+            val request = GoldCoinRecordRequest(size = size, page = page)
+            val response = apiService.getGoldCoinIncreaseDecreaseRecord(token, request)
             
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null && body.code == 1) {
-                    Log.d(TAG, "✅ 添加贴纸包成功")
-                    Result.success(true)
-                    } else {
-                    val error = "添加贴纸包失败: ${response.code().toString()}"
+                    Log.d(TAG, "✅ 获取金币增减记录成功: ${body.data.goldCoinRecord.size}条记录")
+                    Result.success(body.data.goldCoinRecord)
+                } else {
+                    val error = "获取金币增减记录失败: ${body?.msg}"
                     Log.e(TAG, error)
                     Result.failure(Exception(error))
-                    }
+                }
             } else {
-                val error = "添加贴纸包失败: ${response.code()}"
+                val error = "获取金币增减记录失败: ${response.code()}"
                 Log.e(TAG, error)
                 Result.failure(Exception(error))
             }
         } catch (e: Exception) {
-            Log.e(TAG, "❌ 添加贴纸包异常", e)
+            Log.e(TAG, "❌ 获取金币增减记录异常", e)
             Result.failure(e)
         }
     }
     
     /**
-     * 移除收藏表情包
+     * 获取打赏记录（文章/评论）
      */
-    suspend fun removeStickerPack(packId: Long): Result<Boolean> = withContext(Dispatchers.IO) {
+    suspend fun getRewardRecord(
+        type: String,  // "post" 或 "comment"
+        size: Int = 20,
+        page: Int = 1
+    ): Result<List<RewardRecord>> = withContext(Dispatchers.IO) {
         return@withContext try {
             val token = tokenRepository.getTokenSync()
             if (token.isNullOrEmpty()) {
@@ -140,73 +180,28 @@ class StickerRepository @Inject constructor(
                 return@withContext Result.failure(Exception("未登录"))
             }
 
-            val request = StickerPackActionRequest(id = packId)
-            val response = apiService.removeStickerPack(token, request)
+            val request = RewardRecordRequest(type = type, size = size, page = page)
+            val response = apiService.getRewardRecord(token, request)
             
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null && body.code == 1) {
-                    Log.d(TAG, "✅ 移除贴纸包成功")
-                    Result.success(true)
+                    Log.d(TAG, "✅ 获取${if (type == "post") "文章" else "评论"}打赏记录成功: ${body.data.rewards.size}条记录")
+                    Result.success(body.data.rewards)
                 } else {
-                    val error = "移除贴纸包失败: ${response.code().toString()}"
+                    val error = "获取打赏记录失败: ${body?.msg}"
                     Log.e(TAG, error)
                     Result.failure(Exception(error))
                 }
             } else {
-                val error = "移除贴纸包失败: ${response.code()}"
+                val error = "获取打赏记录失败: ${response.code()}"
                 Log.e(TAG, error)
                 Result.failure(Exception(error))
             }
         } catch (e: Exception) {
-            Log.e(TAG, "❌ 移除贴纸包异常", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * 更改收藏表情包的排序
-     * @param sortList List of Pair(id, sort) - sort越大排序越靠前
-     */
-    suspend fun sortStickerPacks(sortList: List<Pair<Long, Int>>): Result<Boolean> = withContext(Dispatchers.IO) {
-        return@withContext try {
-            val token = tokenRepository.getTokenSync()
-            if (token.isNullOrEmpty()) {
-                Log.e(TAG, "Token为空")
-                return@withContext Result.failure(Exception("未登录"))
-            }
-
-            // 构建排序JSON数组字符串
-            val jsonArray = JSONArray()
-            sortList.forEach { (id, sort) ->
-                val jsonObject = JSONObject()
-                jsonObject.put("id", id.toString())
-                jsonObject.put("sort", sort.toString())
-                jsonArray.put(jsonObject)
-            }
-            val sortString = jsonArray.toString()
-            
-            val request = StickerPackSortRequest(sort = sortString)
-            val response = apiService.sortStickerPacks(token, request)
-            
-            if (response.isSuccessful) {
-                val body = response.body()
-                if (body != null && body.code == 1) {
-                    Log.d(TAG, "✅ 贴纸包排序成功")
-                    Result.success(true)
-                } else {
-                    val error = "贴纸包排序失败: ${response.code().toString()}"
-                    Log.e(TAG, error)
-                    Result.failure(Exception(error))
-                }
-            } else {
-                val error = "贴纸包排序失败: ${response.code()}"
-                Log.e(TAG, error)
-                Result.failure(Exception(error))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ 贴纸包排序异常", e)
+            Log.e(TAG, "❌ 获取打赏记录异常", e)
             Result.failure(e)
         }
     }
 }
+

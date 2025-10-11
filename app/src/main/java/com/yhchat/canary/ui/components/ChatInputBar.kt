@@ -17,6 +17,9 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.EmojiEmotions
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Article
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,18 +54,21 @@ fun ChatInputBar(
     selectedMessageType: Int = 1, // 1-文本, 3-Markdown, 8-HTML
     onMessageTypeChange: ((Int) -> Unit)? = null,
     quotedMessageText: String? = null, // 引用的消息文本
-    onClearQuote: (() -> Unit)? = null // 清除引用
+    onClearQuote: (() -> Unit)? = null, // 清除引用
+    onExpressionClick: ((com.yhchat.canary.data.model.Expression) -> Unit)? = null  // 表情点击回调
 ) {
     var showAttachMenu by remember { mutableStateOf(false) }
+    var showExpressionPicker by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
     
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shadowElevation = 4.dp,
-        tonalElevation = 2.dp,
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface
-    ) {
+    Column {
+        Surface(
+            modifier = modifier.fillMaxWidth(),
+            shadowElevation = 4.dp,
+            tonalElevation = 2.dp,
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface
+        ) {
         Column {
             // 引用消息显示框
             if (quotedMessageText != null) {
@@ -130,6 +136,28 @@ fun ChatInputBar(
                     )
                 )
                 
+                // 表情按钮
+                IconButton(
+                    onClick = { 
+                        showExpressionPicker = !showExpressionPicker
+                        showAttachMenu = false  // 关闭附件菜单
+                        if (showExpressionPicker) {
+                            keyboardController?.hide()
+                        }
+                    },
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.EmojiEmotions,
+                        contentDescription = "表情",
+                        tint = if (showExpressionPicker) 
+                            MaterialTheme.colorScheme.primary 
+                        else 
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                
                 // 发送按钮
                 IconButton(
                     onClick = {
@@ -195,233 +223,16 @@ fun ChatInputBar(
             }
         }
     }
-}
-
-/**
- * 附件菜单
- */
-@Composable
-private fun AttachmentMenu(
-    onImageClick: () -> Unit,
-    onFileClick: () -> Unit,
-    onCameraClick: () -> Unit,
-    onHtmlClick: () -> Unit,
-    onMarkdownClick: () -> Unit,
-    selectedMessageType: Int,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // 第一行：图片、拍照、文件
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                AttachmentMenuItem(
-                    icon = Icons.Default.Image,
-                    label = "图片",
-                    onClick = onImageClick
-                )
-                
-                AttachmentMenuItem(
-                    icon = Icons.Default.CameraAlt,
-                    label = "拍照",
-                    onClick = onCameraClick
-                )
-                
-                AttachmentMenuItem(
-                    icon = Icons.Default.AttachFile,
-                    label = "文件",
-                    onClick = onFileClick
-                )
-            }
-            
-            // 第二行：HTML、Markdown
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                MessageTypeMenuItem(
-                    label = "HTML",
-                    isSelected = selectedMessageType == 8,
-                    onClick = onHtmlClick
-                )
-                
-                MessageTypeMenuItem(
-                    label = "Markdown",
-                    isSelected = selectedMessageType == 3,
-                    onClick = onMarkdownClick
-                )
-                
-                // 占位，保持对齐
-                Spacer(modifier = Modifier.weight(1f))
-            }
-        }
-    }
-}
-
-/**
- * 附件菜单项
- */
-@Composable
-private fun AttachmentMenuItem(
-    icon: ImageVector,
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .clickable { onClick() }
-            .padding(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Surface(
-            modifier = Modifier.size(48.dp),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer
-        ) {
-            Box(
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
         
-        Spacer(modifier = Modifier.height(4.dp))
-        
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-/**
- * 消息类型菜单项（HTML/Markdown）
- */
-@Composable
-private fun MessageTypeMenuItem(
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier
-            .clickable { onClick() }
-            .padding(8.dp),
-        shape = RoundedCornerShape(8.dp),
-        color = if (isSelected) 
-            MaterialTheme.colorScheme.primaryContainer 
-        else 
-            MaterialTheme.colorScheme.surfaceVariant,
-        tonalElevation = if (isSelected) 4.dp else 0.dp
-    ) {
-        Box(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = if (isSelected) 
-                    MaterialTheme.colorScheme.onPrimaryContainer 
-                else 
-                    MaterialTheme.colorScheme.onSurfaceVariant
+        // 表情选择器（在Surface外面）
+        if (showExpressionPicker && onExpressionClick != null) {
+            ExpressionPicker(
+                onExpressionClick = { expression ->
+                    onExpressionClick?.invoke(expression)
+                    showExpressionPicker = false
+                },
+                onDismiss = { showExpressionPicker = false }
             )
-        }
-    }
-}
-
-/**
- * 引用消息显示栏
- */
-@Composable
-private fun QuotedMessageBar(
-    quotedText: String,
-    onClearQuote: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        tonalElevation = 2.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // 左侧：引用线和文本
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 引用线
-                Box(
-                    modifier = Modifier
-                        .width(4.dp)
-                        .height(32.dp)
-                        .background(
-                            MaterialTheme.colorScheme.primary,
-                            RoundedCornerShape(2.dp)
-                        )
-                )
-                
-                Spacer(modifier = Modifier.width(12.dp))
-                
-                // 引用文本
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "引用消息",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = quotedText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-            
-            // 右侧：关闭按钮
-            IconButton(
-                onClick = onClearQuote,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "取消引用",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
         }
     }
 }
