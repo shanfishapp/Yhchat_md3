@@ -12,6 +12,10 @@ import coil.request.ImageRequest
  * 支持多种图片格式包括 GIF、AVIF、WEBP、SVG 等
  */
 object ImageUtils {
+    private fun isDataSaverEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences("display_settings", Context.MODE_PRIVATE)
+        return prefs.getBoolean("data_saver", false)
+    }
     
     /**
      * 创建支持多格式的ImageLoader
@@ -40,6 +44,11 @@ object ImageUtils {
         url: String,
         enableHardware: Boolean = true
     ): ImageRequest {
+        if (isDataSaverEnabled(context)) {
+            return ImageRequest.Builder(context)
+                .data(null)
+                .build()
+        }
         return ImageRequest.Builder(context)
             .data(url)
             .setHeader("Referer", "https://myapp.jwznb.com")
@@ -58,6 +67,11 @@ object ImageUtils {
         url: String,
         enableHardware: Boolean = true
     ): ImageRequest {
+        if (isDataSaverEnabled(context)) {
+            return ImageRequest.Builder(context)
+                .data(null)
+                .build()
+        }
         val builder = ImageRequest.Builder(context)
             .data(url)
             .allowHardware(enableHardware)
@@ -81,6 +95,11 @@ object ImageUtils {
         url: String,
         enableHardware: Boolean = true
     ): ImageRequest {
+        if (isDataSaverEnabled(context)) {
+            return ImageRequest.Builder(context)
+                .data(null)
+                .build()
+        }
         val builder = ImageRequest.Builder(context)
             .data(url)
             .allowHardware(enableHardware)
@@ -104,6 +123,11 @@ object ImageUtils {
         url: String,
         enableHardware: Boolean = true
     ): ImageRequest {
+        if (isDataSaverEnabled(context)) {
+            return ImageRequest.Builder(context)
+                .data(null)
+                .build()
+        }
         return ImageRequest.Builder(context)
             .data(url)
             .setHeader("Referer", "https://myapp.jwznb.com")
@@ -122,6 +146,11 @@ object ImageUtils {
         url: String,
         enableHardware: Boolean = true
     ): ImageRequest {
+        if (isDataSaverEnabled(context)) {
+            return ImageRequest.Builder(context)
+                .data(null)
+                .build()
+        }
         return ImageRequest.Builder(context)
             .data(url)
             .setHeader("Referer", "https://myapp.jwznb.com")

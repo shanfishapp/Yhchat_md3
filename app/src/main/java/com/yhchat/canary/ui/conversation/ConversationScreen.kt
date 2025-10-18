@@ -3,8 +3,10 @@ package com.yhchat.canary.ui.conversation
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -221,7 +223,29 @@ fun ConversationScreen(
         ) {
             IntegratedStickyConversations(
                 stickyData = stickyData,
-                onConversationClick = onConversationClick
+                onConversationClick = onConversationClick,
+                onConversationLongClick = { chatId, chatType, chatName ->
+                    // 根据置顶会话创建临时Conversation对象
+                    val stickyItem = stickyData?.sticky?.find { it.chatId == chatId }
+                    if (stickyItem != null) {
+                        selectedConversation = Conversation(
+                            chatId = stickyItem.chatId,
+                            chatType = stickyItem.chatType,
+                            name = stickyItem.chatName,
+                            chatContent = "",
+                            timestampMs = 0L,
+                            unreadMessage = 0,
+                            at = 0,
+                            avatarUrl = stickyItem.avatarUrl,
+                            timestamp = 0L,
+                            certificationLevel = stickyItem.certificationLevel
+                        )
+                        coroutineScope.launch {
+                            isSelectedConversationSticky = true  // 置顶列表中的都是已置顶的
+                            showConversationMenu = true
+                        }
+                    }
+                }
             )
         }
 
@@ -472,6 +496,7 @@ private fun AddMenuBottomSheetContent(
 /**
  * 会话项
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ConversationItem(
     conversation: Conversation,
@@ -491,12 +516,10 @@ fun ConversationItem(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { onClick() },
-                    onLongPress = { onLongClick() }
-                )
-            },
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
@@ -686,6 +709,7 @@ fun ChatTypeIcon(chatType: Int) {
 fun IntegratedStickyConversations(
     stickyData: com.yhchat.canary.data.model.StickyData?,
     onConversationClick: (String, Int, String) -> Unit,
+    onConversationLongClick: (String, Int, String) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     // 如果没有置顶会话，不显示组件
@@ -726,6 +750,13 @@ fun IntegratedStickyConversations(
                                     stickyItem.chatType,
                                     stickyItem.chatName
                                 )
+                            },
+                            onLongClick = {
+                                onConversationLongClick(
+                                    stickyItem.chatId,
+                                    stickyItem.chatType,
+                                    stickyItem.chatName
+                                )
                             }
                         )
                     }
@@ -738,16 +769,21 @@ fun IntegratedStickyConversations(
 /**
  * 集成的置顶会话项
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun IntegratedStickyItem(
     stickyItem: com.yhchat.canary.data.model.StickyItem,
     onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .width(64.dp)
-            .clickable { onClick() },
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {

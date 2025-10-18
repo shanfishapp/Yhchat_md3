@@ -99,6 +99,7 @@ message list_member_send {
     }
     
     string group_id = 3;
+    string keywords = 4; // 搜索关键词
 }
 
 message list_member {
@@ -121,4 +122,22 @@ message edit_group_send {
 
 message edit_group {
     Status status = 1;
+}
+
+// 获取标签成员
+message tag_member_send {
+    Data data = 2;
+    message Data {
+        int32 size = 1; // 分页大小
+        int32 page = 2; // 页数
+    }
+    string group_id = 3; // 标签所处群聊ID
+    int64 tag_id = 4; // 标签ID
+}
+
+// 标签绑定的用户列表
+message tag_member {
+    Status status = 1;
+    repeated User user = 2;
+    int64 total = 3; // 总数
 }

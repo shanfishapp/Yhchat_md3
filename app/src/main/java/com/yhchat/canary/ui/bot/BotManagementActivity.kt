@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -24,8 +25,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.yhchat.canary.data.api.ApiClient
+import com.yhchat.canary.data.di.RepositoryFactory
+import com.yhchat.canary.data.model.CreatedBot
+import com.yhchat.canary.data.model.MyBotListResponse
 import com.yhchat.canary.ui.components.ImageUtils
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
+import kotlinx.coroutines.launch
 
 /**
  * 机器人管理Activity
@@ -36,11 +42,13 @@ class BotManagementActivity : ComponentActivity() {
     companion object {
         const val EXTRA_BOT_ID = "botId"
         const val EXTRA_BOT_NAME = "botName"
+        const val EXTRA_BOT_TOKEN = "botToken"
         
-        fun start(context: Context, botId: String, botName: String) {
+        fun start(context: Context, botId: String, botName: String, botToken: String = "") {
             val intent = Intent(context, BotManagementActivity::class.java).apply {
                 putExtra(EXTRA_BOT_ID, botId)
                 putExtra(EXTRA_BOT_NAME, botName)
+                putExtra(EXTRA_BOT_TOKEN, botToken)
             }
             context.startActivity(intent)
         }
@@ -48,9 +56,11 @@ class BotManagementActivity : ComponentActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         
         val botId = intent.getStringExtra(EXTRA_BOT_ID) ?: ""
         val botName = intent.getStringExtra(EXTRA_BOT_NAME) ?: "机器人"
+        val botToken = intent.getStringExtra(EXTRA_BOT_TOKEN) ?: ""
         
         if (botId.isEmpty()) {
             finish()
@@ -62,6 +72,7 @@ class BotManagementActivity : ComponentActivity() {
                 BotManagementScreen(
                     botId = botId,
                     botName = botName,
+                    botToken = botToken,
                     onBackClick = { finish() }
                 )
             }
@@ -74,9 +85,49 @@ class BotManagementActivity : ComponentActivity() {
 private fun BotManagementScreen(
     botId: String,
     botName: String,
+    botToken: String,
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    
+    // 缓存机器人列表数据
+    var botList by remember { mutableStateOf<List<CreatedBot>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    
+    // 获取当前机器人的token
+    val currentBotToken = remember(botList, botId) {
+        val foundBot = botList.find { it.botId == botId }
+        val finalToken = foundBot?.token ?: botToken
+        android.util.Log.d("BotManagement", "Current bot: $botId, found token: ${foundBot?.token}, final token: $finalToken")
+        finalToken
+    }
+    
+    // 加载机器人列表
+    LaunchedEffect(Unit) {
+        scope.launch {
+            try {
+                val botRepo = RepositoryFactory.getBotRepository(context)
+                botRepo.getMyBotList().fold(
+                    onSuccess = { bots ->
+                        botList = bots
+                        // 调试日志
+                        android.util.Log.d("BotManagement", "Loaded ${bots.size} bots")
+                        bots.forEach { bot ->
+                            android.util.Log.d("BotManagement", "Bot: ${bot.botId}, token: ${bot.token}")
+                        }
+                    },
+                    onFailure = { error ->
+                        android.util.Log.e("BotManagement", "Failed to load bots: ${error.message}")
+                    }
+                )
+            } catch (e: Exception) {
+                // 网络错误，保持空列表
+            } finally {
+                isLoading = false
+            }
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -197,8 +248,7 @@ private fun BotManagementScreen(
                         title = "机器人设置",
                         subtitle = "配置机器人参数",
                         onClick = {
-                            // TODO: 打开机器人设置界面
-                            android.widget.Toast.makeText(context, "设置功能待实现", android.widget.Toast.LENGTH_SHORT).show()
+                            BotSettingsActivity.start(context, botId, botName, currentBotToken)
                         }
                     )
                 }

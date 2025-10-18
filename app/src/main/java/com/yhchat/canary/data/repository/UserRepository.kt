@@ -355,6 +355,43 @@ class UserRepository @Inject constructor(
             Result.failure(e)
         }
     }
+    
+    /**
+     * 修改用户名称（使用protobuf）
+     */
+    suspend fun editNickname(nickname: String): Result<Boolean> {
+        return try {
+            val token = getToken() ?: return Result.failure(Exception("未登录"))
+            
+            // 构建protobuf请求
+            val request = yh_user.User.edit_nickname_send.newBuilder()
+                .setName(nickname)
+                .build()
+            
+            val requestBody = request.toByteArray()
+                .toRequestBody("application/x-protobuf".toMediaType())
+            
+            val response = apiService.editNickname(token, requestBody)
+            
+            if (response.isSuccessful) {
+                val responseBytes = response.body()?.bytes() ?: return Result.failure(Exception("响应为空"))
+                
+                // 解析protobuf响应
+                val editNicknameResponse = yh_user.User.edit_nickname.parseFrom(responseBytes)
+                
+                if (editNicknameResponse.status.code == 1) {
+                    Result.success(true)
+                } else {
+                    Result.failure(Exception(editNicknameResponse.status.msg))
+                }
+            } else {
+                Result.failure(Exception("修改用户名称失败: ${response.code()} - ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Log.e("UserRepository", "修改用户名称异常", e)
+            Result.failure(e)
+        }
+    }
 
     /**
      * 获取用户主页信息

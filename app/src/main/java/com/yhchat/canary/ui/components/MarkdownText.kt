@@ -28,6 +28,10 @@ import io.noties.markwon.html.HtmlPlugin
 import io.noties.markwon.image.coil.CoilImagesPlugin
 import io.noties.markwon.linkify.LinkifyPlugin
 import io.noties.markwon.SoftBreakAddsNewLinePlugin
+import coil.ImageLoader
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
+import android.os.Build
 
 
 /**
@@ -48,10 +52,22 @@ fun MarkdownText(
     val backgroundColorInt = backgroundColor.toArgb()
     
     val markwon = remember(context, isDarkTheme, textColorInt, onImageClick) {
+        // 创建支持GIF动画的ImageLoader
+        val imageLoader = ImageLoader.Builder(context)
+            .components {
+                // 根据Android版本选择合适的GIF解码器
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    add(ImageDecoderDecoder.Factory())  // Android 9+ 使用ImageDecoder，性能更好
+                } else {
+                    add(GifDecoder.Factory())  // Android 9以下使用GifDecoder
+                }
+            }
+            .build()
+        
         Markwon.builder(context)
             .usePlugin(SoftBreakAddsNewLinePlugin.create())  // 支持软换行（单个回车换行）
             .usePlugin(HtmlPlugin.create())
-            .usePlugin(CoilImagesPlugin.create(context))
+            .usePlugin(CoilImagesPlugin.create(context, imageLoader))  // 使用自定义的ImageLoader支持GIF动画
             .usePlugin(object : AbstractMarkwonPlugin() {
                 override fun configureConfiguration(builder: MarkwonConfiguration.Builder) {
                     builder.linkResolver { view, link ->

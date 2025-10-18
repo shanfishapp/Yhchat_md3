@@ -3,6 +3,7 @@ package com.yhchat.canary.ui.search
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,6 +41,7 @@ class ComprehensiveSearchActivity : ComponentActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         
         setContent {
             YhchatCanaryTheme {
@@ -191,7 +193,12 @@ private fun ComprehensiveSearchScreen(
                     userResult = uiState.userResult,
                     isLoading = uiState.isLoading,
                     onUserClick = { user ->
-                        viewModel.showUserDialog(user)
+                        // 直接跳转到用户资料页面
+                        com.yhchat.canary.ui.profile.UserProfileActivity.start(
+                            context,
+                            user.userId ?: "",
+                            user.nickname
+                        )
                     }
                 )
                 2 -> BotSearchPage(
@@ -218,16 +225,7 @@ private fun ComprehensiveSearchScreen(
         )
     }
     
-    if (uiState.showUserDialog) {
-        UserInfoDialog(
-            user = uiState.userResult,
-            onDismiss = { viewModel.hideUserDialog() },
-            onAdd = { user ->
-                viewModel.addUser(user.userId ?: "")
-            },
-            isAdding = uiState.isAdding
-        )
-    }
+    // 用户搜索结果现在直接跳转到 UserProfileActivity，不再显示弹窗
     
     if (uiState.showBotDialog) {
         BotInfoDialog(

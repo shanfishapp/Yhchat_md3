@@ -106,8 +106,11 @@ fun ChatScreen(
     onAvatarClick: (String, String, Int, Int) -> Unit = { _, _, _, _ -> },  // 添加第4个参数：当前用户权限
     onImagePickerClick: () -> Unit = {},  // 图片选择器点击回调
     onCameraClick: () -> Unit = {},  // 相机点击回调
+    onFilePickerClick: () -> Unit = {},  // 文件选择器点击回调
     imageUriToSend: android.net.Uri? = null,  // 待发送的图片URI
-    onImageSent: () -> Unit = {}  // 图片发送完成回调
+    fileUriToSend: android.net.Uri? = null,  // 待发送的文件URI
+    onImageSent: () -> Unit = {},  // 图片发送完成回调
+    onFileSent: () -> Unit = {}  // 文件发送完成回调
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -182,6 +185,24 @@ fun ChatScreen(
         }
     }
     
+    // 监听待发送的文件
+    LaunchedEffect(fileUriToSend) {
+        fileUriToSend?.let { uri ->
+            android.util.Log.d("ChatScreen", "📁 收到待发送的文件URI: $uri")
+            viewModel.uploadAndSendFile(
+                context = context,
+                fileUri = uri,
+                quoteMsgId = quotedMessageId,
+                quoteMsgText = quotedMessageText
+            )
+            // 清除引用状态
+            quotedMessageId = null
+            quotedMessageText = null
+            // 通知已发送
+            onFileSent()
+        }
+    }
+    
     // 退出时保存读取位置
     DisposableEffect(Unit) {
         onDispose {
@@ -197,17 +218,36 @@ fun ChatScreen(
                                    (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset > 100)
     }
     
-    // WebSocket新消息处理：只在用户完全在底部时才滚动，否则保持当前位置不动
+    // WebSocket新消息处理：智能自动滚动
     LaunchedEffect(uiState.newMessageReceived) {
         if (uiState.newMessageReceived) {
-            // 严格检查：只有当用户在最底部且没有滚动时才自动滚动
-            val isExactlyAtBottom = listState.firstVisibleItemIndex == 0 && 
-                                   listState.firstVisibleItemScrollOffset == 0 &&
-                                   !listState.isScrollInProgress
-            if (isExactlyAtBottom) {
-                // 平滑滚动到新消息，不会跳动
+            // 获取最新消息（reversedMessages的第一条就是最新的）
+            val reversedMessages = messages.reversed()
+            val latestMessage = reversedMessages.firstOrNull()
+            
+            // 判断条件1：用户是否在底部附近（允许一些偏移量）
+            val isNearBottom = listState.firstVisibleItemIndex <= 4 && 
+                              !listState.isScrollInProgress
+            
+            // 判断条件2：最新消息是否是当前用户发送的
+            val isMyMessage = latestMessage?.sender?.chatId == userId
+            
+            // 判断条件3：最新消息时间戳是否很新（5秒内）
+            val currentTime = System.currentTimeMillis()
+            val isRecentMessage = latestMessage?.let { 
+                currentTime - it.sendTime <= 20000 // sendTime是毫秒，比较5秒
+            } ?: false
+            
+            // 自动滚动逻辑：
+            // 1. 如果是自己发的消息，总是滚动到底部
+            // 2. 如果用户在底部附近且消息是最近的，也自动滚动
+            val shouldAutoScroll = isMyMessage || (isNearBottom && isRecentMessage)
+            
+            if (shouldAutoScroll) {
+                // 平滑滚动到新消息
                 listState.animateScrollToItem(0)
             }
+            
             // 重置新消息标记
             viewModel.resetNewMessageFlag()
         }
@@ -248,7 +288,9 @@ fun ChatScreen(
             }
         ) {
             Column(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .imePadding()  // 自动响应软键盘，推动内容上移
             ) {
         // 顶部应用栏
         TopAppBar(
@@ -655,7 +697,8 @@ fun ChatScreen(
                     onImagePickerClick()
                 },
                 onFileClick = {
-                    // TODO: 实现文件选择功能
+                    // 调用文件选择器
+                    onFilePickerClick()
                 },
                 onDraftChange = { draftText ->
                     viewModel.sendDraftInput(draftText)
@@ -685,11 +728,16 @@ fun ChatScreen(
                     quotedMessageId = null
                     quotedMessageText = null
                 },
+                onInstructionClick = { instruction ->
+                    // 点击指令后将指令名称插入到输入框
+                    inputText = "/${instruction.name} "
+                },
+                groupId = if (chatType == 2) chatId else null,  // 只在群聊中传递groupId
                 modifier = Modifier.padding(
-                start = 16.dp,
-                end = 16.dp,
-                    top = 8.dp,
-                    bottom = 16.dp // 增加底部间距，避免粘在最底部
+                    start = 0.dp,  // 去掉左右padding让输入框占满宽度
+                    end = 0.dp,
+                    top = 1.dp,
+                    bottom = 8.dp
                 )
             )
         }
@@ -1146,7 +1194,7 @@ private fun SenderNameAndTags(
     memberPermission: Int? = null  // 群成员权限等级：100=群主，2=管理员
 ) {
     val tags = message.sender.tag ?: emptyList()
-    val hasMultipleTags = tags.size > 2
+    val hasMultipleTags = tags.size > 1
     
     Column(
         modifier = Modifier
@@ -1216,7 +1264,7 @@ private fun SenderNameAndTags(
             }
             
             // 显示前两个标签
-            tags.take(2).forEach { tag ->
+            tags.take(1).forEach { tag ->
                 Surface(
                     shape = RoundedCornerShape(4.dp),
                     color = parseTagColor(tag.color)
@@ -1250,7 +1298,7 @@ private fun SenderNameAndTags(
         }
         
         // 展开时显示剩余标签（支持换行）
-        if (tagsExpanded && tags.size > 2) {
+        if (tagsExpanded && tags.size > 1) {
             Spacer(modifier = Modifier.height(4.dp))
             FlowRow(
                 modifier = Modifier.wrapContentWidth(),
@@ -1260,7 +1308,7 @@ private fun SenderNameAndTags(
                     Arrangement.spacedBy(6.dp, Alignment.Start),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                tags.drop(2).forEach { tag ->
+                tags.drop(1).forEach { tag ->
                     Surface(
                         shape = RoundedCornerShape(4.dp),
                         color = parseTagColor(tag.color)

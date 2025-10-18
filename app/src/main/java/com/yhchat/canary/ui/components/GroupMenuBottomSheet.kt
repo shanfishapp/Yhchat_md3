@@ -30,6 +30,7 @@ fun GroupMenuBottomSheet(
     val sheetState = rememberModalBottomSheetState()
     var showReportDialog by remember { mutableStateOf(false) }
     var showShareDialog by remember { mutableStateOf(false) }
+    var showInviteDialog by remember { mutableStateOf(false) }
     
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -80,6 +81,15 @@ fun GroupMenuBottomSheet(
                 onClick = {
                     GroupDiskActivity.start(context, groupId, groupName)
                     onDismiss()
+                }
+            )
+            
+            // 邀请好友
+            GroupMenuItem(
+                icon = Icons.Default.PersonAdd,
+                text = "邀请好友",
+                onClick = {
+                    showInviteDialog = true
                 }
             )
             
@@ -145,6 +155,19 @@ fun GroupMenuBottomSheet(
             chatType = 2,  // 群聊
             chatName = groupName,
             onDismiss = { showShareDialog = false }
+        )
+    }
+    
+    // 邀请好友对话框
+    if (showInviteDialog) {
+        InviteToGroupDialog(
+            groupId = groupId,
+            groupName = groupName,
+            onDismiss = { showInviteDialog = false },
+            onSuccess = {
+                showInviteDialog = false
+                Toast.makeText(context, "邀请成功", Toast.LENGTH_SHORT).show()
+            }
         )
     }
 }

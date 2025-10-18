@@ -814,17 +814,242 @@ data class MyBotList(
 )
 
 data class CreatedBot(
+    @SerializedName("id")
+    val id: Int = 0,
+    
     @SerializedName("botId")
     val botId: String,
     
     @SerializedName("nickname")
     val nickname: String,
     
+    @SerializedName("nicknameId")
+    val nicknameId: Int = 0,
+    
+    @SerializedName("avatarId")
+    val avatarId: Int = 0,
+    
     @SerializedName("avatarUrl")
     val avatarUrl: String,
     
+    @SerializedName("token")
+    val token: String? = null,
+    
+    @SerializedName("link")
+    val link: String? = null,
+    
     @SerializedName("introduction")
-    val introduction: String
+    val introduction: String,
+    
+    @SerializedName("createBy")
+    val createBy: String? = null,
+    
+    @SerializedName("createTime")
+    val createTime: Long = 0,
+    
+    @SerializedName("headcount")
+    val headcount: Int = 0,
+    
+    @SerializedName("private")
+    val private: Int = 0,
+    
+    @SerializedName("isStop")
+    val isStop: Int = 0,
+    
+    @SerializedName("settingJson")
+    val settingJson: String? = null,
+    
+    @SerializedName("del_flag")
+    val delFlag: Int = 0,
+    
+    @SerializedName("alwaysAgree")
+    val alwaysAgree: Int = 0,
+    
+    @SerializedName("groupLimit")
+    val groupLimit: Int = 0,
+    
+    @SerializedName("banId")
+    val banId: Int = 0,
+    
+    @SerializedName("linkStop")
+    val linkStop: Int = 0,
+    
+    @SerializedName("isBigModel")
+    val isBigModel: Int = 0,
+    
+    @SerializedName("uri")
+    val uri: String? = null
+)
+
+data class BotIdRequest(
+    @SerializedName("botId") val botId: String
+)
+
+data class ResetBotTokenResponse(
+    @SerializedName("code") val code: Int,
+    @SerializedName("data") val data: ResetTokenData?,
+    @SerializedName("msg") val msg: String?
+)
+
+data class ResetTokenData(
+    @SerializedName("token") val token: String
+)
+
+data class BotEventEditRequest(
+    @SerializedName("botId") val botId: String,
+    @SerializedName("messageReceiveNormal") val messageReceiveNormal: Int? = null,
+    @SerializedName("messageReceiveInstruction") val messageReceiveInstruction: Int? = null,
+    @SerializedName("botFollowed") val botFollowed: Int? = null,
+    @SerializedName("botUnfollowed") val botUnfollowed: Int? = null,
+    @SerializedName("groupJoin") val groupJoin: Int? = null,
+    @SerializedName("groupLeave") val groupLeave: Int? = null,
+    @SerializedName("botSetting") val botSetting: Int? = null,
+    @SerializedName("typ") val typ: String? = null
+)
+
+data class BotEventSettingsResponse(
+    @SerializedName("code") val code: Int,
+    @SerializedName("data") val data: BotEventSettingsData?,
+    @SerializedName("msg") val msg: String?
+)
+
+data class BotEventSettingsData(
+    @SerializedName("list") val list: BotEventSettings?
+)
+
+data class BotEventSettings(
+    @SerializedName("id") val id: Int,
+    @SerializedName("botId") val botId: String,
+    @SerializedName("messageReceiveNormal") val messageReceiveNormal: Int,
+    @SerializedName("messageReceiveInstruction") val messageReceiveInstruction: Int,
+    @SerializedName("botFollowed") val botFollowed: Int,
+    @SerializedName("botUnfollowed") val botUnfollowed: Int,
+    @SerializedName("groupJoin") val groupJoin: Int,
+    @SerializedName("groupLeave") val groupLeave: Int,
+    @SerializedName("botSetting") val botSetting: Int,
+    @SerializedName("del_flag") val delFlag: Int
+)
+
+/**
+ * 发现群聊分类请求
+ */
+data class RecommendCategoryRequest(
+    @SerializedName("appChannel") val appChannel: String = "default"
+)
+
+/**
+ * 发现群聊分类响应
+ */
+data class RecommendCategoryResponse(
+    @SerializedName("code") val code: Int,
+    @SerializedName("data") val data: RecommendCategoryData?,
+    @SerializedName("msg") val msg: String?
+)
+
+data class RecommendCategoryData(
+    @SerializedName("categories") val categories: List<String>
+)
+
+/**
+ * 发现群聊列表请求
+ */
+data class RecommendGroupListRequest(
+    @SerializedName("category") val category: String = "",
+    @SerializedName("keyword") val keyword: String = "",
+    @SerializedName("size") val size: Int = 30,
+    @SerializedName("page") val page: Int = 1
+)
+
+/**
+ * 发现群聊列表响应
+ */
+data class RecommendGroupListResponse(
+    @SerializedName("code") val code: Int,
+    @SerializedName("data") val data: RecommendGroupListData?,
+    @SerializedName("msg") val msg: String?
+)
+
+data class RecommendGroupListData(
+    @SerializedName("groupList") val groupList: List<RecommendGroup>
+)
+
+/**
+ * 推荐群聊信息
+ */
+data class RecommendGroup(
+    @SerializedName("chatId") val chatId: String,
+    @SerializedName("banId") val banId: Int = 0,
+    @SerializedName("nickname") val nickname: String,
+    @SerializedName("introduction") val introduction: String?,
+    @SerializedName("avatarUrl") val avatarUrl: String?,
+    @SerializedName("headcount") val headcount: Int,
+    @SerializedName("createTime") val createTime: Long
+)
+
+/**
+ * 搜索推荐群聊请求
+ */
+data class SearchRecommendGroupRequest(
+    @SerializedName("keyword") val keyword: String,
+    @SerializedName("categoryId") val categoryId: Int? = null
+)
+
+/**
+ * 搜索推荐群聊响应
+ */
+data class SearchRecommendGroupResponse(
+    @SerializedName("code") val code: Int,
+    @SerializedName("data") val data: SearchRecommendGroupData?,
+    @SerializedName("msg") val msg: String?
+)
+
+data class SearchRecommendGroupData(
+    @SerializedName("groups") val groups: List<SearchRecommendGroupItem>
+)
+
+/**
+ * 搜索到的群聊信息
+ */
+data class SearchRecommendGroupItem(
+    @SerializedName("groupId") val groupId: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("introduction") val introduction: String?,
+    @SerializedName("avatarUrl") val avatarUrl: String?,
+    @SerializedName("headcount") val headcount: Int,
+    @SerializedName("createTime") val createTime: Long,
+    @SerializedName("banId") val banId: Int = 0,
+    @SerializedName("alwaysAgree") val alwaysAgree: Int = 0,
+    @SerializedName("categoryId") val categoryId: Int = 0,
+    @SerializedName("category") val category: String? = null
+)
+
+/**
+ * 推荐机器人列表响应
+ */
+data class RecommendBotListResponse(
+    @SerializedName("code") val code: Int,
+    @SerializedName("data") val data: RecommendBotListData?,
+    @SerializedName("msg") val msg: String?
+)
+
+data class RecommendBotListData(
+    @SerializedName("botList") val botList: List<RecommendBot>
+)
+
+/**
+ * 推荐机器人信息
+ */
+data class RecommendBot(
+    @SerializedName("chatId") val chatId: String,
+    @SerializedName("chatType") val chatType: String,
+    @SerializedName("headcount") val headcount: String,
+    @SerializedName("nickname") val nickname: String,
+    @SerializedName("introduction") val introduction: String?,
+    @SerializedName("introductions") val introductions: String?,
+    @SerializedName("avatarUrl") val avatarUrl: String?,
+    @SerializedName("isAdd") val isAdd: Int = 1,
+    @SerializedName("isApply") val isApply: Int = 0,
+    @SerializedName("alwaysAgree") val alwaysAgree: Int = 0
 )
 
 /**
@@ -1116,5 +1341,47 @@ data class FriendApplyRequest(
     val chatType: Int,
     @SerializedName("remark")
     val remark: String
+)
+
+/**
+ * 群指令列表响应
+ */
+data class InstructionListResponse(
+    @SerializedName("code") val code: Int,
+    @SerializedName("data") val data: InstructionListData?,
+    @SerializedName("msg") val msg: String?
+)
+
+data class InstructionListData(
+    @SerializedName("instructions") val instructions: List<Instruction>
+)
+
+/**
+ * 群指令
+ */
+data class Instruction(
+    @SerializedName("botId") val botId: String,
+    @SerializedName("botName") val botName: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("desc") val desc: String,
+    @SerializedName("id") val id: Int,
+    @SerializedName("sort") val sort: Int,
+    @SerializedName("auth") val auth: Int // 0-所有人可用，1-所有人禁用，2-群主可用，3-群主管理员可用
+)
+
+/**
+ * 群ID请求（通用）
+ */
+data class GroupIdRequest(
+    @SerializedName("groupId") val groupId: String
+)
+
+/**
+ * 邀请加入群聊请求
+ */
+data class InviteGroupRequest(
+    @SerializedName("chatId") val chatId: String,
+    @SerializedName("chatType") val chatType: Int,
+    @SerializedName("groupId") val groupId: String
 )
 

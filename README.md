@@ -4,6 +4,8 @@
 # 声明
 此项目（Yhchat_MD3）是个人为了兴趣而开发, 仅用于学习和测试，请于下载后24小时内删除。 所用API皆从官方网站收集, 不提供任何破解内容。
 
+![image](https://github.com/user-attachments/assets/96b2dc98-0368-443c-bcb6-aa64f6eafe4f)
+
 # 已经实现的功能：
 - [x] 手机号/邮箱登录
 - [x] 显示会话/置顶会话，删除会话

@@ -450,6 +450,103 @@ class MessageRepository @Inject constructor(
     }
     
     /**
+     * 发送文件消息
+     * contentType = 4
+     */
+    suspend fun sendFileMessage(
+        chatId: String,
+        chatType: Int,
+        fileName: String,
+        fileKey: String,  // 七牛云返回的key，格式：disk/xxx.ext
+        fileSize: Long,
+        quoteMsgId: String? = null,
+        quoteMsgText: String? = null
+    ): Result<Boolean> {
+        return try {
+            val tokenFlow = tokenRepository.getToken()
+            val token = tokenFlow.first()?.token
+            if (token.isNullOrEmpty()) {
+                Log.e(tag, "❌ Token为空")
+                return Result.failure(Exception("用户未登录"))
+            }
+
+            val msgId = UUID.randomUUID().toString().replace("-", "")
+            
+            Log.d(tag, "📤 ========== 发送文件消息 ==========")
+            Log.d(tag, "📤 msgId: $msgId")
+            Log.d(tag, "📤 chatId: $chatId")
+            Log.d(tag, "📤 chatType: $chatType")
+            Log.d(tag, "📤 fileName: $fileName")
+            Log.d(tag, "📤 fileKey: $fileKey")
+            Log.d(tag, "📤 fileSize: $fileSize bytes")
+            
+            // 构建protobuf请求 - 文件消息需要设置content.fileName、content.file和content.fileSize
+            // 注意：content.file字段应该只填写key（例如：disk/xxx.ext），不需要完整URL
+            // content.fileSize应该是纯数字（字节数），不带单位
+            val contentBuilder = send_message_send.Content.newBuilder()
+                .setFileName(fileName)
+                .setFile(fileKey)  // 只填写key，例如：disk/xxx.ext
+                .setFileSize(fileSize)  // 文件大小（字节）
+            
+            // 添加引用消息文本
+            if (!quoteMsgText.isNullOrEmpty()) {
+                contentBuilder.setQuoteMsgText(quoteMsgText)
+                Log.d(tag, "📤 引用消息: $quoteMsgText")
+            }
+            
+            val requestBuilder = send_message_send.newBuilder()
+                .setMsgId(msgId)
+                .setChatId(chatId)
+                .setChatType(chatType.toLong())
+                .setContent(contentBuilder.build())
+                .setContentType(4) // 文件消息类型为4
+            
+            if (!quoteMsgId.isNullOrEmpty()) {
+                requestBuilder.setQuoteMsgId(quoteMsgId)
+                Log.d(tag, "📤 引用消息ID: $quoteMsgId")
+            }
+            
+            // 文件消息不需要media字段，只在content中设置即可
+            
+            val request = requestBuilder.build()
+            val requestBytes = request.toByteArray()
+            val requestBody = requestBytes.toRequestBody("application/x-protobuf".toMediaType())
+
+            Log.d(tag, "📤 Protobuf请求大小: ${requestBytes.size} bytes")
+            
+            val response = apiService.sendMessage(token, requestBody)
+            
+            Log.d(tag, "📥 服务器响应码: ${response.code()}")
+            
+            if (response.isSuccessful) {
+                response.body()?.let { responseBody ->
+                    val bytes = responseBody.bytes()
+                    val sendResponse = send_message.parseFrom(bytes)
+                    
+                    Log.d(tag, "📥 响应状态码: ${sendResponse.status.code}")
+                    Log.d(tag, "📥 响应消息: ${sendResponse.status.msg}")
+                    
+                    if (sendResponse.status.code == 1) {
+                        Log.d(tag, "✅ ========== 文件消息发送成功！ ==========")
+                        Result.success(true)
+                    } else {
+                        Log.e(tag, "❌ 发送失败: ${sendResponse.status.msg}")
+                        Result.failure(Exception(sendResponse.status.msg))
+                    }
+                } ?: Result.failure(Exception("响应体为空"))
+            } else {
+                val errorBody = response.errorBody()?.string()
+                Log.e(tag, "❌ HTTP错误: ${response.code()}, 错误详情: $errorBody")
+                Result.failure(Exception("发送失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "❌ 发送文件消息异常", e)
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+    
+    /**
      * 发送表情消息 (contentType=7)
      * @param expression 表情对象，包含id、url等信息
      */

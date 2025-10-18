@@ -159,6 +159,65 @@ class GroupInfoViewModel @Inject constructor(
     }
     
     /**
+     * 搜索群成员
+     */
+    fun searchMembers(groupId: String, keywords: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoadingMembers = true)
+            
+            groupRepository.searchGroupMembers(groupId, keywords, size = 50, page = 1).fold(
+                onSuccess = { members ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoadingMembers = false,
+                        members = members,
+                        currentPage = 1,
+                        hasMoreMembers = false  // 搜索模式下禁用分页加载
+                    )
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoadingMembers = false,
+                        hasMoreMembers = false
+                    )
+                }
+            )
+        }
+    }
+    
+    /**
+     * 清除搜索，重新加载成员列表
+     */
+    fun clearSearch(groupId: String) {
+        _uiState.value = _uiState.value.copy(
+            members = emptyList(),
+            currentPage = 1,
+            hasMoreMembers = true
+        )
+        // 重新加载第一页
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoadingMembers = true)
+            
+            groupRepository.getGroupMembers(groupId, size = 50, page = 1).fold(
+                onSuccess = { members ->
+                    val hasMore = members.size >= 50
+                    _uiState.value = _uiState.value.copy(
+                        isLoadingMembers = false,
+                        members = members,
+                        currentPage = 1,
+                        hasMoreMembers = hasMore
+                    )
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoadingMembers = false,
+                        hasMoreMembers = false
+                    )
+                }
+            )
+        }
+    }
+    
+    /**
      * 清除错误
      */
     fun clearError() {

@@ -13,6 +13,7 @@ import androidx.core.view.WindowCompat
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
@@ -25,13 +26,23 @@ class ChatActivity : ComponentActivity() {
     private var chatType by mutableStateOf(1)
     private var chatName by mutableStateOf("")
     
-    // 图片选择器
+    // 图片选择器 - 使用与 ChatBackgroundActivity 相同的 API
     private val imagePickerLauncher = registerForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+        androidx.activity.result.contract.ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let { selectedUri ->
             android.util.Log.d("ChatActivity", "图片已选择: $selectedUri")
             imageUriToSend = selectedUri
+        }
+    }
+    
+    // 文件选择器
+    private val filePickerLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { selectedUri ->
+            android.util.Log.d("ChatActivity", "📁 文件已选择: $selectedUri")
+            fileUriToSend = selectedUri
         }
     }
     
@@ -49,9 +60,11 @@ class ChatActivity : ComponentActivity() {
     }
     
     private var imageUriToSend by mutableStateOf<android.net.Uri?>(null)
+    private var fileUriToSend by mutableStateOf<android.net.Uri?>(null)
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         
         // 从Intent中读取参数
         updateChatParams(intent)
@@ -85,12 +98,8 @@ class ChatActivity : ComponentActivity() {
                             }
                         },
                         onImagePickerClick = {
-                            // 启动图片选择器
-                            imagePickerLauncher.launch(
-                                androidx.activity.result.PickVisualMediaRequest(
-                                    androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
-                                )
-                            )
+                            // 启动图片选择器 - 使用与 ChatBackgroundActivity 相同的 API
+                            imagePickerLauncher.launch("image/*")
                         },
                         onCameraClick = {
                             // 启动相机拍照
@@ -102,11 +111,22 @@ class ChatActivity : ComponentActivity() {
                             )
                             cameraLauncher.launch(cameraImageUri)
                         },
+                        onFilePickerClick = {
+                            // 启动文件选择器 - 选择所有类型文件
+                            android.util.Log.d("ChatActivity", "📁 启动文件选择器")
+                            filePickerLauncher.launch("*/*")
+                        },
                         imageUriToSend = imageUriToSend,
+                        fileUriToSend = fileUriToSend,
                         onImageSent = {
                             // 图片发送后清空
                             imageUriToSend = null
                             cameraImageUri = null
+                        },
+                        onFileSent = {
+                            // 文件发送后清空
+                            android.util.Log.d("ChatActivity", "📁 文件发送完成，清空URI")
+                            fileUriToSend = null
                         }
                     )
                 }

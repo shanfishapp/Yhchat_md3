@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.YhchatCanary" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.YhchatCanary" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- 状态栏透明 -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <!-- 状态栏文字颜色为深色 -->
+        <item name="android:windowLightStatusBar">true</item>
+        <!-- 导航栏透明 -->
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- 导航栏文字颜色为深色 -->
+        <item name="android:windowLightNavigationBar">true</item>
+        <!-- 启用边到边显示 -->
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
 </resources>

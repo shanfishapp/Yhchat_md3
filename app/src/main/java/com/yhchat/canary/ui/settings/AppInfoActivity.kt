@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -41,7 +42,7 @@ class AppInfoActivity : ComponentActivity() {
     
     companion object {
         // 应用版本信息（开发者可以在这里修改）
-        const val APP_VERSION = "Canary 19.3"
+        const val APP_VERSION = "Canary 19.5"
         const val APP_NAME = "Yhchat Canary"
         const val DEVELOPER_NAME_1 = "Kauid323"
         const val DEVELOPER_NAME_2 = "那狗吧"
@@ -57,6 +58,7 @@ class AppInfoActivity : ComponentActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         setContent {
             YhchatCanaryTheme {
                 AppInfoScreen(

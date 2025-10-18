@@ -38,6 +38,7 @@
             android:name=".ui.chat.ChatActivity"
             android:exported="false"
             android:label="聊天"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.YhchatCanary" />
         <activity
             android:name=".ui.group.GroupInfoActivity"
@@ -48,6 +49,18 @@
             android:name=".ui.group.GroupSettingsActivity"
             android:exported="false"
             android:label="群聊设置"
+            android:theme="@style/Theme.YhchatCanary" />
+        
+        <activity
+            android:name=".ui.group.GroupTagManagementActivity"
+            android:exported="false"
+            android:label="标签管理"
+            android:theme="@style/Theme.YhchatCanary" />
+        
+        <activity
+            android:name=".ui.group.GroupTagDetailActivity"
+            android:exported="false"
+            android:label="标签详情"
             android:theme="@style/Theme.YhchatCanary" />
         <activity
             android:name=".MainActivity"
@@ -264,9 +277,19 @@
         <activity
             android:name=".ui.community.EditPostActivity"
             android:exported="false"
-            android:label="编辑文章
+            android:label="编辑文章"
+            android:theme="@style/Theme.YhchatCanary" />
 
-"
+        <activity
+            android:name=".ui.bot.BotSettingsActivity"
+            android:exported="false"
+            android:label="编辑机器人"
+            android:theme="@style/Theme.YhchatCanary" />
+
+        <activity
+            android:name=".ui.discover.DiscoverGroupsActivity"
+            android:exported="false"
+            android:label="发现群聊"
             android:theme="@style/Theme.YhchatCanary" />
         <!-- 语音播放服务 -->
         <service

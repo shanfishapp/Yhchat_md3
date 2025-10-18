@@ -57,9 +57,12 @@ fun ProfileScreen(
     }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val changeInviteCodeState by viewModel.changeInviteCodeState.collectAsStateWithLifecycle()
+    val changeNicknameState by viewModel.changeNicknameState.collectAsStateWithLifecycle()
     
     // 修改邀请码弹窗状态
     var showChangeInviteCodeDialog by remember { mutableStateOf(false) }
+    // 修改用户名称弹窗状态
+    var showChangeNicknameDialog by remember { mutableStateOf(false) }
     
     // 在界面显示时加载用户资料
     LaunchedEffect(Unit) {
@@ -147,6 +150,7 @@ fun ProfileScreen(
                         tokenRepository = tokenRepository,
                         viewModel = viewModel,
                         onShowChangeInviteCodeDialog = { showChangeInviteCodeDialog = true },
+                        onShowChangeNicknameDialog = { showChangeNicknameDialog = true },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -178,6 +182,21 @@ fun ProfileScreen(
             }
         )
     }
+    
+    // 修改用户名称弹窗
+    if (showChangeNicknameDialog) {
+        ChangeNicknameDialog(
+            currentNickname = uiState.userProfile?.nickname ?: "",
+            changeNicknameState = changeNicknameState,
+            onConfirm = { newNickname ->
+                viewModel.changeNickname(newNickname)
+            },
+            onDismiss = {
+                showChangeNicknameDialog = false
+                viewModel.resetChangeNicknameState()
+            }
+        )
+    }
 }
 @Composable
 private fun UserProfileContent(
@@ -186,6 +205,7 @@ private fun UserProfileContent(
     tokenRepository: com.yhchat.canary.data.repository.TokenRepository? = null,
     viewModel: ProfileViewModel? = null,
     onShowChangeInviteCodeDialog: () -> Unit = {},
+    onShowChangeNicknameDialog: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -227,12 +247,28 @@ private fun UserProfileContent(
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                // 用户名
-                Text(
-                    text = userProfile.nickname,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
+                // 用户名（带编辑按钮）
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                ) {
+                    Text(
+                        text = userProfile.nickname,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(
+                        onClick = onShowChangeNicknameDialog,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "修改用户名",
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
 
                 // 用户ID
                 Text(
@@ -755,6 +791,107 @@ private fun ChangeInviteCodeDialog(
             TextButton(
                 onClick = onDismiss,
                 enabled = !changeInviteCodeState.isLoading
+            ) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+/**
+ * 修改用户名称弹窗
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChangeNicknameDialog(
+    currentNickname: String,
+    changeNicknameState: ChangeNicknameState,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var newNickname by remember { mutableStateOf(currentNickname) }
+    
+    // 成功后自动关闭弹窗
+    LaunchedEffect(changeNicknameState.isSuccess) {
+        if (changeNicknameState.isSuccess) {
+            kotlinx.coroutines.delay(1500) // 显示成功提示1.5秒
+            onDismiss()
+        }
+    }
+    
+    AlertDialog(
+        onDismissRequest = { if (!changeNicknameState.isLoading) onDismiss() },
+        title = {
+            Text(
+                text = "修改用户名",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "请输入新的用户名：",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                
+                OutlinedTextField(
+                    value = newNickname,
+                    onValueChange = { newNickname = it },
+                    label = { Text("用户名") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !changeNicknameState.isLoading,
+                    singleLine = true,
+                    isError = changeNicknameState.error != null
+                )
+                
+                // 错误提示
+                changeNicknameState.error?.let { error ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                
+                // 成功提示
+                if (changeNicknameState.isSuccess) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "修改成功！",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(newNickname) },
+                enabled = !changeNicknameState.isLoading && newNickname.isNotBlank() && !changeNicknameState.isSuccess
+            ) {
+                if (changeNicknameState.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(
+                    text = when {
+                        changeNicknameState.isLoading -> "修改中..."
+                        changeNicknameState.isSuccess -> "已修改"
+                        else -> "确定"
+                    }
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !changeNicknameState.isLoading
             ) {
                 Text("取消")
             }

@@ -15,6 +15,8 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Report
 import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshotFlow
@@ -46,42 +48,87 @@ fun GroupInfoScreenRoot(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showShareDialog by remember { mutableStateOf(false) }
+    var isSearching by remember { mutableStateOf(false) }
+    var searchKeyword by remember { mutableStateOf("") }
     
     LaunchedEffect(groupId) {
         viewModel.loadGroupInfo(groupId)
     }
     
+    // 搜索时自动触发
+    LaunchedEffect(searchKeyword) {
+        if (isSearching) {
+            viewModel.searchMembers(groupId, searchKeyword)
+        }
+    }
+    
     YhchatCanaryTheme {
         Scaffold(
             topBar = {
-            TopAppBar(
-                title = { Text(groupName, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
+                Column {
+                    TopAppBar(
+                        title = { 
+                            if (!isSearching) {
+                                Text(groupName, fontWeight = FontWeight.Bold)
+                            } else {
+                                TextField(
+                                    value = searchKeyword,
+                                    onValueChange = { searchKeyword = it },
+                                    placeholder = { Text("搜索群成员...") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                                        unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
+                                    )
+                                )
+                            }
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = {
+                                if (isSearching) {
+                                    isSearching = false
+                                    searchKeyword = ""
+                                    viewModel.clearSearch(groupId)
+                                } else {
+                                    onBackClick()
+                                }
+                            }) {
+                                Icon(
+                                    imageVector = if (isSearching) Icons.Default.Close else Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = if (isSearching) "取消搜索" else "返回"
+                                )
+                            }
+                        },
+                        actions = {
+                            if (!isSearching) {
+                                IconButton(onClick = { isSearching = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = "搜索"
+                                    )
+                                }
+                                IconButton(onClick = { showShareDialog = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = "分享"
+                                    )
+                                }
+                                IconButton(onClick = onSettingsClick) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "群聊设置"
+                                    )
+                                }
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
                         )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showShareDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "分享"
-                        )
-                    }
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "群聊设置"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            )
+                    )
+                }
             }
         ) { padding ->
             Box(

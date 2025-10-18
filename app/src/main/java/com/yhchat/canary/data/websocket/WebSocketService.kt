@@ -15,6 +15,7 @@ import com.yhchat.canary.R
 import com.yhchat.canary.data.model.ChatMessage
 import com.yhchat.canary.data.model.Conversation
 import com.yhchat.canary.data.repository.TokenRepository
+import com.yhchat.canary.data.repository.CacheRepository
 import com.yhchat.canary.proto.chat_ws_go.heartbeat_ack
 import com.yhchat.canary.proto.chat_ws_go.push_message
 import com.yhchat.canary.proto.chat_ws_go.edit_message
@@ -510,27 +511,26 @@ class WebSocketService @Inject constructor(
             
             // 构建通知内容
             val senderName = message.sender.name.ifEmpty { "未知用户" }
-            val messageContent = when {
-                !message.content.text.isNullOrEmpty() -> message.content.text
-                !message.content.imageUrl.isNullOrEmpty() -> "[图片]"
-                !message.content.fileUrl.isNullOrEmpty() -> "[文件]"
-                !message.content.audioUrl.isNullOrEmpty() -> "[语音]"
-                !message.content.videoUrl.isNullOrEmpty() -> "[视频]"
-                !message.content.stickerUrl.isNullOrEmpty() -> "[表情]"
-                else -> "[消息]"
+            val messageContent = when (message.contentType) {
+                8 -> "HTML消息" // HTML消息
+                3 -> "Markdown消息" // Markdown消息
+                else -> when {
+                    !message.content.text.isNullOrEmpty() -> message.content.text
+                    !message.content.imageUrl.isNullOrEmpty() -> "[图片]"
+                    !message.content.fileUrl.isNullOrEmpty() -> "[文件]"
+                    !message.content.audioUrl.isNullOrEmpty() -> "[语音]"
+                    !message.content.videoUrl.isNullOrEmpty() -> "[视频]"
+                    !message.content.stickerUrl.isNullOrEmpty() -> "[表情]"
+                    else -> "[消息]"
+                }
             }
             
             // 使用正确的chatId和chatType来确定会话
             val targetChatId = message.chatId ?: message.sender.chatId
             val targetChatType = message.chatType ?: message.sender.chatType
             
-            // 确定会话名称
-            val conversationTitle = when (targetChatType) {
-                1 -> senderName // 私聊直接用发送者名称
-                2 -> "群聊" // 群聊 - 这里可以从本地缓存获取群名称
-                3 -> "机器人" // 机器人
-                else -> "会话"
-            }
+            // 确定会话名称 - 尝试从缓存获取真实名称
+            val conversationTitle = getConversationTitle(targetChatId, targetChatType, senderName)
             
             // 点击通知的Intent - 跳转到正确的会话
             val intent = Intent(context, MainActivity::class.java).apply {
@@ -566,6 +566,42 @@ class WebSocketService @Inject constructor(
             
         } catch (e: Exception) {
             Log.e(tag, "Error showing notification", e)
+        }
+    }
+    
+    /**
+     * 获取会话标题
+     */
+    private fun getConversationTitle(chatId: String, chatType: Int, senderName: String): String {
+        return try {
+            // 尝试从缓存中获取会话名称
+            val cacheRepository = CacheRepository(context)
+            val cachedConversations = runBlocking {
+                cacheRepository.getCachedConversationsSync()
+            }
+            
+            val cachedConversation = cachedConversations.find { it.chatId == chatId }
+            
+            if (cachedConversation != null && cachedConversation.name.isNotEmpty()) {
+                cachedConversation.name
+            } else {
+                // 缓存中没有找到，使用默认名称
+                when (chatType) {
+                    1 -> senderName // 私聊直接用发送者名称
+                    2 -> "群聊" // 群聊
+                    3 -> senderName // 机器人聊天用机器人名称
+                    else -> "会话"
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "Failed to get conversation title from cache", e)
+            // 出错时使用默认名称
+            when (chatType) {
+                1 -> senderName // 私聊直接用发送者名称
+                2 -> "群聊" // 群聊
+                3 -> senderName // 机器人聊天用机器人名称
+                else -> "会话"
+            }
         }
     }
     

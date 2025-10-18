@@ -22,6 +22,7 @@ import com.yhchat.canary.data.repository.StickerRepository
 import com.yhchat.canary.data.repository.DiskRepository
 import com.yhchat.canary.data.repository.CoinRepository
 import com.yhchat.canary.data.repository.VipRepository
+import com.yhchat.canary.data.repository.GroupRepository
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
@@ -125,6 +126,17 @@ object RepositoryFactory {
     fun getBotRepository(context: Context): BotRepository {
         return BotRepository(
             apiService = apiService,
+            webApiService = webApiService,
+            tokenRepository = getTokenRepository(context)
+        )
+    }
+    
+    /**
+     * 获取发现仓库实例
+     */
+    fun getDiscoverRepository(context: Context): com.yhchat.canary.data.repository.DiscoverRepository {
+        return com.yhchat.canary.data.repository.DiscoverRepository(
+            apiService = apiService,
             tokenRepository = getTokenRepository(context)
         )
     }
@@ -207,6 +219,15 @@ object RepositoryFactory {
             apiService = apiService,
             tokenRepository = getTokenRepository(context)
         )
+    }
+    
+    /**
+     * 获取群组仓库实例
+     */
+    fun getGroupRepository(context: Context): GroupRepository {
+        val groupRepository = GroupRepository(apiService)
+        groupRepository.setTokenRepository(getTokenRepository(context))
+        return groupRepository
     }
     
     /**

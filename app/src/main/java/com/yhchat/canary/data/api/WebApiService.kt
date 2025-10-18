@@ -32,4 +32,13 @@ interface WebApiService {
     suspend fun getBotInfo(
         @Body request: Map<String, String>
     ): Response<BotInfoResponse>
+    
+    /**
+     * 获取我创建的机器人列表
+     */
+    @POST("v1/bot/bot-group-list")
+    suspend fun getMyBotList(
+        @Header("token") token: String,
+        @Header("Referer") referer: String = "https://www.yhchat.com/"
+    ): Response<MyBotListResponse>
 }

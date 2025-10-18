@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -63,6 +64,7 @@ class GroupDiskActivity : ComponentActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         
         val groupId = intent.getStringExtra(EXTRA_GROUP_ID) ?: ""
         val groupName = intent.getStringExtra(EXTRA_GROUP_NAME) ?: "群聊"
@@ -800,23 +802,128 @@ class GroupDiskViewModel : ViewModel() {
             _uiState.value = _uiState.value.copy(isUploading = true, error = null)
             
             try {
-                // TODO: 实现完整的文件上传流程
-                // 1. 获取文件信息
-                // 2. 计算MD5
-                // 3. 上传到七牛
-                // 4. 调用uploadFileToDisk API
+                val tag = "GroupDiskUpload"
+                android.util.Log.d(tag, "📤 ========== 开始群网盘文件上传 ==========")
+                android.util.Log.d(tag, "📤 群组ID: $groupId")
+                android.util.Log.d(tag, "📤 当前文件夹ID: ${_uiState.value.currentFolderId}")
                 
-                _uiState.value = _uiState.value.copy(
-                    isUploading = false,
-                    error = "文件上传功能开发中..."
+                // 1. 获取七牛上传token
+                val tokenRepo = RepositoryFactory.getTokenRepository(context)
+                val userToken = tokenRepo.getTokenSync()
+                if (userToken.isNullOrEmpty()) {
+                    throw Exception("用户未登录")
+                }
+                
+                android.util.Log.d(tag, "📤 获取七牛上传token...")
+                val tokenResponse = apiService.getQiniuFileToken(userToken)
+                if (!tokenResponse.isSuccessful || tokenResponse.body()?.code != 1) {
+                    throw Exception("获取上传token失败: ${tokenResponse.body()?.msg}")
+                }
+                
+                val qiniuToken = tokenResponse.body()?.data?.token
+                    ?: throw Exception("上传token为空")
+                android.util.Log.d(tag, "✅ 七牛Token获取成功")
+                
+                // 2. 获取文件名（用于显示和记录）
+                val fileName = getFileNameFromUri(context, fileUri) ?: "未命名文件"
+                android.util.Log.d(tag, "📤 文件名: $fileName")
+                
+                // 3. 使用FileUploadUtil上传文件到七牛云
+                android.util.Log.d(tag, "📤 开始上传文件到七牛云...")
+                val uploadResult = com.yhchat.canary.utils.FileUploadUtil.uploadFile(
+                    context = context,
+                    fileUri = fileUri,
+                    uploadToken = qiniuToken
                 )
+                
+                uploadResult.fold(
+                    onSuccess = { uploadResponse ->
+                        android.util.Log.d(tag, "✅ 七牛云上传成功！")
+                        android.util.Log.d(tag, "   key: ${uploadResponse.key}")
+                        android.util.Log.d(tag, "   hash: ${uploadResponse.hash}")
+                        android.util.Log.d(tag, "   size: ${uploadResponse.fsize}")
+                        
+                        // 4. 提取MD5（从key中提取）
+                        val fileMd5 = uploadResponse.key.substringAfter("disk/").substringBefore(".")
+                        android.util.Log.d(tag, "✅ 文件MD5: $fileMd5")
+                        
+                        // 5. 调用上传文件记录API
+                        android.util.Log.d(tag, "📤 记录文件上传信息...")
+                        val uploadFileRequest = com.yhchat.canary.data.model.UploadFileRequest(
+                            chatId = groupId,
+                            chatType = 2,  // 群聊
+                            fileSize = uploadResponse.fsize,
+                            fileName = fileName,
+                            fileMd5 = fileMd5,
+                            fileEtag = uploadResponse.hash,  // hash就是etag
+                            qiniuKey = uploadResponse.key,
+                            folderId = _uiState.value.currentFolderId  // 当前文件夹
+                        )
+                        
+                        val recordResponse = apiService.uploadFileToDisk(userToken, uploadFileRequest)
+                        if (recordResponse.isSuccessful && recordResponse.body()?.code == 1) {
+                            android.util.Log.d(tag, "✅ 文件上传记录成功！")
+                            android.util.Log.d(tag, "✅ ========== 群网盘文件上传完成 ==========")
+                            
+                            _uiState.value = _uiState.value.copy(
+                                isUploading = false,
+                                operationSuccess = true
+                            )
+                        } else {
+                            android.util.Log.e(tag, "❌ 文件上传记录失败: ${recordResponse.body()?.message}")
+                            throw Exception("文件上传记录失败: ${recordResponse.body()?.message}")
+                        }
+                    },
+                    onFailure = { error ->
+                        android.util.Log.e(tag, "❌ 七牛云上传失败", error)
+                        throw error
+                    }
+                )
+                
             } catch (e: Exception) {
+                android.util.Log.e("GroupDiskUpload", "❌ 上传失败", e)
                 _uiState.value = _uiState.value.copy(
                     isUploading = false,
                     error = "上传失败: ${e.message}"
                 )
             }
         }
+    }
+    
+    /**
+     * 从URI获取文件名
+     */
+    private fun getFileNameFromUri(context: Context, uri: Uri): String? {
+        var fileName: String? = null
+        
+        // 优先尝试从ContentProvider获取DISPLAY_NAME
+        try {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) {
+                        fileName = cursor.getString(nameIndex)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("GroupDiskUpload", "⚠️ 无法从ContentResolver获取文件名", e)
+        }
+        
+        // 如果ContentProvider失败，从URI的path获取并清理
+        if (fileName == null) {
+            uri.lastPathSegment?.let { segment ->
+                fileName = if (segment.contains('/')) {
+                    segment.substringAfterLast('/')
+                } else if (segment.contains(':')) {
+                    segment.substringAfterLast(':')
+                } else {
+                    segment
+                }
+            }
+        }
+        
+        return fileName
     }
     
     fun renameFile(fileId: Long, objectType: Int, newName: String) {

@@ -25,6 +25,10 @@ class ProfileViewModel(
     // 修改邀请码状态
     private val _changeInviteCodeState = MutableStateFlow(ChangeInviteCodeState())
     val changeInviteCodeState: StateFlow<ChangeInviteCodeState> = _changeInviteCodeState.asStateFlow()
+    
+    // 修改用户名称状态
+    private val _changeNicknameState = MutableStateFlow(ChangeNicknameState())
+    val changeNicknameState: StateFlow<ChangeNicknameState> = _changeNicknameState.asStateFlow()
 
     /**
      * 加载用户个人资料
@@ -97,6 +101,45 @@ class ProfileViewModel(
     fun resetChangeInviteCodeState() {
         _changeInviteCodeState.value = ChangeInviteCodeState()
     }
+    
+    /**
+     * 修改用户名称
+     */
+    fun changeNickname(nickname: String) {
+        viewModelScope.launch {
+            _changeNicknameState.value = _changeNicknameState.value.copy(
+                isLoading = true, 
+                error = null,
+                isSuccess = false
+            )
+            
+            userRepository.editNickname(nickname).fold(
+                onSuccess = {
+                    _changeNicknameState.value = _changeNicknameState.value.copy(
+                        isLoading = false,
+                        isSuccess = true,
+                        error = null
+                    )
+                    // 修改成功后重新加载用户资料
+                    loadUserProfile()
+                },
+                onFailure = { exception ->
+                    Log.e("ProfileViewModel", "修改用户名称失败", exception)
+                    _changeNicknameState.value = _changeNicknameState.value.copy(
+                        isLoading = false,
+                        error = exception.message ?: "修改用户名称失败"
+                    )
+                }
+            )
+        }
+    }
+    
+    /**
+     * 重置修改用户名称状态
+     */
+    fun resetChangeNicknameState() {
+        _changeNicknameState.value = ChangeNicknameState()
+    }
 }
 
 /**
@@ -112,6 +155,15 @@ data class ProfileUiState(
  * 修改邀请码状态
  */
 data class ChangeInviteCodeState(
+    val isLoading: Boolean = false,
+    val isSuccess: Boolean = false,
+    val error: String? = null
+)
+
+/**
+ * 修改用户名称状态
+ */
+data class ChangeNicknameState(
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false,
     val error: String? = null

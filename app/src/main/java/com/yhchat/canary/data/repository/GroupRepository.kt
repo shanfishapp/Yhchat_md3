@@ -21,7 +21,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class GroupRepository @Inject constructor() {
+class GroupRepository @Inject constructor(
+    private val apiService: com.yhchat.canary.data.api.ApiService
+) {
 
     private val tag = "GroupRepository"
     private val baseUrl = "https://chat-go.jwzhd.com"
@@ -160,7 +162,8 @@ class GroupRepository @Inject constructor() {
     suspend fun getGroupMembers(
         groupId: String,
         size: Int = 50,
-        page: Int = 1
+        page: Int = 1,
+        keywords: String = ""
     ): Result<List<GroupMemberInfo>> = withContext(Dispatchers.IO) {
         val token = tokenRepository?.getTokenSync()
         if (token.isNullOrEmpty()) {
@@ -169,7 +172,7 @@ class GroupRepository @Inject constructor() {
 
         return@withContext try {
             // 构建protobuf请求
-            val request = list_member_send.newBuilder()
+            val requestBuilder = list_member_send.newBuilder()
                 .setGroupId(groupId)
                 .setData(
                     list_member_send.Data.newBuilder()
@@ -177,7 +180,13 @@ class GroupRepository @Inject constructor() {
                         .setPage(page)
                         .build()
                 )
-                .build()
+            
+            // 如果有搜索关键词，添加到请求中
+            if (keywords.isNotEmpty()) {
+                requestBuilder.setKeywords(keywords)
+            }
+            
+            val request = requestBuilder.build()
 
             val requestBody = request.toByteArray()
                 .toRequestBody("application/x-protobuf".toMediaTypeOrNull())
@@ -229,6 +238,19 @@ class GroupRepository @Inject constructor() {
             Log.e(tag, "Unknown error", e)
             Result.failure(e)
         }
+    }
+    
+    /**
+     * 搜索群成员
+     */
+    suspend fun searchGroupMembers(
+        groupId: String,
+        keywords: String,
+        size: Int = 50,
+        page: Int = 1
+    ): Result<List<GroupMemberInfo>> {
+        // 直接调用 getGroupMembers 并传入 keywords
+        return getGroupMembers(groupId, size, page, keywords)
     }
     
     /**
@@ -489,6 +511,63 @@ class GroupRepository @Inject constructor() {
             Result.failure(e)
         } catch (e: Exception) {
             Log.e(tag, "Unknown error", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 获取群指令列表
+     */
+    suspend fun getInstructionList(groupId: String): Result<List<com.yhchat.canary.data.model.Instruction>> {
+        return try {
+            val token = tokenRepository?.getTokenSync()
+            if (token == null) {
+                return Result.failure(Exception("未登录"))
+            }
+            
+            val response = apiService.getInstructionList(
+                token = token,
+                request = com.yhchat.canary.data.model.GroupIdRequest(groupId = groupId)
+            )
+            
+            if (response.isSuccessful && response.body()?.code == 1) {
+                val instructions: List<com.yhchat.canary.data.model.Instruction> = response.body()?.data?.instructions ?: emptyList()
+                Result.success(instructions)
+            } else {
+                Result.failure(Exception(response.body()?.msg ?: "获取指令列表失败"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "获取指令列表失败", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 邀请加入群聊
+     */
+    suspend fun inviteToGroup(chatId: String, chatType: Int, groupId: String): Result<Boolean> {
+        return try {
+            val token = tokenRepository?.getTokenSync()
+            if (token == null) {
+                return Result.failure(Exception("未登录"))
+            }
+            
+            val response = apiService.inviteToGroup(
+                token = token,
+                request = com.yhchat.canary.data.model.InviteGroupRequest(
+                    chatId = chatId,
+                    chatType = chatType,
+                    groupId = groupId
+                )
+            )
+            
+            if (response.isSuccessful && response.body()?.code == 1) {
+                Result.success(true)
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "邀请失败"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "邀请失败", e)
             Result.failure(e)
         }
     }

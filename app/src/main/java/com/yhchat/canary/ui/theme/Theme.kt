@@ -9,8 +9,12 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 
 private val DarkColorScheme = darkColorScheme(
     primary = ChatPrimaryDark,
@@ -52,6 +56,8 @@ private val LightColorScheme = lightColorScheme(
     scrim = Color(0xFF000000)
 )
 
+val LocalGlobalScale = staticCompositionLocalOf { 1.0f }
+
 @Composable
 fun YhchatCanaryTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -59,6 +65,9 @@ fun YhchatCanaryTheme(
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences("display_settings", android.content.Context.MODE_PRIVATE)
+    val globalScale = prefs.getFloat("global_scale", 1.0f)
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
@@ -69,9 +78,20 @@ fun YhchatCanaryTheme(
         else -> LightColorScheme
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
+    val baseDensity = LocalDensity.current
+    val scaledDensity = Density(
+        density = baseDensity.density * globalScale,
+        fontScale = baseDensity.fontScale * globalScale
     )
+
+    CompositionLocalProvider(
+        LocalGlobalScale provides globalScale,
+        LocalDensity provides scaledDensity
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

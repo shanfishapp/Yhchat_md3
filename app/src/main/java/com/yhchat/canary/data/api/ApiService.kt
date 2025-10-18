@@ -153,13 +153,33 @@ interface ApiService {
         @Body body: okhttp3.RequestBody
     ): Response<okhttp3.ResponseBody>
     
+
     /**
-     * 获取我创建的机器人列表
+     * 重置机器人token
      */
-    @POST("v1/bot/bot-group-list")
-    suspend fun getMyBotList(
-        @Header("token") token: String
-    ): Response<com.yhchat.canary.data.model.MyBotListResponse>
+    @POST("v1/bot/reset-bot-token")
+    suspend fun resetBotToken(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.BotIdRequest
+    ): Response<com.yhchat.canary.data.model.ResetBotTokenResponse>
+
+    /**
+     * 获取机器人事件订阅设置
+     */
+    @POST("v1/event/list")
+    suspend fun getBotEventSettings(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.BotIdRequest
+    ): Response<com.yhchat.canary.data.model.BotEventSettingsResponse>
+    
+    /**
+     * 设置机器人事件订阅
+     */
+    @POST("v1/event/edit")
+    suspend fun editBotEventSettings(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.BotEventEditRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
     
     /**
      * 编辑机器人信息
@@ -569,6 +589,38 @@ interface ApiService {
         @Header("token") token: String,
         @Body request: ChangeInviteCodeRequest
     ): Response<Map<String, Any>>
+    
+    @POST("v1/user/edit-nickname")
+    suspend fun editNickname(
+        @Header("token") token: String,
+        @Body requestBody: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
+    
+    /**
+     * 获取发现群聊分区列表
+     */
+    @POST("v1/user/recommend-category-list")
+    suspend fun getRecommendCategoryList(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.RecommendCategoryRequest
+    ): Response<com.yhchat.canary.data.model.RecommendCategoryResponse>
+    
+    /**
+     * 获取发现群聊列表
+     */
+    @POST("v1/user/recommend-list")
+    suspend fun getRecommendGroupList(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.RecommendGroupListRequest
+    ): Response<com.yhchat.canary.data.model.RecommendGroupListResponse>
+    
+    /**
+     * 获取机器人推荐列表
+     */
+    @POST("v1/user/recommend")
+    suspend fun getRecommendBotList(
+        @Header("token") token: String
+    ): Response<com.yhchat.canary.data.model.RecommendBotListResponse>
 
 
     /**
@@ -660,6 +712,110 @@ interface ApiService {
     suspend fun getQiniuImageToken(
         @Header("token") token: String
     ): Response<QiniuTokenResponse>
+    
+    /**
+     * 获取文件上传token
+     * GET /v1/misc/qiniu-token2
+     */
+    @GET("v1/misc/qiniu-token2")
+    suspend fun getQiniuFileToken(
+        @Header("token") token: String
+    ): Response<QiniuTokenResponse>
+    
+    // ========== 群组标签相关API ==========
+    
+    /**
+     * 获取群组标签列表
+     */
+    @POST("v1/group-tag/list")
+    suspend fun getGroupTagList(
+        @Header("token") token: String,
+        @Body request: GroupTagListRequest
+    ): Response<GroupTagListResponse>
+    
+    /**
+     * 创建群组标签
+     */
+    @POST("v1/group-tag/create")
+    suspend fun createGroupTag(
+        @Header("token") token: String,
+        @Body request: CreateGroupTagRequest
+    ): Response<ApiStatus>
+    
+    /**
+     * 编辑群组标签
+     */
+    @POST("v1/group-tag/edit")
+    suspend fun editGroupTag(
+        @Header("token") token: String,
+        @Body request: EditGroupTagRequest
+    ): Response<ApiStatus>
+    
+    /**
+     * 删除群组标签
+     */
+    @POST("v1/group-tag/delete")
+    suspend fun deleteGroupTag(
+        @Header("token") token: String,
+        @Body request: DeleteGroupTagRequest
+    ): Response<ApiStatus>
+    
+    /**
+     * 关联用户标签
+     */
+    @POST("v1/group-tag/relate")
+    suspend fun relateUserTag(
+        @Header("token") token: String,
+        @Body request: RelateUserTagRequest
+    ): Response<ApiStatus>
+    
+    /**
+     * 取消关联用户标签
+     */
+    @POST("v1/group-tag/relate-cancel")
+    suspend fun cancelRelateUserTag(
+        @Header("token") token: String,
+        @Body request: RelateUserTagRequest
+    ): Response<ApiStatus>
+    
+    /**
+     * 获取标签绑定的用户列表（ProtoBuf）
+     */
+    @POST("v1/group-tag/members")
+    suspend fun getTagMembers(
+        @Header("token") token: String,
+        @Body body: okhttp3.RequestBody
+    ): Response<ResponseBody>
+    
+    /**
+     * 搜索推荐群聊
+     * POST /v1/group/recommend/list
+     */
+    @POST("v1/group/recommend/list")
+    suspend fun searchRecommendGroups(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.SearchRecommendGroupRequest
+    ): Response<com.yhchat.canary.data.model.SearchRecommendGroupResponse>
+    
+    /**
+     * 获取群指令列表
+     * POST /v1/group/instruction-list
+     */
+    @POST("v1/group/instruction-list")
+    suspend fun getInstructionList(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.GroupIdRequest
+    ): Response<com.yhchat.canary.data.model.InstructionListResponse>
+    
+    /**
+     * 邀请加入群聊
+     * POST /v1/group/invite
+     */
+    @POST("v1/group/invite")
+    suspend fun inviteToGroup(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.InviteGroupRequest
+    ): Response<com.yhchat.canary.data.model.ApiStatus>
     
 }
 
@@ -1146,4 +1302,111 @@ data class EditBotRequest(
     
     @SerializedName("private")
     val private: Int
+)
+
+// ========== 群组标签相关数据模型 ==========
+
+/**
+ * 群组标签列表请求
+ */
+data class GroupTagListRequest(
+    @SerializedName("groupId")
+    val groupId: String,
+    @SerializedName("size")
+    val size: Int = 50,
+    @SerializedName("page")
+    val page: Int = 1,
+    @SerializedName("tag")
+    val tag: String = ""
+)
+
+/**
+ * 群组标签列表响应
+ */
+data class GroupTagListResponse(
+    @SerializedName("code")
+    val code: Int,
+    @SerializedName("data")
+    val data: GroupTagListData?,
+    @SerializedName("msg")
+    val msg: String
+)
+
+data class GroupTagListData(
+    @SerializedName("list")
+    val list: List<GroupTag>
+)
+
+/**
+ * 群组标签
+ */
+data class GroupTag(
+    @SerializedName("id")
+    val id: Long,
+    @SerializedName("groupId")
+    val groupId: String,
+    @SerializedName("tag")
+    val tag: String,
+    @SerializedName("color")
+    val color: String,
+    @SerializedName("desc")
+    val desc: String = "",
+    @SerializedName("sort")
+    val sort: Int = 0,
+    @SerializedName("delFlag")
+    val delFlag: Int = 0,
+    @SerializedName("createTime")
+    val createTime: Long = 0
+)
+
+/**
+ * 创建群组标签请求
+ */
+data class CreateGroupTagRequest(
+    @SerializedName("groupId")
+    val groupId: String,
+    @SerializedName("tag")
+    val tag: String,
+    @SerializedName("color")
+    val color: String,
+    @SerializedName("desc")
+    val desc: String = "",
+    @SerializedName("sort")
+    val sort: Int = 0
+)
+
+/**
+ * 编辑群组标签请求
+ */
+data class EditGroupTagRequest(
+    @SerializedName("id")
+    val id: Long,
+    @SerializedName("groupId")
+    val groupId: String,
+    @SerializedName("tag")
+    val tag: String,
+    @SerializedName("color")
+    val color: String,
+    @SerializedName("desc")
+    val desc: String = "",
+    @SerializedName("sort")
+    val sort: Int = 0
+)
+
+/**
+ * 删除群组标签请求
+ */
+data class DeleteGroupTagRequest(
+    @SerializedName("id")
+    val id: Long
+)
+
+/**
+ * 关联用户标签请求
+ */
+data class RelateUserTagRequest(
+    @SerializedName("userId")
+    val userId: String,
+    @SerializedName("tagGroupId")
+    val tagGroupId: Long
 )

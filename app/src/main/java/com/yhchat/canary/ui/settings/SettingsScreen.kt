@@ -305,6 +305,16 @@ private fun DisplaySettingsCard(
             
             Spacer(modifier = Modifier.height(8.dp))
             
+            // 全局组件大小（无极调节）
+            GlobalScaleSettingItem(context = context)
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 省流量模式
+            DataSaverSettingItem(context = context)
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             // WebSocket 连接开关
             WebSocketSettingItem(context = context)
         }
@@ -588,6 +598,167 @@ private fun FontSizeSettingItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+    }
+}
+
+/**
+ * 全局组件大小无极调节
+ */
+@Composable
+private fun GlobalScaleSettingItem(
+    context: Context,
+    modifier: Modifier = Modifier
+) {
+    val prefs = remember {
+        context.getSharedPreferences("display_settings", Context.MODE_PRIVATE)
+    }
+
+    var scale by remember {
+        mutableStateOf(prefs.getFloat("global_scale", 1.0f))
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Tune,
+                    contentDescription = "组件大小",
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "组件大小",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = String.format("%.0f%% (部分界面需重启生效)", scale * 100f),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "50%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Slider(
+                    value = scale,
+                    onValueChange = { newValue ->
+                        val clamped = newValue.coerceIn(0.5f, 1.5f)
+                        scale = clamped
+                        prefs.edit().putFloat("global_scale", clamped).apply()
+                    },
+                    valueRange = 0.5f..1.5f,
+                    steps = 0,
+                    modifier = Modifier.weight(1f)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = "150%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 省流量模式（不加载全局任何图片）
+ */
+@Composable
+private fun DataSaverSettingItem(
+    context: Context,
+    modifier: Modifier = Modifier
+) {
+    val prefs = remember {
+        context.getSharedPreferences("display_settings", Context.MODE_PRIVATE)
+    }
+
+    var dataSaver by remember {
+        mutableStateOf(prefs.getBoolean("data_saver", false))
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.DataSaverOn,
+                contentDescription = "省流量模式",
+                modifier = Modifier.size(24.dp),
+                tint = if (dataSaver) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "省流量模式",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (dataSaver) "不加载全局图片（头像/消息图片/背景等）" else "默认关闭",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Switch(
+                checked = dataSaver,
+                onCheckedChange = { checked ->
+                    dataSaver = checked
+                    prefs.edit().putBoolean("data_saver", checked).apply()
+                }
+            )
         }
     }
 }

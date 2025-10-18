@@ -325,6 +325,162 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
+     * 上传并发送文件
+     */
+    fun uploadAndSendFile(
+        context: android.content.Context,
+        fileUri: android.net.Uri,
+        quoteMsgId: String? = null,
+        quoteMsgText: String? = null
+    ) {
+        viewModelScope.launch {
+            try {
+                Log.d(tag, "📁 ========== 开始上传并发送文件 ==========")
+                Log.d(tag, "📁 文件URI: $fileUri")
+                Log.d(tag, "📁 当前chatId: $currentChatId, chatType: $currentChatType")
+                
+                // 1. 获取用户token
+                val token = tokenRepository.getTokenSync()
+                if (token.isNullOrEmpty()) {
+                    Log.e(tag, "❌ Token为空")
+                    _uiState.value = _uiState.value.copy(error = "未登录")
+                    return@launch
+                }
+                Log.d(tag, "✅ Token获取成功")
+                
+                // 2. 获取文件上传token
+                Log.d(tag, "📤 请求七牛文件上传token...")
+                val tokenResponse = apiService.getQiniuFileToken(token)
+                
+                if (!tokenResponse.isSuccessful || tokenResponse.body()?.code != 1) {
+                    Log.e(tag, "❌ 获取文件上传token失败: code=${tokenResponse.code()}")
+                    _uiState.value = _uiState.value.copy(error = "获取文件上传token失败")
+                    return@launch
+                }
+                
+                val uploadToken = tokenResponse.body()?.data?.token ?: run {
+                    Log.e(tag, "❌ 文件上传token为空")
+                    _uiState.value = _uiState.value.copy(error = "获取文件上传token失败")
+                    return@launch
+                }
+                
+                Log.d(tag, "✅ 文件上传token获取成功: ${uploadToken.take(30)}...")
+                
+                // 3. 上传文件到七牛云
+                Log.d(tag, "📤 开始上传文件到七牛云...")
+                val uploadResult = com.yhchat.canary.utils.FileUploadUtil.uploadFile(
+                    context = context,
+                    fileUri = fileUri,
+                    uploadToken = uploadToken
+                )
+                
+                uploadResult.fold(
+                    onSuccess = { uploadResponse ->
+                        Log.d(tag, "✅ 文件上传成功！")
+                        Log.d(tag, "   key: ${uploadResponse.key}")
+                        Log.d(tag, "   hash (etag): ${uploadResponse.hash}")
+                        Log.d(tag, "   size: ${uploadResponse.fsize} bytes")
+                        
+                        // 4. 获取原始文件名
+                        val fileName = getFileNameFromUri(context, fileUri) ?: "未知文件"
+                        Log.d(tag, "✅ 原始文件名: $fileName")
+                        
+                        // 5. 计算MD5（从key中提取）
+                        val fileMd5 = uploadResponse.key.substringAfter("disk/").substringBefore(".")
+                        Log.d(tag, "✅ 文件MD5: $fileMd5")
+                        
+                        // 6. 发送文件消息（contentType = 4）
+                        // 注意：直接发送文件时不需要调用群网盘上传记录API
+                        // fileUrl直接使用七牛返回的key，不需要添加域名前缀
+                        // MessageRepository会根据需要添加正确的前缀
+                        val fileKey = uploadResponse.key  // 格式：disk/xxx.ext
+                        
+                        Log.d(tag, "📤 发送文件消息...")
+                        Log.d(tag, "   fileName: $fileName")
+                        Log.d(tag, "   fileKey: $fileKey")
+                        Log.d(tag, "   fileSize: ${uploadResponse.fsize}")
+                        
+                        val sendResult = messageRepository.sendFileMessage(
+                            chatId = currentChatId,
+                            chatType = currentChatType,
+                            fileName = fileName,
+                            fileKey = fileKey,
+                            fileSize = uploadResponse.fsize,
+                            quoteMsgId = quoteMsgId,
+                            quoteMsgText = quoteMsgText
+                        )
+                        
+                        sendResult.fold(
+                            onSuccess = {
+                                Log.d(tag, "✅ 文件消息发送成功！")
+                                Log.d(tag, "✅ ========== 文件发送流程完成 ==========")
+                                // 刷新消息列表
+                                loadMessages(refresh = true)
+                            },
+                            onFailure = { error ->
+                                Log.e(tag, "❌ 发送文件消息失败", error)
+                                _uiState.value = _uiState.value.copy(error = "发送文件失败: ${error.message}")
+                            }
+                        )
+                    },
+                    onFailure = { error ->
+                        Log.e(tag, "❌ 上传文件失败", error)
+                        _uiState.value = _uiState.value.copy(error = "上传文件失败: ${error.message}")
+                    }
+                )
+                
+            } catch (e: Exception) {
+                Log.e(tag, "❌ 上传并发送文件异常", e)
+                e.printStackTrace()
+                _uiState.value = _uiState.value.copy(error = "发送文件失败: ${e.message}")
+            }
+        }
+    }
+    
+    /**
+     * 从URI获取文件名
+     * 优先使用ContentResolver的DISPLAY_NAME，确保获取正确的文件名
+     */
+    private fun getFileNameFromUri(context: android.content.Context, uri: android.net.Uri): String? {
+        var fileName: String? = null
+        
+        // 优先尝试从ContentProvider获取DISPLAY_NAME
+        try {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) {
+                        fileName = cursor.getString(nameIndex)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("ChatViewModel", "⚠️ 无法从ContentResolver获取文件名", e)
+        }
+        
+        // 如果ContentProvider失败，从URI的path获取并清理
+        if (fileName == null) {
+            uri.lastPathSegment?.let { segment ->
+                // 移除可能的前缀（如 "primary:Download/"）
+                fileName = if (segment.contains('/')) {
+                    segment.substringAfterLast('/')
+                } else if (segment.contains(':')) {
+                    segment.substringAfterLast(':')
+                } else {
+                    segment
+                }
+            }
+        }
+        
+        // 如果还是空，使用默认名称
+        if (fileName.isNullOrBlank()) {
+            fileName = "file_${System.currentTimeMillis()}"
+        }
+        
+        return fileName
+    }
+    
+    /**
      * 处理编辑的消息
      */
     private fun handleEditedMessage(message: ChatMessage) {

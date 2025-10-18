@@ -131,6 +131,7 @@ private fun GroupSettingsContent(
     viewModel: GroupSettingsViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val groupInfo = uiState.groupInfo!!
     val isAdminOrOwner = viewModel.isAdminOrOwner()
     
@@ -307,6 +308,56 @@ private fun GroupSettingsContent(
                             Icon(
                                 imageVector = Icons.Default.Edit,
                                 contentDescription = "设置",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+            
+            // 标签管理
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "标签管理",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        // 群组标签管理
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    GroupTagManagementActivity.start(
+                                        context,
+                                        groupInfo.groupId,
+                                        groupInfo.name
+                                    )
+                                },
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "群组标签",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = "管理群组成员标签",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "管理",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }

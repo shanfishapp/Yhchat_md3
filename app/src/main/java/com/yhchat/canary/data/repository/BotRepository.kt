@@ -2,6 +2,7 @@ package com.yhchat.canary.data.repository
 
 import android.util.Log
 import com.yhchat.canary.data.api.ApiService
+import com.yhchat.canary.data.api.WebApiService
 import com.yhchat.canary.data.model.BaseResponse
 import com.yhchat.canary.data.model.BotInfo
 import yh_bot.Bot
@@ -19,6 +20,7 @@ import javax.inject.Singleton
 @Singleton
 class BotRepository @Inject constructor(
     private val apiService: ApiService,
+    private val webApiService: WebApiService,
     private val tokenRepository: TokenRepository
 ) {
     
@@ -223,7 +225,7 @@ class BotRepository @Inject constructor(
                 return Result.failure(Exception("未登录"))
             }
             
-            val response = apiService.getMyBotList(token)
+            val response = webApiService.getMyBotList(token)
             
             if (response.isSuccessful) {
                 val responseBody = response.body()
