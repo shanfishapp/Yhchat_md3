@@ -104,10 +104,13 @@ fun ConversationScreen(
     val listState = rememberLazyListState()
 
     // 置顶栏显示状态 - 使用key保持状态
-    var showStickyBar by remember(key1 = "sticky_bar") { mutableStateOf(false) }
+    var showStickyBar by remember(key1 = "sticky_bar") { mutableStateOf(true) }
 
     // 刷新状态 - 使用key保持状态
     var refreshing by remember(key1 = "refreshing") { mutableStateOf(false) }
+    
+    // 记录用户是否正在主动交互（滚动）
+    var isUserScrolling by remember { mutableStateOf(false) }
 
     // 下拉刷新状态
     val swipeRefreshState =
@@ -125,10 +128,16 @@ fun ConversationScreen(
     var showAddMenuBottomSheet by remember { mutableStateOf(false) }
 
     // 监听列表滚动位置，控制置顶栏显示
-    LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) {
-        // 只有当滚动到顶部附近（前几个项目且滚动偏移较小）时才显示置顶栏
-        // 注意：这里判断是否在顶部，不考虑置顶会话
-        showStickyBar = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 100
+    // 只有当用户主动滚动时才改变置顶栏状态
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
+            // 用户开始滚动
+            isUserScrolling = true
+        } else if (isUserScrolling) {
+            // 用户停止滚动，根据当前位置决定是否显示置顶栏
+            showStickyBar = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 100
+            isUserScrolling = false
+        }
     }
     
     // 连接滚动行为到底部导航栏的显示/隐藏
@@ -389,8 +398,8 @@ fun ConversationScreen(
                 },
                 onCreateGroupBot = {
                     showAddMenuBottomSheet = false
-                    // TODO: 创建群聊/机器人功能
-                    android.widget.Toast.makeText(context, "创建群聊/机器人功能待实现", android.widget.Toast.LENGTH_SHORT).show()
+                    val intent = Intent(context, com.yhchat.canary.ui.create.CreateActivity::class.java)
+                    context.startActivity(intent)
                 },
                 onScan = {
                     showAddMenuBottomSheet = false

@@ -28,5 +28,7 @@ data class CachedMessage(
     val editTime: Long? = null,
     val msgDeleteTime: Long? = null,
     val quoteMsgId: String? = null,
+    val cmdName: String? = null,  // 指令名称
+    val cmdType: Int? = null,  // 指令类型
     val localInsertTime: Long = System.currentTimeMillis()
 )

@@ -202,7 +202,7 @@ fun ChatBackgroundScreen(
                             item {
                                 BackgroundCard(
                                     background = currentBg,
-                                    onDelete = { viewModel.deleteBackground(it) }
+                                    onDelete = { viewModel.deleteBackground(it, chatId) }
                                 )
                             }
                         }
@@ -221,7 +221,7 @@ fun ChatBackgroundScreen(
                             item {
                                 BackgroundCard(
                                     background = globalBg,
-                                    onDelete = { viewModel.deleteBackground(it) }
+                                    onDelete = { viewModel.deleteBackground(it, "all") }
                                 )
                             }
                         }
@@ -242,7 +242,7 @@ fun ChatBackgroundScreen(
                             items(otherBgs) { background ->
                                 BackgroundCard(
                                     background = background,
-                                    onDelete = { viewModel.deleteBackground(it) }
+                                    onDelete = { viewModel.deleteBackground(it, background.chatId) }
                                 )
                             }
                         }
@@ -438,14 +438,39 @@ class ChatBackgroundViewModel : ViewModel() {
         }
     }
     
-    fun deleteBackground(background: ChatBackground) {
-        // TODO: 实现删除背景API（文档中没有提供删除接口）
+    fun deleteBackground(background: ChatBackground, chatId: String) {
         viewModelScope.launch {
-            Toast.makeText(
-                null, 
-                "删除功能需要联系后端添加API", 
-                Toast.LENGTH_SHORT
-            ).show()
+            try {
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+                
+                // 删除背景：将URL设置为空字符串
+                val result = backgroundRepository.setChatBackground(
+                    chatId = chatId,
+                    backgroundUrl = ""
+                )
+                
+                result.fold(
+                    onSuccess = { success ->
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            setSuccess = true
+                        )
+                        // 重新加载背景列表
+                        loadBackgrounds()
+                    },
+                    onFailure = { exception ->
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = "删除背景失败: ${exception.message}"
+                        )
+                    }
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "删除背景失败: ${e.message}"
+                )
+            }
         }
     }
     

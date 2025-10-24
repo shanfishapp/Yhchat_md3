@@ -35,6 +35,10 @@ class UserRepository @Inject constructor(
         return tokenRepository?.getTokenSync()
     }
     
+    suspend fun getTokenSync(): String? {
+        return tokenRepository?.getTokenSync()
+    }
+    
     /**
      * 获取用户信息
      */
@@ -754,6 +758,87 @@ class UserRepository @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e("UserRepository", "获取分享信息异常", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 修改用户头像
+     */
+    suspend fun editAvatar(avatarUrl: String): Result<Boolean> {
+        return try {
+            val token = getToken() ?: return Result.failure(Exception("未登录"))
+            
+            // 构建ProtoBuf请求
+            val requestBuilder = yh_user.User.edit_avatar_send.newBuilder()
+            requestBuilder.url = avatarUrl
+            
+            val requestBytes = requestBuilder.build().toByteArray()
+            val requestBody = requestBytes.toRequestBody(
+                "application/x-protobuf".toMediaType()
+            )
+            
+            val response = apiService.editAvatar(token, requestBody)
+            
+            if (response.isSuccessful) {
+                val responseBytes = response.body()?.bytes() ?: return Result.failure(Exception("响应为空"))
+                val editResponse = yh_user.User.edit_avatar.parseFrom(responseBytes)
+                
+                if (editResponse.status.code == 1) {
+                    Result.success(true)
+                } else {
+                    Result.failure(Exception("修改头像失败: ${editResponse.status.msg}"))
+                }
+            } else {
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e("UserRepository", "修改头像异常", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 删除好友/群聊/机器人
+     */
+    /**
+     * 获取用户详细信息
+     */
+    suspend fun getUserDetail(token: String, requestBody: RequestBody): Result<ByteArray> {
+        return try {
+            val response = apiService.getUserDetail(token, requestBody)
+            
+            if (response.isSuccessful) {
+                response.body()?.bytes()?.let { bytes ->
+                    Result.success(bytes)
+                } ?: Result.failure(Exception("响应为空"))
+            } else {
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    suspend fun deleteFriend(chatId: String, chatType: Int): Result<Boolean> {
+        return try {
+            val token = getToken() ?: return Result.failure(Exception("未登录"))
+            val request = DeleteFriendRequest(chatId = chatId, chatType = chatType)
+            val response = apiService.deleteFriend(token, request)
+            
+            if (response.isSuccessful) {
+                response.body()?.let { body ->
+                    if (body.code == 1) {
+                        Result.success(true)
+                    } else {
+                        Result.failure(Exception(body.message ?: "删除失败"))
+                    }
+                } ?: Result.failure(Exception("响应为空"))
+            } else {
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e("UserRepository", "删除好友/群聊/机器人异常", e)
             Result.failure(e)
         }
     }

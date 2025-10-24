@@ -144,7 +144,8 @@ class MessageRepository @Inject constructor(
         text: String,
         contentType: Int = 1, // 1-文本
         quoteMsgId: String? = null,
-        quoteMsgText: String? = null
+        quoteMsgText: String? = null,
+        commandId: Long? = null  // 指令ID
     ): Result<Boolean> {
         return try {
             val tokenFlow = tokenRepository.getToken()
@@ -174,6 +175,12 @@ class MessageRepository @Inject constructor(
             
             if (!quoteMsgId.isNullOrEmpty()) {
                 requestBuilder.setQuoteMsgId(quoteMsgId)
+            }
+            
+            // 添加指令ID
+            if (commandId != null) {
+                requestBuilder.setCommandId(commandId)
+                Log.d(tag, "📋 发送指令消息，commandId: $commandId")
             }
             
             val request = requestBuilder.build()

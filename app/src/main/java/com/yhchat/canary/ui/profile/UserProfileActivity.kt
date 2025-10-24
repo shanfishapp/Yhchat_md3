@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Report
 import androidx.compose.material.icons.filled.Wallpaper
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,6 +42,9 @@ import com.yhchat.canary.data.model.UserProfile
 import com.yhchat.canary.data.model.UserHomepageInfo
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -208,6 +212,8 @@ fun UserProfileScreen(
                 }
             },
             actions = {
+                var showDeleteFriendDialog by remember { mutableStateOf(false) }
+                
                 // 举报按钮
                 IconButton(onClick = { showReportDialog = true }) {
                     Icon(
@@ -223,6 +229,72 @@ fun UserProfileScreen(
                     Icon(
                         imageVector = Icons.Default.Wallpaper,
                         contentDescription = "聊天背景"
+                    )
+                }
+                
+                // 删除好友按钮
+                IconButton(onClick = {
+                    showDeleteFriendDialog = true
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "删除好友",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+                
+                // 删除好友确认对话框
+                if (showDeleteFriendDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDeleteFriendDialog = false },
+                        title = {
+                            Text(
+                                text = "删除好友",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        text = {
+                            Text("确定要删除好友「${initialUserName ?: "该用户"}」吗？")
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    showDeleteFriendDialog = false
+                                    // 调用删除好友API
+                                    val db = com.yhchat.canary.data.local.AppDatabase.getDatabase(context)
+                                    val tokenRepository = com.yhchat.canary.data.repository.TokenRepository(db.userTokenDao(), context)
+                                    val userRepository = com.yhchat.canary.data.repository.UserRepository(
+                                        com.yhchat.canary.data.api.ApiClient.apiService,
+                                        tokenRepository
+                                    )
+                                    CoroutineScope(Dispatchers.Main).launch {
+                                        userRepository.deleteFriend(userId, 1).fold(
+                                            onSuccess = {
+                                                onShowToast("已删除好友")
+                                                // 返回上一页
+                                                if (context is android.app.Activity) {
+                                                    context.finish()
+                                                }
+                                            },
+                                            onFailure = { exception: Throwable ->
+                                                onShowToast("删除好友失败: ${exception.message}")
+                                            }
+                                        )
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.error
+                                )
+                            ) {
+                                Text("删除", color = MaterialTheme.colorScheme.onError)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDeleteFriendDialog = false }) {
+                                Text("取消")
+                            }
+                        }
                     )
                 }
                 

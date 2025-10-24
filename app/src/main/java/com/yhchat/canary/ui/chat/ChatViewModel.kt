@@ -12,12 +12,16 @@ import com.yhchat.canary.data.repository.TokenRepository
 import com.yhchat.canary.data.websocket.WebSocketManager
 import com.yhchat.canary.data.websocket.MessageEvent
 import com.yhchat.canary.data.local.ReadPositionStore
+import com.yhchat.canary.proto.group.Bot_data
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlinx.coroutines.Job
+import com.yhchat.canary.data.model.GroupDetail
+import yh_bot.Bot
 
 data class ChatUiState(
     val isLoading: Boolean = false,
@@ -25,11 +29,15 @@ data class ChatUiState(
     val isConnected: Boolean = false,
     val isRefreshing: Boolean = false,
     val newMessageReceived: Boolean = false,  // 标记是否收到新消息
+    val groupInfo: GroupDetail? = null,
     val groupMembers: Map<String, GroupMemberInfo> = emptyMap(),  // 群成员信息：chatId -> GroupMemberInfo
     val groupMemberCount: Int = 0,  // 群成员总数
-    val botInfo: yh_bot.Bot.bot_info? = null,  // 机器人信息
-    val botBoard: yh_bot.Bot.board? = null,  // 机器人看板
-    val chatBackgroundUrl: String? = null  // 聊天背景图片URL
+    val botInfo: Bot.bot_info? = null,  // 机器人信息
+    val botBoard: Bot.board? = null,  // 机器人看板（单个机器人聊天）
+    val groupBots: List<Bot_data> = emptyList(),  // 群聊中的机器人列表
+    val groupBotBoards: Map<String, Bot.board.Board_data> = emptyMap(),  // 群聊机器人看板：botId -> board_data
+    val chatBackgroundUrl: String? = null,  // 聊天背景图片URL
+    val menuButtons: List<com.yhchat.canary.data.model.MenuButton> = emptyList()  // 群聊菜单按钮
 )
 
 @HiltViewModel
@@ -77,9 +85,15 @@ class ChatViewModel @Inject constructor(
         oldestMsgSeq = 0
         oldestMsgId = null
         
-        // 如果是群聊，加载群成员信息
-        if (chatType == 2) {
+        // 如果是群聊，加载群成员信息、机器人列表和菜单按钮
+        if (chatType == 2) { // 群聊
+            loadGroupInfo(chatId)
             loadGroupMembers(chatId)
+            loadGroupBotsAndBoards(chatId)
+            loadGroupMenuButtons(chatId)
+        } else if (chatType == 3) { // 机器人
+            loadBotInfo(chatId)
+            loadBotBoard(chatId, 3)
         }
         
         // 开始监听WebSocket消息
@@ -90,6 +104,27 @@ class ChatViewModel @Inject constructor(
         loadMessages()
     }
     
+    /**
+     * 加载群聊基本信息
+     */
+    private fun loadGroupInfo(groupId: String) {
+        viewModelScope.launch {
+            Log.d(tag, "Loading group info for: $groupId")
+            groupRepository.setTokenRepository(tokenRepository)
+            
+            groupRepository.getGroupInfo(groupId).fold(
+                onSuccess = { groupDetail ->
+                    Log.d(tag, "✅ Group info loaded successfully")
+                    _uiState.value = _uiState.value.copy(groupInfo = groupDetail)
+                },
+                onFailure = { error ->
+                    Log.e(tag, "❌ Failed to load group info", error)
+                    _uiState.value = _uiState.value.copy(error = "加载群信息失败: ${error.message}")
+                }
+            )
+        }
+    }
+
     /**
      * 加载群成员信息（加载群信息和部分成员以显示权限标签）
      */
@@ -131,6 +166,106 @@ class ChatViewModel @Inject constructor(
                 },
                 onFailure = { error ->
                     Log.e(tag, "Failed to load group info", error)
+                }
+            )
+        }
+    }
+    
+    /**
+     * 加载群聊中的机器人列表和他们的看板
+     */
+    private fun loadGroupBotsAndBoards(chatId: String) {
+        viewModelScope.launch {
+            groupRepository.getGroupBots(chatId).fold(
+                onSuccess = { bots ->
+                    _uiState.value = _uiState.value.copy(groupBots = bots)
+                    if (bots.isNotEmpty()) {
+                        // 只需要调用一次API，获取所有机器人的看板
+                        loadGroupBotBoards(chatId)
+                    }
+                },
+                onFailure = { error ->
+                    Log.e(tag, "加载群聊机器人列表失败", error)
+                }
+            )
+        }
+    }
+
+    /**
+     * 加载群聊内所有机器人的看板
+     * @param chatId 群聊ID
+     */
+    private fun loadGroupBotBoards(chatId: String) {
+        viewModelScope.launch {
+            Log.d(tag, "开始加载群聊机器人看板: groupId=$chatId")
+            // 使用chatType=2获取群聊的看板
+            botRepository.getBotBoard(chatId, 2).fold(
+                onSuccess = { boardResponse ->
+                    // boardResponse.boardList 现在是一个列表
+                    val boardsDataList = boardResponse.boardList
+                    Log.d(tag, "✅ 加载群聊看板成功: groupId=$chatId, 数量=${boardsDataList.size}")
+                    if (boardsDataList.isNotEmpty()) {
+                        // 使用机器人ID作为key，创建一个map
+                        val boardsMap = boardsDataList.associateBy { it.botId }
+                        _uiState.value = _uiState.value.copy(groupBotBoards = boardsMap)
+                    }
+                },
+                onFailure = { error ->
+                    Log.e(tag, "❌ 加载群聊机器人看板失败: groupId=$chatId", error)
+                }
+            )
+        }
+    }
+    
+    /**
+     * 刷新单个机器人的看板（用于WebSocket更新）
+     */
+    fun refreshBotBoard(botId: String) {
+        if (currentChatType == 2) {
+            // 群聊场景
+            loadGroupBotBoards(currentChatId)
+        } else if (currentChatType == 3 && currentChatId == botId) {
+            // 单个机器人聊天场景
+            loadBotBoard(botId, 3)
+        }
+    }
+    
+    private fun loadGroupMenuButtons(groupId: String) {
+        viewModelScope.launch {
+            Log.d(tag, "Loading group menu buttons for: $groupId")
+            groupRepository.setTokenRepository(tokenRepository)
+            
+            groupRepository.getGroupMenuButtons(groupId).fold(
+                onSuccess = { menuButtons ->
+                    Log.d(tag, "✅ 加载到 ${menuButtons.size} 个菜单按钮")
+                    _uiState.value = _uiState.value.copy(menuButtons = menuButtons)
+                },
+                onFailure = { error ->
+                    Log.e(tag, "❌ 加载菜单按钮失败", error)
+                }
+            )
+        }
+    }
+    
+    /**
+     * 点击菜单按钮
+     */
+    fun clickMenuButton(button: com.yhchat.canary.data.model.MenuButton) {
+        viewModelScope.launch {
+            Log.d(tag, "点击菜单按钮: ${button.name} (ID: ${button.id})")
+            
+            groupRepository.clickMenuButton(
+                buttonId = button.id,
+                chatId = currentChatId,
+                chatType = currentChatType,
+                value = button.select
+            ).fold(
+                onSuccess = {
+                    Log.d(tag, "✅ 菜单按钮点击成功")
+                },
+                onFailure = { error ->
+                    Log.e(tag, "❌ 菜单按钮点击失败", error)
+                    _uiState.value = _uiState.value.copy(error = error.message)
                 }
             )
         }
@@ -744,15 +879,22 @@ class ChatViewModel @Inject constructor(
      * @param contentType 消息类型：1-文本，3-Markdown，8-HTML
      * @param quoteMsgId 引用消息ID
      * @param quoteMsgText 引用消息文本
+     * @param commandId 指令ID
      */
     fun sendMessage(
         text: String, 
         contentType: Int = 1, 
         quoteMsgId: String? = null,
-        quoteMsgText: String? = null
+        quoteMsgText: String? = null,
+        commandId: Long? = null
     ) {
-        if (text.isBlank() || currentChatId.isEmpty()) {
-            Log.w(tag, "Cannot send empty message or chat not initialized")
+        // 如果是指令消息，允许空文本；否则检查文本是否为空
+        if (currentChatId.isEmpty()) {
+            Log.w(tag, "Chat not initialized")
+            return
+        }
+        if (text.isBlank() && commandId == null) {
+            Log.w(tag, "Cannot send empty message without command")
             return
         }
         
@@ -771,7 +913,8 @@ class ChatViewModel @Inject constructor(
                     text = text,
                     contentType = contentType,
                     quoteMsgId = quoteMsgId,
-                    quoteMsgText = quoteMsgText
+                    quoteMsgText = quoteMsgText,
+                    commandId = commandId
                 )
 
                 result.fold(
@@ -1024,11 +1167,13 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             botRepository.getBotBoard(chatId, chatType).fold(
                 onSuccess = { board ->
-                    _uiState.value = _uiState.value.copy(botBoard = board)
-                    Log.d(tag, "机器人看板加载成功")
+                    // 单个机器人私聊时，boardList应该只有一个元素
+                    if (board.boardCount > 0) {
+                        _uiState.value = _uiState.value.copy(botBoard = board)
+                    }
                 },
                 onFailure = { error ->
-                    Log.e(tag, "加载机器人看板失败", error)
+                    _uiState.value = _uiState.value.copy(error = "加载机器人看板失败: ${error.message}")
                 }
             )
         }

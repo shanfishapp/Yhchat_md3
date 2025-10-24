@@ -58,15 +58,42 @@ fun ProfileScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val changeInviteCodeState by viewModel.changeInviteCodeState.collectAsStateWithLifecycle()
     val changeNicknameState by viewModel.changeNicknameState.collectAsStateWithLifecycle()
+    val changeAvatarState by viewModel.changeAvatarState.collectAsStateWithLifecycle()
     
     // 修改邀请码弹窗状态
     var showChangeInviteCodeDialog by remember { mutableStateOf(false) }
     // 修改用户名称弹窗状态
     var showChangeNicknameDialog by remember { mutableStateOf(false) }
+    // 图片选择器状态
+    var showImagePicker by remember { mutableStateOf(false) }
+    
+    // 图片选择器
+    val imagePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        uri?.let { 
+            viewModel.changeAvatar(context, it)
+        }
+    }
     
     // 在界面显示时加载用户资料
     LaunchedEffect(Unit) {
         viewModel.loadUserProfile()
+    }
+    
+    // 监听头像修改状态
+    LaunchedEffect(changeAvatarState.isSuccess) {
+        if (changeAvatarState.isSuccess) {
+            android.widget.Toast.makeText(context, "头像修改成功", android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.resetChangeAvatarState()
+        }
+    }
+    
+    LaunchedEffect(changeAvatarState.error) {
+        changeAvatarState.error?.let { error ->
+            android.widget.Toast.makeText(context, error, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.resetChangeAvatarState()
+        }
     }
 
     Column(
@@ -151,6 +178,8 @@ fun ProfileScreen(
                         viewModel = viewModel,
                         onShowChangeInviteCodeDialog = { showChangeInviteCodeDialog = true },
                         onShowChangeNicknameDialog = { showChangeNicknameDialog = true },
+                        imagePickerLauncher = imagePickerLauncher,
+                        changeAvatarState = changeAvatarState,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -206,6 +235,8 @@ private fun UserProfileContent(
     viewModel: ProfileViewModel? = null,
     onShowChangeInviteCodeDialog: () -> Unit = {},
     onShowChangeNicknameDialog: () -> Unit = {},
+    imagePickerLauncher: androidx.activity.result.ActivityResultLauncher<String>,
+    changeAvatarState: ChangeAvatarState,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -226,23 +257,70 @@ private fun UserProfileContent(
                     .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 头像
-                if (!userProfile.avatarUrl.isNullOrEmpty()) {
-                    AsyncImage(
-                        model = userProfile.avatarUrl,
-                        contentDescription = "用户头像",
+                // 头像（可点击修改）
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clickable { 
+                            imagePickerLauncher.launch("image/*")
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (!userProfile.avatarUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = userProfile.avatarUrl,
+                            contentDescription = "用户头像",
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = "默认头像",
+                            modifier = Modifier.size(80.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    
+                    // 修改头像指示器
+                    Surface(
                         modifier = Modifier
-                            .size(80.dp)
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.AccountCircle,
-                        contentDescription = "默认头像",
-                        modifier = Modifier.size(80.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                            .size(24.dp)
+                            .align(Alignment.BottomEnd),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        shadowElevation = 2.dp
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "修改头像",
+                            modifier = Modifier
+                                .size(16.dp)
+                                .padding(4.dp),
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                    
+                    // 上传中指示器
+                    if (changeAvatarState.isLoading) {
+                        Surface(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(CircleShape),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                        }
+                    }
                 }
                 
                 Spacer(modifier = Modifier.height(12.dp))

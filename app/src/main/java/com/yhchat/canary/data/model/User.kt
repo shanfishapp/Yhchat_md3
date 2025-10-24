@@ -1364,9 +1364,14 @@ data class Instruction(
     @SerializedName("botName") val botName: String,
     @SerializedName("name") val name: String,
     @SerializedName("desc") val desc: String,
-    @SerializedName("id") val id: Int,
-    @SerializedName("sort") val sort: Int,
-    @SerializedName("auth") val auth: Int // 0-所有人可用，1-所有人禁用，2-群主可用，3-群主管理员可用
+    @SerializedName("id") val id: Long, // 改为Long以匹配ProtoBuf的int64
+    @SerializedName("sort") val sort: Int = 0,
+    @SerializedName("auth") val auth: Int = 0, // 0-所有人可用，1-所有人禁用，2-群主可用，3-群主管理员可用
+    // ProtoBuf额外字段
+    val type: Int = 1, // 指令类型：1-普通指令，2-直发指令，5-自定义输入指令
+    val hintText: String = "", // 输入框提示文字
+    val defaultText: String = "", // 输入框默认文字
+    val form: String = "" // 表单（自定义输入指令用）
 )
 
 /**
@@ -1383,5 +1388,32 @@ data class InviteGroupRequest(
     @SerializedName("chatId") val chatId: String,
     @SerializedName("chatType") val chatType: Int,
     @SerializedName("groupId") val groupId: String
+)
+
+data class RemoveGroupBotRequest(
+    @SerializedName("groupId") val groupId: String,
+    @SerializedName("botId") val botId: String
+)
+
+/**
+ * 移除群聊机器人请求
+ */
+data class RemoveBotRequest(
+    @SerializedName("botId") val botId: String,
+    @SerializedName("groupId") val groupId: String
+)
+
+/**
+ * 群聊机器人菜单按钮
+ */
+data class MenuButton(
+    val id: Long,
+    val botId: String,
+    val name: String,
+    val content: String, // 内容
+    val menuType: Int, // 按钮类型,1-普通按钮 2-选中按钮 3-下拉选择
+    val createTime: Long,
+    val menuAction: Int, // 操作类型
+    val select: String = "" // 选择的选项,在选择按钮的时候也作为状态,选中为1,未选中为0
 )
 

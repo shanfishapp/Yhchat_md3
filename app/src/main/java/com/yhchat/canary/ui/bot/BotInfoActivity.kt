@@ -76,6 +76,14 @@ class BotInfoActivity : ComponentActivity() {
     companion object {
         const val EXTRA_BOT_ID = "extra_bot_id"
         const val EXTRA_BOT_NAME = "extra_bot_name"
+        
+        fun start(context: android.content.Context, botId: String, botName: String) {
+            val intent = android.content.Intent(context, BotInfoActivity::class.java).apply {
+                putExtra(EXTRA_BOT_ID, botId)
+                putExtra(EXTRA_BOT_NAME, botName)
+            }
+            context.startActivity(intent)
+        }
     }
 }
 

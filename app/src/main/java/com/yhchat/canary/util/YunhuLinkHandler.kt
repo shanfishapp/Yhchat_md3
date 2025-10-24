@@ -28,13 +28,17 @@ object YunhuLinkHandler {
     // yunhu:// 链接的正则表达式
     private val YUNHU_LINK_PATTERN = Pattern.compile("yunhu://post-detail\\?id=(\\d+)")
     
+    // 网页文章链接的正则表达式
+    private val WEB_ARTICLE_PATTERN = Pattern.compile("https://www\\.yhchat\\.com/c/p/(\\d+)")
+    
     /**
-     * 解析yunhu链接并跳转到相应页面
+     * 解析yunhu链接和网页文章链接并跳转到相应页面
      */
     fun handleYunhuLink(context: Context, link: String): Boolean {
-        val matcher = YUNHU_LINK_PATTERN.matcher(link)
-        if (matcher.find()) {
-            val postId = matcher.group(1)?.toIntOrNull()
+        // 先尝试匹配 yunhu:// 链接
+        val yunhuMatcher = YUNHU_LINK_PATTERN.matcher(link)
+        if (yunhuMatcher.find()) {
+            val postId = yunhuMatcher.group(1)?.toIntOrNull()
             if (postId != null) {
                 // 跳转到文章详情页
                 val intent = Intent(context, PostDetailActivity::class.java).apply {
@@ -46,6 +50,23 @@ object YunhuLinkHandler {
                 return true
             }
         }
+        
+        // 再尝试匹配网页文章链接
+        val webMatcher = WEB_ARTICLE_PATTERN.matcher(link)
+        if (webMatcher.find()) {
+            val postId = webMatcher.group(1)?.toIntOrNull()
+            if (postId != null) {
+                // 跳转到文章详情页
+                val intent = Intent(context, PostDetailActivity::class.java).apply {
+                    putExtra("post_id", postId)
+                    putExtra("post_title", "文章详情")
+                    putExtra("token", "") // 可能需要从其他地方获取token
+                }
+                context.startActivity(intent)
+                return true
+            }
+        }
+        
         return false
     }
     
@@ -58,12 +79,35 @@ object YunhuLinkHandler {
         linkColor: Int = android.graphics.Color.BLUE
     ) {
         val spannable = SpannableStringBuilder(text)
-        val matcher = YUNHU_LINK_PATTERN.matcher(text)
         
-        while (matcher.find()) {
-            val start = matcher.start()
-            val end = matcher.end()
-            val link = matcher.group()
+        // 处理 yunhu:// 链接
+        val yunhuMatcher = YUNHU_LINK_PATTERN.matcher(text)
+        while (yunhuMatcher.find()) {
+            val start = yunhuMatcher.start()
+            val end = yunhuMatcher.end()
+            val link = yunhuMatcher.group()
+            
+            val clickableSpan = object : ClickableSpan() {
+                override fun onClick(widget: View) {
+                    handleYunhuLink(widget.context, link)
+                }
+            }
+            
+            spannable.setSpan(clickableSpan, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            spannable.setSpan(
+                ForegroundColorSpan(linkColor), 
+                start, 
+                end, 
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
+        
+        // 处理网页文章链接
+        val webMatcher = WEB_ARTICLE_PATTERN.matcher(text)
+        while (webMatcher.find()) {
+            val start = webMatcher.start()
+            val end = webMatcher.end()
+            val link = webMatcher.group()
             
             val clickableSpan = object : ClickableSpan() {
                 override fun onClick(widget: View) {
@@ -85,36 +129,50 @@ object YunhuLinkHandler {
     }
     
     /**
-     * 检查文本是否包含yunhu链接
+     * 检查文本是否包含yunhu链接或网页文章链接
      */
     fun containsYunhuLink(text: String): Boolean {
-        return YUNHU_LINK_PATTERN.matcher(text).find()
+        return YUNHU_LINK_PATTERN.matcher(text).find() || WEB_ARTICLE_PATTERN.matcher(text).find()
     }
     
     /**
-     * 提取文本中的所有yunhu链接
+     * 提取文本中的所有yunhu链接和网页文章链接
      */
     fun extractYunhuLinks(text: String): List<String> {
         val links = mutableListOf<String>()
-        val matcher = YUNHU_LINK_PATTERN.matcher(text)
         
-        while (matcher.find()) {
-            links.add(matcher.group())
+        // 提取 yunhu:// 链接
+        val yunhuMatcher = YUNHU_LINK_PATTERN.matcher(text)
+        while (yunhuMatcher.find()) {
+            links.add(yunhuMatcher.group())
+        }
+        
+        // 提取网页文章链接
+        val webMatcher = WEB_ARTICLE_PATTERN.matcher(text)
+        while (webMatcher.find()) {
+            links.add(webMatcher.group())
         }
         
         return links
     }
     
     /**
-     * 从yunhu链接中提取文章ID
+     * 从yunhu链接或网页文章链接中提取文章ID
      */
     fun extractPostIdFromLink(link: String): Int? {
-        val matcher = YUNHU_LINK_PATTERN.matcher(link)
-        return if (matcher.find()) {
-            matcher.group(1)?.toIntOrNull()
-        } else {
-            null
+        // 先尝试 yunhu:// 链接
+        val yunhuMatcher = YUNHU_LINK_PATTERN.matcher(link)
+        if (yunhuMatcher.find()) {
+            return yunhuMatcher.group(1)?.toIntOrNull()
         }
+        
+        // 再尝试网页文章链接
+        val webMatcher = WEB_ARTICLE_PATTERN.matcher(link)
+        if (webMatcher.find()) {
+            return webMatcher.group(1)?.toIntOrNull()
+        }
+        
+        return null
     }
     
     /**

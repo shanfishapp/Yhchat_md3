@@ -149,6 +149,11 @@ class BotRepository @Inject constructor(
     /**
      * 获取看板信息（使用 Protobuf）
      */
+    /**
+     * 获取机器人看板
+     * @param chatId 群聊ID或机器人ID
+     * @param chatType 对象类型 1-用户 2-群聊 3-机器人
+     */
     suspend fun getBotBoard(chatId: String, chatType: Int): Result<Bot.board> {
         return try {
             Log.d(TAG, "开始获取看板信息: chatId=$chatId, chatType=$chatType")
@@ -160,13 +165,15 @@ class BotRepository @Inject constructor(
             }
             
             // 构建 protobuf 请求
+            // 注意：根据API文档，使用id字段（字段序号3）表示群聊/机器人ID
             val request = Bot.board_send.newBuilder()
-                .setChatId(chatId)
+                .setChatId(chatId)  // proto中字段3是chat_id
                 .setChatType(chatType.toLong())
                 .build()
             
             val requestBody = request.toByteArray()
-                .toRequestBody("application/x-protobuf".toMediaType())
+                .toRequestBody("application/x-protobuf".
+                toMediaType())
             
             Log.d(TAG, "发送请求: chatId=$chatId, chatType=$chatType")
             
@@ -189,25 +196,20 @@ class BotRepository @Inject constructor(
             }
             
             // 解析 protobuf 响应
-            val board = Bot.board.parseFrom(responseBody.bytes())
-            
-            Log.d(TAG, "解析成功: status=${board.status.code}, msg=${board.status.msg}")
-            
-            if (board.status.code != 1) {
-                val errorMsg = "获取看板信息失败: ${board.status.msg}"
+            val boardResponse = Bot.board.parseFrom(responseBody.bytes())
+
+            Log.d(TAG, "解析成功: status=${boardResponse.status.code}, msg=${boardResponse.status.msg},看板数量=${boardResponse.boardCount}")
+
+            if (boardResponse.status.code != 1) {
+                val errorMsg = "API返回错误: ${boardResponse.status.msg} (code: ${boardResponse.status.code})"
                 Log.e(TAG, errorMsg)
                 return Result.failure(Exception(errorMsg))
             }
             
-            Log.d(TAG, "✅ 看板信息获取成功")
-            Log.d(TAG, "  机器人ID: ${board.board.botId}")
-            Log.d(TAG, "  对象ID: ${board.board.chatId}")
-            Log.d(TAG, "  内容类型: ${board.board.contentType}")
-            
-            Result.success(board)
+            Result.success(boardResponse)
             
         } catch (e: Exception) {
-            Log.e(TAG, "获取看板信息异常", e)
+            Log.e(TAG, "获取看板信息失败", e)
             Result.failure(e)
         }
     }
@@ -289,13 +291,100 @@ class BotRepository @Inject constructor(
                     Log.e(TAG, "编辑机器人信息失败: ${responseBody?.message}")
                     Result.failure(Exception(responseBody?.message ?: "编辑失败"))
                 }
-        } else {
+            } else {
                 val errorBody = response.errorBody()?.string()
                 Log.e(TAG, "编辑机器人信息失败: ${response.code()} - $errorBody")
                 Result.failure(Exception("编辑机器人信息失败: ${response.code()} - $errorBody"))
             }
         } catch (e: Exception) {
             Log.e(TAG, "编辑机器人信息异常", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 移除群聊中的机器人
+     */
+    suspend fun removeGroupBot(botId: String, groupId: String): Result<Boolean> {
+        return try {
+            Log.d(TAG, "开始移除群机器人: botId=$botId, groupId=$groupId")
+            
+            val token = tokenRepository.getTokenSync()
+            if (token.isNullOrEmpty()) {
+                Log.e(TAG, "Token 为空")
+                return Result.failure(Exception("未登录"))
+            }
+            
+            val request = com.yhchat.canary.data.model.RemoveGroupBotRequest(
+                groupId = groupId,
+                botId = botId
+            )
+            
+            val response = apiService.removeGroupBot(token, request)
+            
+            if (response.isSuccessful && response.body()?.code == 1) {
+                Log.d(TAG, "✅ 移除群机器人成功")
+                Result.success(true)
+        } else {
+                val errorMsg = response.body()?.message ?: "移除失败"
+                Log.e(TAG, "❌ 移除群机器人失败: $errorMsg")
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "移除群机器人异常", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 创建机器人
+     */
+    suspend fun createBot(
+        name: String,
+        introduction: String,
+        avatarUrl: String,
+        isPrivate: Boolean
+    ): Result<String> {
+        return try {
+            val token = tokenRepository.getTokenSync()
+            if (token.isNullOrEmpty()) {
+                Log.e(TAG, "Token 为空")
+                return Result.failure(Exception("未登录"))
+            }
+            
+            // 构建ProtoBuf请求
+            val request = yh_bot.Bot.create_bot_send.newBuilder()
+                .setName(name)
+                .setIntroduction(introduction)
+                .setAvatarUrl(avatarUrl)
+                .setPrivate(if (isPrivate) 1 else 0)
+                .build()
+            
+            val requestBody = request.toByteArray().toRequestBody("application/x-protobuf".toMediaType())
+            
+            Log.d(TAG, "🤖 创建机器人: name=$name, isPrivate=$isPrivate")
+            val response = apiService.createBot(token, requestBody)
+            
+            if (response.isSuccessful) {
+                val responseBody = response.body()?.bytes()
+                if (responseBody != null) {
+                    val createBotResponse = yh_bot.Bot.create_bot.parseFrom(responseBody)
+                    
+                    if (createBotResponse.status.code == 1) {
+                        val botId = createBotResponse.data.botId
+                        Log.d(TAG, "✅ 机器人创建成功: botId=$botId")
+                        Result.success(botId)
+                    } else {
+                        Result.failure(Exception(createBotResponse.status.msg))
+                    }
+                } else {
+                    Result.failure(Exception("响应体为空"))
+                }
+        } else {
+                Result.failure(Exception("请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "创建机器人失败", e)
             Result.failure(e)
         }
     }

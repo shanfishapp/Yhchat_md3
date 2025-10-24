@@ -26,9 +26,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import yh_bot.Bot
 import com.yhchat.canary.ui.components.ImageUtils
 import com.yhchat.canary.ui.components.MarkdownText
@@ -36,6 +40,37 @@ import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.yhchat.canary.data.local.AppDatabase
+import com.yhchat.canary.data.repository.TokenRepository
+import com.yhchat.canary.data.repository.UserRepository
+import com.yhchat.canary.data.api.ApiClient
+import com.yhchat.canary.data.model.BotInfo
+import com.yhchat.canary.ui.bot.BotDetailViewModel
+import android.app.Activity
+import android.widget.Toast
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Wallpaper
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.GroupAdd
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import com.yhchat.canary.ui.components.HtmlWebView
+import androidx.compose.foundation.layout.height
 
 /**
  * 机器人详细信息 Activity
@@ -107,8 +142,8 @@ private fun BotDetailScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showImageViewer by remember { mutableStateOf(false) }
     var currentImageUrl by remember { mutableStateOf("") }
-    
-    Box(modifier = Modifier.fillMaxSize()) {
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -128,6 +163,7 @@ private fun BotDetailScreen(
                 },
                 actions = {
                     val context = LocalContext.current
+                    
                     IconButton(onClick = {
                         com.yhchat.canary.ui.background.ChatBackgroundActivity.start(
                             context, 
@@ -138,6 +174,71 @@ private fun BotDetailScreen(
                         Icon(
                             imageVector = Icons.Default.Wallpaper,
                             contentDescription = "聊天背景"
+                        )
+                    }
+                    
+                    IconButton(onClick = {
+                        showDeleteDialog = true
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "删除机器人",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    
+                    // 删除机器人确认对话框
+                    if (showDeleteDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showDeleteDialog = false },
+                            title = {
+                                Text(
+                                    text = "删除机器人",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            text = {
+                                Text("确定要删除机器人「$botName」吗？")
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        showDeleteDialog = false
+                                        // 调用删除机器人API
+                                        val db = com.yhchat.canary.data.local.AppDatabase.getDatabase(context)
+                                        val tokenRepository = com.yhchat.canary.data.repository.TokenRepository(db.userTokenDao(), context)
+                                        val userRepository = com.yhchat.canary.data.repository.UserRepository(
+                                            com.yhchat.canary.data.api.ApiClient.apiService,
+                                            tokenRepository
+                                        )
+                                        CoroutineScope(Dispatchers.Main).launch {
+                                            userRepository.deleteFriend(botId, 3).fold(
+                                                onSuccess = {
+                                                    android.widget.Toast.makeText(context, "已删除机器人", android.widget.Toast.LENGTH_SHORT).show()
+                                                    // 返回上一页
+                                                    if (context is android.app.Activity) {
+                                                        context.finish()
+                                                    }
+                                                },
+                                                onFailure = { exception: Throwable ->
+                                                    android.widget.Toast.makeText(context, "删除机器人失败: ${exception.message}", android.widget.Toast.LENGTH_SHORT).show()
+                                                }
+                                            )
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.error
+                                    )
+                                ) {
+                                    Text("删除", color = MaterialTheme.colorScheme.onError)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showDeleteDialog = false }) {
+                                    Text("取消")
+                                }
+                            }
                         )
                     }
                 }
@@ -207,7 +308,6 @@ private fun BotDetailScreen(
             imageUrl = currentImageUrl,
             onDismiss = { showImageViewer = false }
         )
-    }
     }
 }
 
@@ -398,7 +498,9 @@ private fun BotDetailContent(
         }
         
         // 看板信息
-        if (boardInfo != null && boardInfo.board.content.isNotBlank()) {
+        if (boardInfo != null && boardInfo.boardCount > 0) {
+            val boardData = boardInfo.getBoardList().firstOrNull()
+            if (boardData != null && boardData.content.isNotBlank()) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
@@ -426,37 +528,38 @@ private fun BotDetailContent(
                         )
                     }
                     
-                    when (boardInfo.board.contentType) {
+                    when (boardData.contentType) {
                         1 -> { // 文本
                             Text(
-                                text = boardInfo.board.content,
+                                text = boardData.content,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        3 -> { // Markdown
+                        2 -> { // Markdown
                             MarkdownText(
-                                markdown = boardInfo.board.content,
+                                markdown = boardData.content,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
-                        8 -> { // HTML
+                        3 -> { // HTML
                             com.yhchat.canary.ui.components.HtmlWebView(
-                                htmlContent = boardInfo.board.content,
+                                htmlContent = boardData.content,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .heightIn(min = 200.dp, max = 400.dp)
                             )
                         }
-                        else -> {
+                        else -> { // 默认按文本处理
                             Text(
-                                text = boardInfo.board.content,
+                                text = boardData.content,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 }
+            }
             }
         } else if (isBoardLoading) {
             Card(

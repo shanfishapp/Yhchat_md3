@@ -17,6 +17,7 @@ import javax.inject.Inject
 data class GroupInfoUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
+    val successMessage: String? = null,  // 成功消息
     val groupInfo: GroupDetail? = null,
     val members: List<GroupMemberInfo> = emptyList(),
     val isLoadingMembers: Boolean = false,
@@ -224,6 +225,10 @@ class GroupInfoViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(error = null)
     }
     
+    fun clearSuccessMessage() {
+        _uiState.value = _uiState.value.copy(successMessage = null)
+    }
+    
     /**
      * 切换成员列表显示状态
      */
@@ -263,11 +268,9 @@ class GroupInfoViewModel @Inject constructor(
             groupRepository.removeMember(groupId, userId).fold(
                 onSuccess = {
                     Log.d(tag, "✅ Member removed successfully")
-                    android.widget.Toast.makeText(
-                        android.app.Application().applicationContext,
-                        "已踢出该成员",
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
+                    _uiState.value = _uiState.value.copy(
+                        successMessage = "已踢出该成员"
+                    )
                     // 重新加载群成员列表
                     loadGroupMembers(groupId)
                 },
@@ -300,11 +303,9 @@ class GroupInfoViewModel @Inject constructor(
                         else -> "禁言设置成功"
                     }
                     Log.d(tag, "✅ Member gagged successfully: $message")
-                    android.widget.Toast.makeText(
-                        android.app.Application().applicationContext,
-                        message,
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
+                    _uiState.value = _uiState.value.copy(
+                        successMessage = message
+                    )
                     // 重新加载群成员列表
                     loadGroupMembers(groupId)
                 },

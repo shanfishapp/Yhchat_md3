@@ -21,7 +21,9 @@ object UnifiedLinkHandler {
      * 检查是否为可处理的链接
      */
     fun isHandleableLink(url: String): Boolean {
-        return url.startsWith("yunhu://") || url.startsWith("https://yhfx.jwznb.com/share")
+        return url.startsWith("yunhu://") || 
+               url.startsWith("https://yhfx.jwznb.com/share") ||
+               url.contains("https://www.yhchat.com/c/p/")
     }
     
     /**
@@ -40,6 +42,9 @@ object UnifiedLinkHandler {
                 }
                 url.startsWith("https://yhfx.jwznb.com/share") -> {
                     handleYhfxShareLink(context, url)
+                }
+                url.contains("https://www.yhchat.com/c/p/") -> {
+                    handleWebArticleLink(context, url)
                 }
                 else -> {
                     Log.w(TAG, "Unknown link type: $url")
@@ -125,6 +130,20 @@ object UnifiedLinkHandler {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
+    }
+    
+    /**
+     * 处理网页文章链接 https://www.yhchat.com/c/p/文章id
+     */
+    private fun handleWebArticleLink(context: Context, url: String) {
+        Log.d(TAG, "Handling web article link: $url")
+        
+        // 使用 YunhuLinkHandler 来处理
+        val handled = com.yhchat.canary.util.YunhuLinkHandler.handleYunhuLink(context, url)
+        if (!handled) {
+            Log.w(TAG, "Failed to handle web article link: $url")
+            android.widget.Toast.makeText(context, "无法打开文章链接", android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
 }
 

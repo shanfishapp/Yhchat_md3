@@ -29,6 +29,10 @@ class ProfileViewModel(
     // 修改用户名称状态
     private val _changeNicknameState = MutableStateFlow(ChangeNicknameState())
     val changeNicknameState: StateFlow<ChangeNicknameState> = _changeNicknameState.asStateFlow()
+    
+    // 修改头像状态
+    private val _changeAvatarState = MutableStateFlow(ChangeAvatarState())
+    val changeAvatarState: StateFlow<ChangeAvatarState> = _changeAvatarState.asStateFlow()
 
     /**
      * 加载用户个人资料
@@ -140,6 +144,81 @@ class ProfileViewModel(
     fun resetChangeNicknameState() {
         _changeNicknameState.value = ChangeNicknameState()
     }
+    
+    /**
+     * 修改用户头像
+     */
+    fun changeAvatar(context: android.content.Context, imageUri: android.net.Uri) {
+        viewModelScope.launch {
+            _changeAvatarState.value = _changeAvatarState.value.copy(isLoading = true, error = null)
+            
+            try {
+                // 首先获取上传token
+                val token = userRepository.getTokenSync() ?: ""
+                val tokenResult = com.yhchat.canary.data.api.ApiClient.apiService.getQiniuImageToken(token)
+                
+                if (!tokenResult.isSuccessful || tokenResult.body()?.data == null) {
+                    _changeAvatarState.value = _changeAvatarState.value.copy(
+                        isLoading = false,
+                        error = "获取上传token失败"
+                    )
+                    return@launch
+                }
+                
+                val uploadToken = tokenResult.body()!!.data.token
+                
+                // 上传图片
+                val uploadResult = com.yhchat.canary.utils.ImageUploadUtil.uploadImage(
+                    context = context,
+                    imageUri = imageUri,
+                    uploadToken = uploadToken
+                )
+                
+                uploadResult.fold(
+                    onSuccess = { uploadResponse ->
+                        // 构建完整的图片URL
+                        val imageUrl = "https://chat-img.jwznb.com/${uploadResponse.key}"
+                        
+                        // 调用修改头像API
+                        userRepository.editAvatar(imageUrl).fold(
+                            onSuccess = {
+                                _changeAvatarState.value = _changeAvatarState.value.copy(
+                                    isLoading = false,
+                                    isSuccess = true
+                                )
+                                // 重新加载用户资料
+                                loadUserProfile()
+                            },
+                            onFailure = { exception ->
+                                _changeAvatarState.value = _changeAvatarState.value.copy(
+                                    isLoading = false,
+                                    error = exception.message ?: "修改头像失败"
+                                )
+                            }
+                        )
+                    },
+                    onFailure = { exception ->
+                        _changeAvatarState.value = _changeAvatarState.value.copy(
+                            isLoading = false,
+                            error = "上传图片失败: ${exception.message}"
+                        )
+                    }
+                )
+            } catch (e: Exception) {
+                _changeAvatarState.value = _changeAvatarState.value.copy(
+                    isLoading = false,
+                    error = "修改头像异常: ${e.message}"
+                )
+            }
+        }
+    }
+    
+    /**
+     * 重置修改头像状态
+     */
+    fun resetChangeAvatarState() {
+        _changeAvatarState.value = ChangeAvatarState()
+    }
 }
 
 /**
@@ -164,6 +243,15 @@ data class ChangeInviteCodeState(
  * 修改用户名称状态
  */
 data class ChangeNicknameState(
+    val isLoading: Boolean = false,
+    val isSuccess: Boolean = false,
+    val error: String? = null
+)
+
+/**
+ * 修改头像状态
+ */
+data class ChangeAvatarState(
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false,
     val error: String? = null

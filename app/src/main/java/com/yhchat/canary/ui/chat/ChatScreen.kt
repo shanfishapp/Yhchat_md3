@@ -1,7 +1,6 @@
 package com.yhchat.canary.ui.chat
 
 import android.content.Intent
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.layout.*
@@ -84,6 +83,9 @@ import androidx.compose.foundation.border
 import org.json.JSONArray
 import org.json.JSONObject
 // pointerInput 相关扩展函数无需单独 import，consume 已废弃
+import com.yhchat.canary.ui.theme.YhchatCanaryTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * 聊天界面
@@ -125,11 +127,12 @@ fun ChatScreen(
     }
     var inputText by remember { mutableStateOf("") }
     var selectedMessageType by remember { mutableStateOf(1) } // 1-文本, 3-Markdown, 8-HTML
+    var selectedInstruction by remember { mutableStateOf<com.yhchat.canary.data.model.Instruction?>(null) } // 选中的指令
     val listState = rememberLazyListState()
     
     // 图片预览状态
     var showImageViewer by remember { mutableStateOf(false) }
-    var currentImageUrl by remember { mutableStateOf("") }
+    var currentImageUrl by remember { mutableStateOf<String?>(null) }
     
     // 滚动到底部按钮状态
     var showScrollToBottomButton by remember { mutableStateOf(false) }
@@ -235,7 +238,7 @@ fun ChatScreen(
             // 判断条件3：最新消息时间戳是否很新（5秒内）
             val currentTime = System.currentTimeMillis()
             val isRecentMessage = latestMessage?.let { 
-                currentTime - it.sendTime <= 20000 // sendTime是毫秒，比较5秒
+                currentTime - it.sendTime <= 500000 
             } ?: false
             
             // 自动滚动逻辑：
@@ -278,28 +281,28 @@ fun ChatScreen(
                 alpha = 0.3f  // 半透明效果
             )
         }
-        
-        Surface(
+    
+    Surface(
             modifier = Modifier.fillMaxSize(),
             color = if (uiState.chatBackgroundUrl != null) {
                 MaterialTheme.colorScheme.background.copy(alpha = 0.85f)
             } else {
                 MaterialTheme.colorScheme.background
             }
-        ) {
-            Column(
+    ) {
+        Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .imePadding()  // 自动响应软键盘，推动内容上移
-            ) {
+        ) {
         // 顶部应用栏
         TopAppBar(
             title = {
                 Column {
-                    Text(
-                        text = chatName,
-                        fontWeight = FontWeight.Bold
-                    )
+                Text(
+                    text = chatName,
+                    fontWeight = FontWeight.Bold
+                )
                     // 如果是群聊，显示群人数
                     if (chatType == 2 && uiState.groupMemberCount > 0) {
                         Text(
@@ -330,6 +333,22 @@ fun ChatScreen(
                 }
             },
             actions = {
+                // 用户详情按钮（只在单聊时显示）
+                if (chatType == 1) {
+                    IconButton(onClick = {
+                        android.util.Log.d("ChatScreen", "Opening user detail: chatId=$chatId, chatName=$chatName")
+                        com.yhchat.canary.ui.user.UserDetailActivity.start(
+                            context = context,
+                            userId = chatId,
+                            userName = chatName
+                        )
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "用户详情"
+                        )
+                    }
+                }
                 // 群聊信息菜单（只在群聊时显示）
                 if (chatType == 2) {
                     IconButton(onClick = {
@@ -364,10 +383,17 @@ fun ChatScreen(
             )
         )
         
-        // 机器人看板按钮和内容（只在机器人聊天时显示）
-        if (chatType == 3) {
+        // 机器人看板按钮和内容
+        // 单个机器人聊天时显示该机器人的看板（且设置允许）
+        val botBoardEnabled = remember { 
+            context.getSharedPreferences("chat_settings", android.content.Context.MODE_PRIVATE)
+                .getBoolean("show_bot_board", true) 
+        }
+        if (chatType == 3 && botBoardEnabled) {
             val botBoard = uiState.botBoard
-            if (botBoard != null && botBoard.board.content.isNotBlank()) {
+            if (botBoard != null && botBoard.boardCount > 0) {
+                val boardData = botBoard.getBoardList().firstOrNull()
+                if (boardData != null && boardData.content.isNotBlank()) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -412,63 +438,36 @@ fun ChatScreen(
                     enter = expandVertically() + fadeIn(),
                     exit = shrinkVertically() + fadeOut()
                 ) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp)
-                        ) {
-                            when (botBoard.board.contentType) {
-                                1 -> { // 文本
-                                    Text(
-                                        text = botBoard.board.content,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                                3 -> { // Markdown
-                                    MarkdownText(
-                                        markdown = botBoard.board.content,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        onImageClick = { url ->
-                                            currentImageUrl = url
-                                            showImageViewer = true
-                                        }
-                                    )
-                                }
-                                8 -> { // HTML
-                                    HtmlWebView(
-                                        htmlContent = botBoard.board.content,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .heightIn(max = 300.dp),
-                                        onImageClick = { url ->
-                                            currentImageUrl = url
-                                            showImageViewer = true
-                                        }
-                                    )
-                                }
-                                else -> {
-                                    Text(
-                                        text = botBoard.board.content,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
+                    uiState.botBoard?.let { board ->
+                        if (board.boardCount > 0) {
+                            val boardData = board.getBoardList().firstOrNull()
+                            boardData?.let { data ->
+                                BotBoardContent(
+                                    boardData = data,
+                                    onImageClick = { url ->
+                                        currentImageUrl = url
+                                        showImageViewer = true
+                                    }
+                                )
                             }
                         }
                     }
                 }
             }
+                }
             }
+        }
+        
+        // 群聊中的机器人看板列表（且设置允许）
+        if (chatType == 2 && uiState.groupBots.isNotEmpty() && botBoardEnabled) {
+            GroupBotBoardsSection(
+                groupBots = uiState.groupBots,
+                groupBotBoards = uiState.groupBotBoards,
+                onImageClick = { url ->
+                    currentImageUrl = url
+                    showImageViewer = true
+                }
+            )
         }
         
         // 错误信息
@@ -529,8 +528,9 @@ fun ChatScreen(
                     items(
                         count = reversedMessages.size,
                         key = { index -> 
-                            // 使用msgId作为唯一key，确保稳定性
-                            reversedMessages[index].msgId
+                            // 使用msgId和sendTime组合作为唯一key，避免重复
+                            val message = reversedMessages[index]
+                            "${message.msgId}_${message.sendTime}"
                         }
                     ) { index ->
                         val message = reversedMessages[index]
@@ -667,18 +667,60 @@ fun ChatScreen(
             }
         }
 
+        // 菜单按钮栏（仅群聊显示，且设置允许）
+        val showMenuButtons = remember { 
+            context.getSharedPreferences("chat_settings", android.content.Context.MODE_PRIVATE)
+                .getBoolean("show_menu_buttons", true) 
+        }
+        if (chatType == 2 && uiState.menuButtons.isNotEmpty() && showMenuButtons) {
+            com.yhchat.canary.ui.components.MenuButtonBar(
+                menuButtons = uiState.menuButtons,
+                onButtonClick = { button ->
+                    val buttonValue = button.content
+                    
+                    // 检查按钮值是否是可处理的链接
+                    when {
+                        com.yhchat.canary.utils.UnifiedLinkHandler.isHandleableLink(buttonValue) -> {
+                            // 使用 UnifiedLinkHandler 处理 yunhu://, yhfx 分享链接, yhchat.com 文章链接
+                            com.yhchat.canary.utils.UnifiedLinkHandler.handleLink(context, buttonValue)
+                        }
+                        (buttonValue as String).startsWith("http://") || (buttonValue as String).startsWith("https://") -> {
+                            // 其他 HTTP/HTTPS 链接，使用系统浏览器打开
+                            try {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(buttonValue))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                android.widget.Toast.makeText(context, "无法打开链接", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        else -> {
+                            // 不是链接，发送按钮请求
+                            viewModel.clickMenuButton(button)
+                        }
+                    }
+                }
+            )
+        }
+
         // 底部输入栏
             ChatInputBar(
                 text = inputText,
                 onTextChange = { inputText = it },
                 onSendMessage = {
                     if (inputText.isNotBlank()) {
-                        // 根据选择的消息类型发送消息，带上引用信息
+                        if (selectedInstruction != null) {
+                            android.util.Log.d("ChatScreen", "📤 发送指令消息: /${selectedInstruction?.name}, commandId=${selectedInstruction?.id}, text=${inputText.trim()}")
+                        } else {
+                            android.util.Log.d("ChatScreen", "📤 发送普通消息: ${inputText.trim()}")
+                        }
+                        
+                        // 根据选择的消息类型发送消息，带上引用信息和指令ID
                         viewModel.sendMessage(
                             text = inputText.trim(),
                             contentType = selectedMessageType,
                             quoteMsgId = quotedMessageId,
-                            quoteMsgText = quotedMessageText
+                            quoteMsgText = quotedMessageText,
+                            commandId = selectedInstruction?.id  // 传递指令ID
                         )
                         inputText = ""
                         // 发送后重置为文本类型
@@ -686,6 +728,8 @@ fun ChatScreen(
                         // 清除引用状态
                         quotedMessageId = null
                         quotedMessageText = null
+                        // 清除选中的指令
+                        selectedInstruction = null
                         // 发送消息后自动滚动到最新消息
                         coroutineScope.launch {
                             listState.animateScrollToItem(0)
@@ -729,28 +773,71 @@ fun ChatScreen(
                     quotedMessageText = null
                 },
                 onInstructionClick = { instruction ->
-                    // 点击指令后将指令名称插入到输入框
-                    inputText = "/${instruction.name} "
+                    android.util.Log.d("ChatScreen", "🎯 用户点击指令: /${instruction.name} (id=${instruction.id}, type=${instruction.type})")
+                    
+                    // 选中指令
+                    selectedInstruction = instruction
+                    
+                    // 根据指令类型处理
+                    when (instruction.type) {
+                        1 -> {
+                            android.util.Log.d("ChatScreen", "📝 普通指令，应用默认文本: ${instruction.defaultText}")
+                            // 普通指令：应用默认文本（如果有）
+                            if (instruction.defaultText.isNotEmpty()) {
+                                inputText = instruction.defaultText
+                            }
+                        }
+                        2 -> {
+                            android.util.Log.d("ChatScreen", "⚡ 直发指令，立即发送消息")
+                            // 直发指令：发送 "/{指令名称}"
+                            val textToSend = "/${instruction.name}"
+                            android.util.Log.d("ChatScreen", "📤 直发指令发送文本: '$textToSend'")
+                            
+                            // 立即发送消息
+                            viewModel.sendMessage(
+                                text = textToSend,
+                                contentType = selectedMessageType,
+                                quoteMsgId = quotedMessageId,
+                                quoteMsgText = quotedMessageText,
+                                commandId = instruction.id
+                            )
+                            inputText = ""
+                            selectedInstruction = null
+                            quotedMessageId = null
+                            quotedMessageText = null
+                        }
+                        else -> {
+                            android.util.Log.w("ChatScreen", "⚠️ 未知指令类型: ${instruction.type}")
+                            // 其他类型指令暂不处理
+                        }
+                    }
                 },
                 groupId = if (chatType == 2) chatId else null,  // 只在群聊中传递groupId
-                modifier = Modifier.padding(
-                    start = 0.dp,  // 去掉左右padding让输入框占满宽度
-                    end = 0.dp,
-                    top = 1.dp,
-                    bottom = 8.dp
-                )
+                selectedInstruction = selectedInstruction,  // 传递选中的指令
+                onClearInstruction = {
+                    selectedInstruction = null
+                    inputText = ""
+                },
+                modifier = Modifier
+                    .navigationBarsPadding()  // 自适应导航栏
+                    .padding(
+                        start = 0.dp,  // 去掉左右padding让输入框占满宽度
+                        end = 0.dp,
+                        top = 1.dp,
+                        bottom = 0.dp  // 导航栏padding已处理
+                    )
             )
         }
         }
     }  // 闭合Box（聊天背景容器）
     
     // 图片预览器
-    if (showImageViewer && currentImageUrl.isNotEmpty()) {
+    if (showImageViewer && !currentImageUrl.isNullOrEmpty()) {
         ImageViewer(
-            imageUrl = currentImageUrl,
+            imageUrl = currentImageUrl!!,
             onDismiss = {
                 showImageViewer = false
-                currentImageUrl = ""
+                currentImageUrl = null
             }
         )
     }
@@ -886,6 +973,16 @@ private fun MessageItem(
                 onToggleExpand = { tagsExpanded = !tagsExpanded },
                 memberPermission = memberPermission
             )
+            
+            // 指令消息标识（只有当cmd不为null且name不为空时才显示）
+            if (message.cmd != null && message.cmd.name.isNotEmpty()) {
+                Text(
+                    text = "/${message.cmd.name}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                )
+            }
 
             // 消息气泡
             Surface(
@@ -1587,7 +1684,7 @@ private fun MessageContentView(
                             .clickable {
                                 if (isPersonalExpression) {
                                     // 个人表情：打开图片预览
-                                    onImageClick(imageUrl)
+                                onImageClick(imageUrl)
                                 } else if (isStickerPack) {
                                     // 表情包：跳转到表情包详情
                                     com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
@@ -1621,7 +1718,7 @@ private fun MessageContentView(
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable {
                                     if (isPersonalExpression) {
-                                        onImageClick(fullUrl)
+                                    onImageClick(fullUrl)
                                     } else if (isStickerPack) {
                                         com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
                                             context = context,

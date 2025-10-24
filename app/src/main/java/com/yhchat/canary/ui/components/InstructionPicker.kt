@@ -1,6 +1,7 @@
 package com.yhchat.canary.ui.components
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -203,28 +204,74 @@ class InstructionPickerViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(InstructionPickerUiState())
     val uiState: StateFlow<InstructionPickerUiState> = _uiState.asStateFlow()
     
+    companion object {
+        private const val TAG = "InstructionPicker"
+    }
+    
     fun init(context: Context) {
         groupRepository = RepositoryFactory.getGroupRepository(context)
     }
     
     fun loadInstructions(groupId: String) {
         viewModelScope.launch {
+            Log.d(TAG, "📋 开始加载群指令，groupId: $groupId")
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             
-            groupRepository.getInstructionList(groupId).fold(
-                onSuccess = { instructions ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        instructions = instructions
-                    )
-                },
-                onFailure = { error ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = error.message
-                    )
-                }
-            )
+            // 同时请求两个API
+            Log.d(TAG, "🔄 请求 ProtoBuf API...")
+            val protobufResult = groupRepository.getGroupBotList(groupId)
+            Log.d(TAG, "🔄 请求 JSON API...")
+            val jsonResult = groupRepository.getInstructionList(groupId)
+            
+            // 合并数据
+            val protobufInstructions = protobufResult.getOrNull() ?: emptyList()
+            val jsonInstructions = jsonResult.getOrNull() ?: emptyList()
+            
+            Log.d(TAG, "✅ ProtoBuf API 返回 ${protobufInstructions.size} 条指令")
+            Log.d(TAG, "✅ JSON API 返回 ${jsonInstructions.size} 条指令")
+            
+            // 使用Map去重，ProtoBuf数据优先（因为更详细）
+            val instructionMap = mutableMapOf<Long, Instruction>()
+            
+            // 先加载JSON数据（auth字段只在JSON中有）
+            jsonInstructions.forEach { instruction ->
+                instructionMap[instruction.id] = instruction
+                Log.d(TAG, "  📝 JSON指令: id=${instruction.id}, name=${instruction.name}, auth=${instruction.auth}")
+            }
+            
+            // 再加载ProtoBuf数据，覆盖已有的（但保留auth字段）
+            protobufInstructions.forEach { protobufInstruction ->
+                val existingAuth = instructionMap[protobufInstruction.id]?.auth ?: 0
+                instructionMap[protobufInstruction.id] = protobufInstruction.copy(auth = existingAuth)
+                Log.d(TAG, "  🔧 ProtoBuf指令: id=${protobufInstruction.id}, name=${protobufInstruction.name}, type=${protobufInstruction.type}, hintText=${protobufInstruction.hintText}, defaultText=${protobufInstruction.defaultText}")
+            }
+            
+            val mergedInstructions = instructionMap.values
+                .sortedBy { it.sort }
+                .toList()
+            
+            Log.d(TAG, "🎯 合并后共 ${mergedInstructions.size} 条指令")
+            mergedInstructions.forEach { instruction ->
+                Log.d(TAG, "  ✨ 最终指令: id=${instruction.id}, name=/${instruction.name}, type=${instruction.type}, auth=${instruction.auth}, botName=${instruction.botName}")
+            }
+            
+            if (mergedInstructions.isNotEmpty()) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    instructions = mergedInstructions
+                )
+                Log.d(TAG, "✅ 指令加载完成！")
+            } else {
+                // 两个API都失败了，显示错误
+                val error = protobufResult.exceptionOrNull()?.message 
+                    ?: jsonResult.exceptionOrNull()?.message 
+                    ?: "获取指令失败"
+                Log.e(TAG, "❌ 指令加载失败: $error")
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = error
+                )
+            }
         }
     }
 }

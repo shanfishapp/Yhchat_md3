@@ -61,7 +61,9 @@ fun ChatInputBar(
     onClearQuote: (() -> Unit)? = null, // 清除引用
     onExpressionClick: ((com.yhchat.canary.data.model.Expression) -> Unit)? = null,  // 表情点击回调
     onInstructionClick: ((com.yhchat.canary.data.model.Instruction) -> Unit)? = null,  // 指令点击回调
-    groupId: String? = null  // 群聊ID，用于加载指令
+    groupId: String? = null,  // 群聊ID，用于加载指令
+    selectedInstruction: com.yhchat.canary.data.model.Instruction? = null, // 选中的指令
+    onClearInstruction: (() -> Unit)? = null // 清除指令
 ) {
     var showAttachMenu by remember { mutableStateOf(false) }
     var showExpressionPicker by remember { mutableStateOf(false) }
@@ -81,6 +83,14 @@ fun ChatInputBar(
                 )
             }
             
+            // 指令显示框
+            if (selectedInstruction != null) {
+                InstructionBar(
+                    instruction = selectedInstruction,
+                    onClearInstruction = { onClearInstruction?.invoke() }
+                )
+            }
+            
             // 整体输入框背景 - 圆角矩形，包含所有按钮和输入框
             Surface(
                 modifier = Modifier
@@ -97,22 +107,22 @@ fun ChatInputBar(
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    // 加号按钮
-                    IconButton(
-                        onClick = { 
-                            showAttachMenu = !showAttachMenu
+            ) {
+                // 加号按钮
+                IconButton(
+                    onClick = { 
+                        showAttachMenu = !showAttachMenu
                             showExpressionPicker = false
                             showInstructionPicker = false
-                            if (showAttachMenu) {
-                                keyboardController?.hide()
-                            }
-                        },
+                        if (showAttachMenu) {
+                            keyboardController?.hide()
+                        }
+                    },
                         modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "附件",
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "附件",
                             tint = if (showAttachMenu) 
                                 MaterialTheme.colorScheme.primary 
                             else 
@@ -123,13 +133,13 @@ fun ChatInputBar(
                     
                     // 输入框 - 无边框，融入背景
                     BasicTextField(
-                        value = text,
+                    value = text,
                         onValueChange = { newText: String ->
-                            onTextChange(newText)
-                            onDraftChange?.invoke(newText)
-                        },
-                        modifier = Modifier
-                            .weight(1f)
+                        onTextChange(newText)
+                        onDraftChange?.invoke(newText)
+                    },
+                    modifier = Modifier
+                        .weight(1f)
                             .heightIn(min = 36.dp, max = 90.dp)
                             .padding(horizontal = 8.dp, vertical = 8.dp),
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
@@ -142,8 +152,13 @@ fun ChatInputBar(
                                 contentAlignment = Alignment.CenterStart
                             ) {
                                 if (text.isEmpty()) {
-                                    Text(
-                                        text = placeholder,
+                                    val effectivePlaceholder = when {
+                                        selectedInstruction != null && selectedInstruction.hintText.isNotEmpty() -> 
+                                            selectedInstruction.hintText
+                                        else -> placeholder
+                                    }
+                        Text(
+                                        text = effectivePlaceholder,
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                     )
@@ -202,32 +217,32 @@ fun ChatInputBar(
                     }
                     
                     // 发送按钮 - 圆形背景
-                    IconButton(
-                        onClick = {
-                            if (text.isNotBlank()) {
-                                onSendMessage()
-                            }
-                        },
-                        enabled = text.isNotBlank(),
-                        modifier = Modifier
+                IconButton(
+                    onClick = {
+                        if (text.isNotBlank()) {
+                            onSendMessage()
+                        }
+                    },
+                    enabled = text.isNotBlank(),
+                    modifier = Modifier
                             .size(32.dp)
-                            .background(
-                                if (text.isNotBlank()) 
-                                    MaterialTheme.colorScheme.primary 
-                                else 
-                                    MaterialTheme.colorScheme.surfaceVariant,
-                                CircleShape
-                            )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Send,
-                            contentDescription = "发送",
-                            tint = if (text.isNotBlank()) 
-                                MaterialTheme.colorScheme.onPrimary 
+                        .background(
+                            if (text.isNotBlank()) 
+                                MaterialTheme.colorScheme.primary 
                             else 
-                                MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
+                                MaterialTheme.colorScheme.surfaceVariant,
+                            CircleShape
                         )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Send,
+                        contentDescription = "发送",
+                        tint = if (text.isNotBlank()) 
+                            MaterialTheme.colorScheme.onPrimary 
+                        else 
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                    )
                     }
                 }
             }
@@ -288,6 +303,61 @@ fun ChatInputBar(
                 },
                 onDismiss = { showInstructionPicker = false }
             )
+        }
+    }
+}
+
+/**
+ * 指令显示条
+ */
+@Composable
+fun InstructionBar(
+    instruction: com.yhchat.canary.data.model.Instruction,
+    onClearInstruction: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                    text = "/${instruction.name}",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                if (instruction.desc.isNotEmpty()) {
+                    Text(
+                        text = instruction.desc,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                }
+            }
+            
+            IconButton(
+                onClick = onClearInstruction,
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "清除指令",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
     }
 }

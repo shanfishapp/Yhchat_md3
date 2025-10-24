@@ -46,7 +46,7 @@ message board_send {
 
 message board {
     Status status = 1;
-    Board_data board = 2;
+    repeated Board_data board = 2;
 
     message Board_data {
         string bot_id = 1; // 机器人ID
@@ -56,6 +56,23 @@ message board {
         int32 content_type = 5;
         int64 last_update_time = 6; // 最后更新时间戳
         string bot_name = 7;
+    }
+}
+
+// 创建机器人
+message create_bot_send {
+    string name = 2;                // 机器人名称
+    string introduction = 3;        // 机器人简介
+    string avatar_url = 4;          // 头像URL
+    int32 private = 5;              // 是否私有 (0-公开，1-私有)
+}
+
+message create_bot {
+    Status status = 1;
+    BotData data = 2;               // 机器人数据
+    
+    message BotData {
+        string bot_id = 1;          // 创建的机器人ID
     }
 }
 

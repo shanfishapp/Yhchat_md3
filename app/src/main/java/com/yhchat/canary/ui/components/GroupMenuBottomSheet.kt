@@ -15,6 +15,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.yhchat.canary.ui.disk.GroupDiskActivity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * 群聊菜单BottomSheet
@@ -27,10 +30,13 @@ fun GroupMenuBottomSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true  // 完全展开，不显示部分展开状态
+    )
     var showReportDialog by remember { mutableStateOf(false) }
     var showShareDialog by remember { mutableStateOf(false) }
     var showInviteDialog by remember { mutableStateOf(false) }
+    var showExitGroupDialog by remember { mutableStateOf(false) }
     
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -128,6 +134,17 @@ fun GroupMenuBottomSheet(
                 }
             )
             
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            
+            // 退出群聊
+            GroupMenuItem(
+                icon = Icons.Default.ExitToApp,
+                text = "退出群聊",
+                onClick = {
+                    showExitGroupDialog = true
+                }
+            )
+            
             // 底部间距
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -170,6 +187,78 @@ fun GroupMenuBottomSheet(
             }
         )
     }
+    
+    // 退出群聊确认对话框
+    if (showExitGroupDialog) {
+        ExitGroupDialog(
+            groupName = groupName,
+            onConfirm = {
+                showExitGroupDialog = false
+                onDismiss()
+                // 调用退出群聊API
+                val db = com.yhchat.canary.data.local.AppDatabase.getDatabase(context)
+                val tokenRepository = com.yhchat.canary.data.repository.TokenRepository(db.userTokenDao(), context)
+                val userRepository = com.yhchat.canary.data.repository.UserRepository(
+                    com.yhchat.canary.data.api.ApiClient.apiService,
+                    tokenRepository
+                )
+                CoroutineScope(Dispatchers.Main).launch {
+                    userRepository.deleteFriend(groupId, 2).fold(
+                        onSuccess = {
+                            Toast.makeText(context, "已退出群聊", Toast.LENGTH_SHORT).show()
+                            // 返回到主界面
+                            if (context is android.app.Activity) {
+                                context.finish()
+                            }
+                        },
+                        onFailure = { exception: Throwable ->
+                            Toast.makeText(context, "退出群聊失败: ${exception.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                }
+            },
+            onDismiss = { showExitGroupDialog = false }
+        )
+    }
+}
+
+/**
+ * 退出群聊确认对话框
+ */
+@Composable
+fun ExitGroupDialog(
+    groupName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "退出群聊",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Text("确定要退出群聊「$groupName」吗？")
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("退出", color = MaterialTheme.colorScheme.onError)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }
 
 /**

@@ -21,6 +21,14 @@ class GroupInfoActivity : ComponentActivity() {
     companion object {
         const val EXTRA_GROUP_ID = "groupId"
         const val EXTRA_GROUP_NAME = "groupName"
+        
+        fun start(context: android.content.Context, groupId: String, groupName: String) {
+            val intent = Intent(context, GroupInfoActivity::class.java).apply {
+                putExtra(EXTRA_GROUP_ID, groupId)
+                putExtra(EXTRA_GROUP_NAME, groupName)
+            }
+            context.startActivity(intent)
+        }
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {

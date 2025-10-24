@@ -221,7 +221,16 @@ fun PostContentCard(
         post.group?.let { group ->
             if (!group.groupId.isNullOrEmpty() && group.groupId != "0") {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            // 跳转到群聊详情页
+                            com.yhchat.canary.ui.group.GroupInfoActivity.start(
+                                context = context,
+                                groupId = group.groupId,
+                                groupName = group.name
+                            )
+                        },
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                     )

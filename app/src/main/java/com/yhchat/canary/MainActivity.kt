@@ -1,5 +1,6 @@
 package com.yhchat.canary
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import dagger.hilt.android.AndroidEntryPoint
@@ -226,10 +227,13 @@ class MainActivity : ComponentActivity() {
                                                 token = token,
                                                 userId = userId,
                                                 onConversationClick = { chatId, chatType, chatName ->
-                                                    currentChatId = chatId
-                                                    currentChatType = chatType
-                                                    currentChatName = chatName
-                                                    currentScreen = "chat"
+                                                    // 启动 ChatActivity 而不是切换到内嵌的聊天屏幕
+                                                    val intent = Intent(this@MainActivity, com.yhchat.canary.ui.chat.ChatActivity::class.java)
+                                                    intent.putExtra("chatId", chatId)
+                                                    intent.putExtra("chatType", chatType)
+                                                    intent.putExtra("chatName", chatName)
+                                                    intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                                    startActivity(intent)
                                                 },
                                                 onSearchClick = {
                                                     if (isInitialized) {
@@ -310,11 +314,13 @@ class MainActivity : ComponentActivity() {
                                             currentScreen = "conversation"
                                         },
                                         onItemClick = { chatId, chatType, chatName ->
-                                            // 处理搜索项点击，跳转到聊天界面
-                                            currentChatId = chatId
-                                            currentChatType = chatType
-                                            currentChatName = chatName
-                                            currentScreen = "chat"
+                                            // 启动 ChatActivity 而不是切换到内嵌的聊天屏幕
+                                            val intent = Intent(this@MainActivity, com.yhchat.canary.ui.chat.ChatActivity::class.java)
+                                            intent.putExtra("chatId", chatId)
+                                            intent.putExtra("chatType", chatType)
+                                            intent.putExtra("chatName", chatName)
+                                            intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                            startActivity(intent)
                                         },
                                         tokenRepository = tokenRepository,
                                         modifier = Modifier.fillMaxSize()

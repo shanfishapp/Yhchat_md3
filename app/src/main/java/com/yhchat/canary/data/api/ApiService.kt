@@ -21,6 +21,24 @@ interface ApiService {
     suspend fun getUserProfile(
         @Header("token") token: String
     ): Response<ResponseBody>
+    
+    /**
+     * 修改用户头像
+     */
+    @POST("v1/user/edit-avatar")
+    suspend fun editAvatar(
+        @Header("token") token: String,
+        @Body request: okhttp3.RequestBody
+    ): Response<ResponseBody>
+    
+    /**
+     * 获取用户详细信息
+     */
+    @POST("v1/user/get-user")
+    suspend fun getUserDetail(
+        @Header("token") token: String,
+        @Body request: okhttp3.RequestBody
+    ): Response<ResponseBody>
 
     
     @POST("v1/user/captcha")
@@ -189,6 +207,16 @@ interface ApiService {
         @Header("token") token: String,
         @Body request: EditBotRequest
     ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
+    /**
+     * 删除群聊对机器人的添加
+     * POST /v1/bot/remove-group
+     */
+    @POST("v1/bot/remove-group")
+    suspend fun removeGroupBot(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.RemoveBotRequest
+    ): Response<com.yhchat.canary.data.model.ApiStatus>
     
     @POST("v1/msg/recall-msg-batch")
     suspend fun recallMessagesBatch(
@@ -589,7 +617,7 @@ interface ApiService {
         @Header("token") token: String,
         @Body request: ChangeInviteCodeRequest
     ): Response<Map<String, Any>>
-    
+
     @POST("v1/user/edit-nickname")
     suspend fun editNickname(
         @Header("token") token: String,
@@ -798,7 +826,17 @@ interface ApiService {
     ): Response<com.yhchat.canary.data.model.SearchRecommendGroupResponse>
     
     /**
-     * 获取群指令列表
+     * 获取群机器人列表（ProtoBuf，包含详细指令信息）
+     * POST /v1/group/bot-list
+     */
+    @POST("v1/group/bot-list")
+    suspend fun getGroupBotList(
+        @Header("token") token: String,
+        @Body request: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
+    
+    /**
+     * 获取群指令列表（JSON API）
      * POST /v1/group/instruction-list
      */
     @POST("v1/group/instruction-list")
@@ -816,6 +854,45 @@ interface ApiService {
         @Header("token") token: String,
         @Body request: com.yhchat.canary.data.model.InviteGroupRequest
     ): Response<com.yhchat.canary.data.model.ApiStatus>
+    
+    /**
+     * 移除群聊机器人
+     */
+    @POST("v1/group/remove-bot")
+    suspend fun removeGroupBot(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.RemoveGroupBotRequest
+    ): Response<com.yhchat.canary.data.model.ApiStatus>
+    
+    /**
+     * 创建群聊
+     * POST /v1/group/create-group
+     */
+    @POST("v1/group/create-group")
+    suspend fun createGroup(
+        @Header("token") token: String,
+        @Body request: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
+    
+    /**
+     * 创建机器人
+     * POST /v1/bot/create-bot
+     */
+    @POST("v1/bot/create-bot")
+    suspend fun createBot(
+        @Header("token") token: String,
+        @Body request: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
+    
+    /**
+     * 点击消息输入框上面按钮的反馈
+     * POST /v1/menu/event
+     */
+    @POST("v1/menu/event")
+    suspend fun menuEvent(
+        @Header("token") token: String,
+        @Body request: MenuEventRequest
+    ): Response<BaseResponse>
     
 }
 
@@ -1399,6 +1476,20 @@ data class EditGroupTagRequest(
 data class DeleteGroupTagRequest(
     @SerializedName("id")
     val id: Long
+)
+
+/**
+ * 菜单按钮点击事件请求
+ */
+data class MenuEventRequest(
+    @SerializedName("id")
+    val id: Long, // 按钮id
+    @SerializedName("chatId")
+    val chatId: String, // 聊天id
+    @SerializedName("chatType")
+    val chatType: Int, // 会话类型
+    @SerializedName("value")
+    val value: String = "" // 按钮的值
 )
 
 /**

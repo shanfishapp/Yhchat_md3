@@ -10,11 +10,16 @@ import com.yhchat.canary.proto.group.list_member
 import com.yhchat.canary.proto.group.list_member_send
 import com.yhchat.canary.proto.group.edit_group
 import com.yhchat.canary.proto.group.edit_group_send
+import com.yhchat.canary.proto.group.bot_list_send
+import com.yhchat.canary.proto.group.bot_list
+import com.yhchat.canary.proto.group.Bot_data
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import javax.inject.Inject
@@ -516,7 +521,123 @@ class GroupRepository @Inject constructor(
     }
     
     /**
-     * 获取群指令列表
+     * 获取群机器人列表（ProtoBuf API，包含详细指令信息）
+     */
+    suspend fun getGroupBotList(groupId: String): Result<List<com.yhchat.canary.data.model.Instruction>> {
+        return try {
+            val token = tokenRepository?.getTokenSync()
+            if (token == null) {
+                return Result.failure(Exception("未登录"))
+            }
+            
+            // 构建ProtoBuf请求
+            val request = bot_list_send.newBuilder()
+                .setGroupId(groupId)
+                .build()
+            
+            val requestBody = RequestBody.create(
+                "application/x-protobuf".toMediaTypeOrNull(),
+                request.toByteArray()
+            )
+            
+            val response = apiService.getGroupBotList(token, requestBody)
+            
+            if (response.isSuccessful) {
+                val responseBody = response.body()?.bytes()
+                if (responseBody != null) {
+                    val botListResponse = bot_list.parseFrom(responseBody)
+                    
+                    if (botListResponse.status.code == 1) {
+                        // 解析指令列表 - 注意：protobuf中字段名是instruction（单数）
+                        val instructions = botListResponse.instructionList.map { instructionData ->
+                            com.yhchat.canary.data.model.Instruction(
+                                id = instructionData.id,
+                                botId = instructionData.botId,
+                                name = instructionData.name,
+                                desc = instructionData.desc,
+                                botName = instructionData.botName,
+                                type = instructionData.type,
+                                hintText = instructionData.hintText,
+                                defaultText = instructionData.defaultText,
+                                form = instructionData.form,
+                                sort = instructionData.sort.toInt(),
+                                auth = 0 // ProtoBuf中没有auth字段，默认为0
+                            )
+                        }
+                        
+                        Log.d(tag, "✅ 从ProtoBuf获取到 ${instructions.size} 条指令")
+                        
+                        // 同时获取机器人列表，供后续使用
+                        val bots = botListResponse.botList.map { botData ->
+                            Log.d(tag, "  机器人: ${botData.name} (${botData.botId})")
+                            botData
+                        }
+                        
+                        Log.d(tag, "从ProtoBuf获取到 ${instructions.size} 条指令")
+                        Result.success(instructions)
+                    } else {
+                        Result.failure(Exception(botListResponse.status.msg))
+                    }
+                } else {
+                    Result.failure(Exception("响应体为空"))
+                }
+            } else {
+                Result.failure(Exception("请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "获取群机器人列表失败", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 获取群聊中的机器人列表（返回机器人数据）
+     */
+    suspend fun getGroupBots(groupId: String): Result<List<Bot_data>> {
+        return try {
+            val token = tokenRepository?.getTokenSync()
+            if (token == null) {
+                return Result.failure(Exception("未登录"))
+            }
+            
+            // 构建ProtoBuf请求
+            val request = bot_list_send.newBuilder()
+                .setGroupId(groupId)
+                .build()
+            
+            val requestBody = RequestBody.create(
+                "application/x-protobuf".toMediaTypeOrNull(),
+                request.toByteArray()
+            )
+            
+            val response = apiService.getGroupBotList(token, requestBody)
+            
+            if (response.isSuccessful) {
+                val responseBody = response.body()?.bytes()
+                if (responseBody != null) {
+                    val botListResponse = bot_list.parseFrom(responseBody)
+                    
+                    if (botListResponse.status.code == 1) {
+                        val bots = botListResponse.botList
+                        Log.d(tag, "✅ 获取到 ${bots.size} 个群机器人")
+                        Result.success(bots)
+                    } else {
+                        Result.failure(Exception(botListResponse.status.msg))
+                    }
+                } else {
+                    Result.failure(Exception("响应体为空"))
+                }
+            } else {
+                Result.failure(Exception("请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "获取群机器人列表失败", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 获取群指令列表（JSON API）
      */
     suspend fun getInstructionList(groupId: String): Result<List<com.yhchat.canary.data.model.Instruction>> {
         return try {
@@ -538,6 +659,104 @@ class GroupRepository @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e(tag, "获取指令列表失败", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 获取群聊菜单按钮
+     */
+    suspend fun getGroupMenuButtons(groupId: String): Result<List<com.yhchat.canary.data.model.MenuButton>> {
+        return try {
+            val token = tokenRepository?.getTokenSync()
+            if (token == null) {
+                return Result.failure(Exception("未登录"))
+            }
+            
+            // 构建ProtoBuf请求
+            val request = bot_list_send.newBuilder()
+                .setGroupId(groupId)
+                .build()
+            
+            val requestBody = RequestBody.create(
+                "application/x-protobuf".toMediaTypeOrNull(),
+                request.toByteArray()
+            )
+            
+            val response = apiService.getGroupBotList(token, requestBody)
+            
+            if (response.isSuccessful) {
+                val responseBody = response.body()?.bytes()
+                if (responseBody != null) {
+                    val botListResponse = bot_list.parseFrom(responseBody)
+                    
+                    if (botListResponse.status.code == 1) {
+                        // 解析菜单按钮列表
+                        val menuButtons = botListResponse.menuList.map { menuData ->
+                            com.yhchat.canary.data.model.MenuButton(
+                                id = menuData.id,
+                                botId = menuData.botId,
+                                name = menuData.name,
+                                content = menuData.content,
+                                menuType = menuData.menuType,
+                                createTime = menuData.createTime,
+                                menuAction = menuData.menuAction,
+                                select = menuData.select
+                            )
+                        }
+                        
+                        Log.d(tag, "✅ 获取到 ${menuButtons.size} 个菜单按钮")
+                        menuButtons.forEach { button ->
+                            Log.d(tag, "  - 按钮: id=${button.id}, name=${button.name}, content=${button.content}, botId=${button.botId}, type=${button.menuType}")
+                        }
+                        Result.success(menuButtons)
+                    } else {
+                        Result.failure(Exception(botListResponse.status.msg))
+                    }
+                } else {
+                    Result.failure(Exception("响应体为空"))
+                }
+            } else {
+                Result.failure(Exception("请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "获取群聊菜单按钮失败", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 点击菜单按钮
+     */
+    suspend fun clickMenuButton(
+        buttonId: Long,
+        chatId: String,
+        chatType: Int,
+        value: String = ""
+    ): Result<Boolean> {
+        return try {
+            val token = tokenRepository?.getTokenSync()
+            if (token == null) {
+                return Result.failure(Exception("未登录"))
+            }
+            
+            val request = com.yhchat.canary.data.api.MenuEventRequest(
+                id = buttonId,
+                chatId = chatId,
+                chatType = chatType,
+                value = value
+            )
+            
+            val response = apiService.menuEvent(token, request)
+            
+            if (response.isSuccessful && response.body()?.code == 1) {
+                Log.d(tag, "✅ 菜单按钮点击成功")
+                Result.success(true)
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "点击失败"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "菜单按钮点击失败", e)
             Result.failure(e)
         }
     }
@@ -568,6 +787,63 @@ class GroupRepository @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e(tag, "邀请失败", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 创建群聊
+     */
+    suspend fun createGroup(
+        name: String,
+        introduction: String,
+        avatarUrl: String,
+        category: String,
+        categoryId: Int
+    ): Result<String> {
+        return try {
+            val token = tokenRepository?.getTokenSync()
+            if (token == null) {
+                return Result.failure(Exception("未登录"))
+            }
+            
+            // 构建ProtoBuf请求
+            val request = com.yhchat.canary.proto.group.create_group_send.newBuilder()
+                .setName(name)
+                .setIntroduction(introduction)
+                .setAvatarUrl(avatarUrl)
+                .setCategory(category)
+                .setCategoryId(categoryId)
+                .build()
+            
+            val requestBody = RequestBody.create(
+                "application/x-protobuf".toMediaTypeOrNull(),
+                request.toByteArray()
+            )
+            
+            Log.d(tag, "🏗️ 创建群聊: name=$name")
+            val response = apiService.createGroup(token, requestBody)
+            
+            if (response.isSuccessful) {
+                val responseBody = response.body()?.bytes()
+                if (responseBody != null) {
+                    val createGroupResponse = com.yhchat.canary.proto.group.create_group.parseFrom(responseBody)
+                    
+                    if (createGroupResponse.status.code == 1) {
+                        val groupId = createGroupResponse.groupId
+                        Log.d(tag, "✅ 群聊创建成功: groupId=$groupId")
+                        Result.success(groupId)
+                    } else {
+                        Result.failure(Exception(createGroupResponse.status.msg))
+                    }
+                } else {
+                    Result.failure(Exception("响应体为空"))
+                }
+            } else {
+                Result.failure(Exception("请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "创建群聊失败", e)
             Result.failure(e)
         }
     }

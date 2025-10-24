@@ -317,6 +317,16 @@ private fun DisplaySettingsCard(
 
             // WebSocket 连接开关
             WebSocketSettingItem(context = context)
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 机器人看板显示开关
+            BotBoardSettingItem(context = context)
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 菜单按钮栏显示开关
+            MenuButtonsSettingItem(context = context)
         }
     }
 }
@@ -757,6 +767,138 @@ private fun DataSaverSettingItem(
                 onCheckedChange = { checked ->
                     dataSaver = checked
                     prefs.edit().putBoolean("data_saver", checked).apply()
+                }
+            )
+        }
+    }
+}
+
+/**
+ * 机器人看板显示设置项
+ */
+@Composable
+private fun BotBoardSettingItem(
+    context: Context,
+    modifier: Modifier = Modifier
+) {
+    val prefs = remember { 
+        context.getSharedPreferences("chat_settings", Context.MODE_PRIVATE) 
+    }
+    
+    var showBotBoard by remember { 
+        mutableStateOf(prefs.getBoolean("show_bot_board", true)) 
+    }
+    
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Dashboard,
+                contentDescription = "机器人看板",
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "显示机器人看板",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (showBotBoard) "在聊天界面显示群聊机器人看板和单机器人看板" else "隐藏所有机器人看板",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            Switch(
+                checked = showBotBoard,
+                onCheckedChange = { checked ->
+                    showBotBoard = checked
+                    prefs.edit().putBoolean("show_bot_board", checked).apply()
+                }
+            )
+        }
+    }
+}
+
+/**
+ * 菜单按钮栏显示设置项
+ */
+@Composable
+private fun MenuButtonsSettingItem(
+    context: Context,
+    modifier: Modifier = Modifier
+) {
+    val prefs = remember { 
+        context.getSharedPreferences("chat_settings", Context.MODE_PRIVATE) 
+    }
+    
+    var showMenuButtons by remember { 
+        mutableStateOf(prefs.getBoolean("show_menu_buttons", true)) 
+    }
+    
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Apps,
+                contentDescription = "菜单按钮栏",
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "显示菜单按钮栏",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (showMenuButtons) "在聊天输入框上方显示菜单按钮栏" else "隐藏菜单按钮栏",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            Switch(
+                checked = showMenuButtons,
+                onCheckedChange = { checked ->
+                    showMenuButtons = checked
+                    prefs.edit().putBoolean("show_menu_buttons", checked).apply()
                 }
             )
         }

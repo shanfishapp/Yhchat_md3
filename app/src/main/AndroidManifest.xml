@@ -46,6 +46,11 @@
             android:label="群聊信息"
             android:theme="@style/Theme.YhchatCanary" />
         <activity
+            android:name=".ui.create.CreateActivity"
+            android:exported="false"
+            android:label="创建"
+            android:theme="@style/Theme.YhchatCanary" />
+        <activity
             android:name=".ui.group.GroupSettingsActivity"
             android:exported="false"
             android:label="群聊设置"
@@ -62,6 +67,13 @@
             android:exported="false"
             android:label="标签详情"
             android:theme="@style/Theme.YhchatCanary" />
+        
+        <activity
+            android:name=".ui.group.GroupBotManagementActivity"
+            android:exported="false"
+            android:label="机器人管理"
+            android:theme="@style/Theme.YhchatCanary" />
+        
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -152,6 +164,13 @@
             android:name=".ui.profile.UserProfileActivity"
             android:exported="false"
             android:label="用户资料"
+            android:theme="@style/Theme.YhchatCanary" />
+        
+        <!-- 用户详情 Activity -->
+        <activity
+            android:name=".ui.user.UserDetailActivity"
+            android:exported="false"
+            android:label="用户详情"
             android:theme="@style/Theme.YhchatCanary" />
         
         <!-- 表情包详情 -->

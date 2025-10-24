@@ -190,6 +190,22 @@ fun GroupInfoScreenRoot(
             )
         }
     }
+    
+    // 显示成功消息
+    LaunchedEffect(uiState.successMessage) {
+        uiState.successMessage?.let { message ->
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.clearSuccessMessage()
+        }
+    }
+    
+    // 显示错误消息
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let { error ->
+            android.widget.Toast.makeText(context, error, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.clearError()
+        }
+    }
 }
 
 @Composable
