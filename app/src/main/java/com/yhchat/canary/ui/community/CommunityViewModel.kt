@@ -109,7 +109,7 @@ class CommunityViewModel @Inject constructor(
     }
     
     /**
-     * 加载我的文章列表
+     * 加载我的文章列表（一次性加载全部）
      */
     fun loadMyPostList(token: String, page: Int = 1, isRefresh: Boolean = false) {
         viewModelScope.launch {
@@ -121,7 +121,7 @@ class CommunityViewModel @Inject constructor(
             
             communityRepository.getMyPostList(
                 token = token,
-                size = 20,
+                size = 9000,  // 一次性加载所有文章
                 page = page
             ).fold(
                 onSuccess = { response ->
@@ -130,8 +130,7 @@ class CommunityViewModel @Inject constructor(
                         isRefreshing = false,
                         posts = response.data.posts,
                         total = response.data.total,
-                        currentPage = page,
-                        hasMore = page * 20 < response.data.total
+                        currentPage = page
                     )
                 },
                 onFailure = { error ->
@@ -143,16 +142,6 @@ class CommunityViewModel @Inject constructor(
                 }
             )
         }
-    }
-    
-    /**
-     * 加载更多我的文章
-     */
-    fun loadMoreMyPosts(token: String) {
-        val currentState = _myPostListState.value
-        if (currentState.isLoading || !currentState.hasMore) return
-        
-        loadMyPostList(token, currentState.currentPage + 1)
     }
     
     
@@ -512,6 +501,5 @@ data class MyPostListState(
     val posts: List<CommunityPost> = emptyList(),
     val total: Int = 0,
     val currentPage: Int = 1,
-    val hasMore: Boolean = false,
     val error: String? = null
 )

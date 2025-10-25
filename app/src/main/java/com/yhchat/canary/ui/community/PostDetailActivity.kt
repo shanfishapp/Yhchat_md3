@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.filled.Favorite
@@ -69,6 +70,11 @@ import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import com.yhchat.canary.ui.components.ImageViewer
 import com.yhchat.canary.ui.components.MarkdownText
+import com.yhchat.canary.ui.components.ImageUtils
+import com.yhchat.canary.data.model.CommunityBoard
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import android.content.Intent
 
 /**
  * 文章详情Activity
@@ -119,6 +125,8 @@ class PostDetailActivity : ComponentActivity() {
 @Composable
 fun PostContentCard(
     post: CommunityPost,
+    board: CommunityBoard? = null,
+    token: String = "",
     onLikeClick: () -> Unit,
     onCollectClick: () -> Unit,
     onCommentClick: () -> Unit = {},
@@ -258,8 +266,72 @@ fun PostContentCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
+        }
+        
+        // 分区信息卡片
+        board?.let { boardInfo ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        // 跳转到分区详情页
+                        val intent = Intent(context, BoardDetailActivity::class.java).apply {
+                            putExtra("board_id", boardInfo.id)
+                            putExtra("board_name", boardInfo.name)
+                            putExtra("token", token)
+                        }
+                        context.startActivity(intent)
+                    },
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AsyncImage(
+                        model = ImageUtils.createBoardImageRequest(
+                            context = context,
+                            url = boardInfo.avatar
+                        ),
+                        contentDescription = boardInfo.name,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(6.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = boardInfo.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "${boardInfo.memberNum} 成员 · ${boardInfo.postNum} 文章",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    
+                    Icon(
+                        imageVector = Icons.Default.ArrowForward,
+                        contentDescription = "进入分区",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
         }
         
         // 操作按钮 - 使用MD3图标
@@ -908,10 +980,15 @@ fun PostDetailScreen(
     // 分享对话框状态
     var showShareDialog by remember { mutableStateOf(false) }
     
+    // Token状态
+    var currentToken by remember { mutableStateOf("") }
+    
     // 加载数据
     LaunchedEffect(postId) {
         if (postId > 0) {
             viewModel.loadPostDetailWithToken(postId)
+            // 获取token
+            currentToken = viewModel.getTokenAsync()
         }
     }
     
@@ -1006,6 +1083,8 @@ fun PostDetailScreen(
                             item {
                                 PostContentCard(
                                     post = post,
+                                    board = postDetailState.board,
+                                    token = currentToken,
                                     onLikeClick = {
                                         viewModel.likePostWithToken(postId)
                                     },

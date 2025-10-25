@@ -33,7 +33,6 @@ import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import android.os.Build
 
-
 /**
  * Markdown文本渲染组件
  * 支持Material Design 3主题，背景透明以适配消息气泡

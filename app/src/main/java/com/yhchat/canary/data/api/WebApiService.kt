@@ -41,4 +41,13 @@ interface WebApiService {
         @Header("token") token: String,
         @Header("Referer") referer: String = "https://www.yhchat.com/"
     ): Response<MyBotListResponse>
+    
+    /**
+     * 恢复机器人订阅链接
+     */
+    @POST("v1/bot/bot-link-reset")
+    suspend fun resetBotLink(
+        @Header("token") token: String,
+        @Body request: Map<String, String>
+    ): Response<BaseResponse>
 }

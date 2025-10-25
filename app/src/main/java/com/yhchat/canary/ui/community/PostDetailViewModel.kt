@@ -355,6 +355,13 @@ class PostDetailViewModel @Inject constructor(
         _postDetailState.value = _postDetailState.value.copy(error = null)
         _commentListState.value = _commentListState.value.copy(error = null)
     }
+    
+    /**
+     * 异步获取当前token
+     */
+    suspend fun getTokenAsync(): String {
+        return tokenRepository.getTokenSync() ?: ""
+    }
 }
 
 /**

@@ -444,6 +444,15 @@ interface ApiService {
     ): Response<ProductDetailResponse>
     
     /**
+     * 购买商品
+     */
+    @POST("v1/coin/shop/order-create")
+    suspend fun purchaseProduct(
+        @Header("token") token: String,
+        @Body request: PurchaseProductRequest
+    ): Response<PurchaseProductResponse>
+    
+    /**
      * 获取金币增减记录
      */
     @POST("v1/user/gold-coin-increase-decrease-record")

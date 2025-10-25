@@ -128,7 +128,7 @@ fun CoinShopScreen(
                         ProductCard(
                             product = product,
                             onClick = {
-                                Toast.makeText(context, "商品详情功能待实现", Toast.LENGTH_SHORT).show()
+                                ProductDetailActivity.start(context, product.id.toInt())
                             }
                         )
                     }

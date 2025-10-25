@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -34,6 +35,7 @@ import com.yhchat.canary.R
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import com.yhchat.canary.utils.UnifiedLinkHandler
 import com.yhchat.canary.ui.components.ImageViewer
+import com.yhchat.canary.ui.chat.ChatActivity
 
 /**
  * 应用详情 Activity
@@ -42,7 +44,7 @@ class AppInfoActivity : ComponentActivity() {
     
     companion object {
         // 应用版本信息（开发者可以在这里修改）
-        const val APP_VERSION = "Canary 19.6"
+        const val APP_VERSION = "Canary 19.7"
         const val APP_NAME = "Yhchat Canary"
         const val DEVELOPER_NAME_1 = "Kauid323"
         const val DEVELOPER_NAME_2 = "那狗吧"
@@ -103,7 +105,7 @@ class AppInfoActivity : ComponentActivity() {
 /**
  * 应用详情界面
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun AppInfoScreen(
     onBack: () -> Unit,
@@ -112,6 +114,8 @@ private fun AppInfoScreen(
 ) {
     var showImageViewer by remember { mutableStateOf(false) }
     var currentImageUrl by remember { mutableStateOf("") }
+    var showChatDebugDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     
     Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
@@ -143,7 +147,7 @@ private fun AppInfoScreen(
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 应用图标
+            // 应用图标（支持长按打开调试对话框）
             AsyncImage(
                 model = coil.request.ImageRequest.Builder(LocalContext.current)
                     .data(R.mipmap.ic_launcher)
@@ -153,9 +157,15 @@ private fun AppInfoScreen(
                 modifier = Modifier
                     .size(120.dp)
                     .clip(CircleShape)
-                    .clickable {
-                        // 应用图标暂不支持预览（是mipmap资源）
-                    },
+                    .combinedClickable(
+                        onClick = {
+                            // 短按不做任何事
+                        },
+                        onLongClick = {
+                            // 长按打开调试对话框
+                            showChatDebugDialog = true
+                        }
+                    ),
                 contentScale = ContentScale.Crop
             )
             
@@ -234,7 +244,124 @@ private fun AppInfoScreen(
             )
         }
     }
+    
+    // 聊天调试对话框
+    if (showChatDebugDialog) {
+        ChatDebugDialog(
+            onDismiss = { showChatDebugDialog = false },
+            onConfirm = { chatId, chatType ->
+                // 跳转到聊天界面
+                val intent = Intent(context, ChatActivity::class.java).apply {
+                    putExtra("chatId", chatId)
+                    putExtra("chatType", chatType)
+                }
+                context.startActivity(intent)
+                showChatDebugDialog = false
+            }
+        )
     }
+    }
+}
+
+/**
+ * 聊天调试对话框
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChatDebugDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String, Int) -> Unit
+) {
+    var chatId by remember { mutableStateOf("") }
+    var chatTypeText by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf("") }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "调试：跳转到会话",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 会话ID输入框
+                OutlinedTextField(
+                    value = chatId,
+                    onValueChange = { 
+                        chatId = it
+                        errorMessage = ""
+                    },
+                    label = { Text("会话ID") },
+                    placeholder = { Text("例如: 123456") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                
+                // 会话类型输入框
+                OutlinedTextField(
+                    value = chatTypeText,
+                    onValueChange = { 
+                        chatTypeText = it
+                        errorMessage = ""
+                    },
+                    label = { Text("会话类型") },
+                    placeholder = { Text("1-user, 2-group, 3-bot") },
+                    supportingText = {
+                        Text(
+                            text = "1 = 用户私聊\n2 = 群聊\n3 = 机器人",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                
+                // 错误提示
+                if (errorMessage.isNotEmpty()) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    // 验证输入
+                    if (chatId.isBlank()) {
+                        errorMessage = "请输入会话ID"
+                        return@TextButton
+                    }
+                    
+                    val chatType = chatTypeText.toIntOrNull()
+                    if (chatType == null || chatType !in 1..3) {
+                        errorMessage = "会话类型必须是 1、2 或 3"
+                        return@TextButton
+                    }
+                    
+                    // 调用确认回调
+                    onConfirm(chatId, chatType)
+                },
+                enabled = chatId.isNotBlank() && chatTypeText.isNotBlank()
+            ) {
+                Text("确定")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }
 
 /**

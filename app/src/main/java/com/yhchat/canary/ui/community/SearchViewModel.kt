@@ -48,7 +48,7 @@ class SearchViewModel(
                     keyword = keyword,
                     typ = 3, // 根据API文档，typ为3
                     page = 1,
-                    size = 50
+                    size = 100
                 )
                 
                 if (response.code == 1) {

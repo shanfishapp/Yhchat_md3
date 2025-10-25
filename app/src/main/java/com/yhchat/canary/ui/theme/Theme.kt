@@ -66,16 +66,33 @@ fun YhchatCanaryTheme(
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
-    val prefs = context.getSharedPreferences("display_settings", android.content.Context.MODE_PRIVATE)
-    val globalScale = prefs.getFloat("global_scale", 1.0f)
-    val colorScheme = when {
+    val displayPrefs = context.getSharedPreferences("display_settings", android.content.Context.MODE_PRIVATE)
+    val themePrefs = context.getSharedPreferences("theme_settings", android.content.Context.MODE_PRIVATE)
+    val globalScale = displayPrefs.getFloat("global_scale", 1.0f)
+    
+    // 读取自定义主题颜色设置
+    val customColorInt = themePrefs.getInt("custom_primary_color", -1)
+    val useCustomColor = customColorInt != -1 && customColorInt != 0xFF6200EE.toInt()
+    val customPrimaryColor = if (useCustomColor) Color(customColorInt) else null
+    
+    // 选择配色方案
+    val baseColorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
+    }
+    
+    // 应用自定义主题色（如果设置了）
+    val colorScheme = if (customPrimaryColor != null) {
+        baseColorScheme.copy(
+            primary = customPrimaryColor,
+            primaryContainer = customPrimaryColor.copy(alpha = 0.3f),
+            onPrimaryContainer = if (darkTheme) customPrimaryColor.copy(alpha = 0.9f) else customPrimaryColor
+        )
+    } else {
+        baseColorScheme
     }
 
     val baseDensity = LocalDensity.current

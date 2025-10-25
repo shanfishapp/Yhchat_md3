@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshotFlow
@@ -61,6 +62,10 @@ fun CommunityTabScreen(
     val pagerState = rememberPagerState { 3 }
     var selectedTab by remember { mutableStateOf(0) }
     
+    // 搜索状态（仅用于"我的文章"标签）
+    var isSearching by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    
     // 标签页标题
     val tabTitles = listOf("分区列表", "关注分区", "我的文章")
     
@@ -81,19 +86,61 @@ fun CommunityTabScreen(
         }
     }
     
+    // 重置搜索状态当切换标签时
+    LaunchedEffect(selectedTab) {
+        if (selectedTab != 2) {
+            isSearching = false
+            searchQuery = ""
+        }
+    }
+    
     Column(
         modifier = modifier.fillMaxSize()
     ) {
         // 顶部应用栏
         TopAppBar(
             title = {
-                Text(
-                    text = "社区",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
+                if (isSearching && selectedTab == 2) {
+                    // 搜索模式：显示搜索输入框
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("搜索我的文章...") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                        )
+                    )
+                } else {
+                    Text(
+                        text = "社区",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             },
             actions = {
+                // 如果是"我的文章"标签，显示搜索我的文章按钮
+                if (selectedTab == 2) {
+                    IconButton(onClick = {
+                        if (isSearching) {
+                            // 退出搜索模式
+                            isSearching = false
+                            searchQuery = ""
+                        } else {
+                            // 进入搜索模式
+                            isSearching = true
+                        }
+                    }) {
+                        Icon(
+                            imageVector = if (isSearching) Icons.Default.Close else Icons.Default.Search,
+                            contentDescription = if (isSearching) "关闭搜索" else "搜索我的文章"
+                        )
+                    }
+                }
+                // 全局搜索按钮
                 IconButton(onClick = {
                     // 跳转到搜索Activity
                     val intent = Intent(context, SearchActivity::class.java).apply {
@@ -103,7 +150,7 @@ fun CommunityTabScreen(
                 }) {
                     Icon(
                         imageVector = Icons.Default.Search,
-                        contentDescription = "搜索"
+                        contentDescription = "全局搜索"
                     )
                 }
             }
@@ -156,9 +203,6 @@ fun CommunityTabScreen(
             state = pagerState,
             modifier = Modifier.fillMaxSize()
         ) { 
-            
-            
-            
             page ->
             when (page) {
                 0 -> {
@@ -210,16 +254,29 @@ fun CommunityTabScreen(
                 2 -> {
                     // 我的文章
                     val swipeRefreshState = rememberSwipeRefreshState(myPostListState.isRefreshing)
+                    
+                    // 本地过滤文章列表
+                    val filteredPosts = remember(myPostListState.posts, searchQuery) {
+                        if (searchQuery.isBlank()) {
+                            myPostListState.posts
+                        } else {
+                            myPostListState.posts.filter { post ->
+                                post.title.contains(searchQuery, ignoreCase = true) ||
+                                post.content.contains(searchQuery, ignoreCase = true)
+                            }
+                        }
+                    }
+                    
                     SwipeRefresh(
                         state = swipeRefreshState,
                         onRefresh = { viewModel.refreshMyPostList(token) }
                     ) {
                         MyPostListContent(
-                            posts = myPostListState.posts,
+                            posts = filteredPosts,
                             isLoading = myPostListState.isLoading,
                             error = myPostListState.error,
-                            hasMore = myPostListState.hasMore,
                             scrollBehavior = scrollBehavior,
+                            searchQuery = searchQuery,
                             onPostClick = { post ->
                                 // 跳转到文章详情
                                 val intent = Intent(context, PostDetailActivity::class.java).apply {
@@ -228,9 +285,6 @@ fun CommunityTabScreen(
                                     putExtra("token", token)
                                 }
                                 context.startActivity(intent)
-                            },
-                            onLoadMore = {
-                                viewModel.loadMoreMyPosts(token)
                             },
                             onDeletePost = { postId ->
                                 viewModel.deletePost(token, postId)
@@ -344,13 +398,12 @@ fun MyPostListContent(
     posts: List<CommunityPost>,
     isLoading: Boolean,
     error: String?,
-    hasMore: Boolean,
     onPostClick: (CommunityPost) -> Unit,
-    onLoadMore: () -> Unit,
     onDeletePost: (Int) -> Unit,
     context: android.content.Context,
     token: String,
     scrollBehavior: ScrollBehavior? = null,
+    searchQuery: String = "",
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -391,47 +444,25 @@ fun MyPostListContent(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(posts) { post ->
-                            MyPostItem(
-                                post = post,
-                                onClick = { onPostClick(post) },
-                                onEdit = { 
-                                    // 跳转到编辑文章Activity
-                                    val intent = Intent(
-                                        context, EditPostActivity::class.java).apply {
-                                        putExtra("post_id", post.id)
-                                        putExtra("token", token)
-                                        putExtra("original_title", post.title)
-                                        putExtra("original_content", post.content)
-                                        putExtra("content_type", post.contentType)
-                                    }
-                                    context.startActivity(intent)
-                                },
-                                onDelete = {
-                                    onDeletePost(post.id)
-                                }
-                            )
-            }
-            
-            // 加载更多按钮
-            if (posts.isNotEmpty() && hasMore) {
-                item {
-                    Button(
-                        onClick = onLoadMore,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 16.dp),
-                        enabled = !isLoading
-                    ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
+                MyPostItem(
+                    post = post,
+                    onClick = { onPostClick(post) },
+                    onEdit = { 
+                        // 跳转到编辑文章Activity
+                        val intent = Intent(
+                            context, EditPostActivity::class.java).apply {
+                            putExtra("post_id", post.id)
+                            putExtra("token", token)
+                            putExtra("original_title", post.title)
+                            putExtra("original_content", post.content)
+                            putExtra("content_type", post.contentType)
                         }
-                        Text(if (isLoading) "加载中..." else "加载更多")
+                        context.startActivity(intent)
+                    },
+                    onDelete = {
+                        onDeletePost(post.id)
                     }
-                }
+                )
             }
             
             // 空状态
@@ -444,7 +475,7 @@ fun MyPostListContent(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "暂无文章",
+                            text = if (searchQuery.isNotBlank()) "未找到匹配的文章" else "暂无文章",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

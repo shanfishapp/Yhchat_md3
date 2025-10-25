@@ -128,6 +128,41 @@ class CoinRepository @Inject constructor(
     }
     
     /**
+     * 购买商品
+     */
+    suspend fun purchaseProduct(productId: Int, price: Int): Result<Int> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val token = tokenRepository.getTokenSync()
+            if (token.isNullOrEmpty()) {
+                Log.e(TAG, "Token为空")
+                return@withContext Result.failure(Exception("未登录"))
+            }
+
+            val request = PurchaseProductRequest(productId = productId, price = price)
+            val response = apiService.purchaseProduct(token, request)
+            
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null && body.code == 1) {
+                    Log.d(TAG, "✅ 购买商品成功: 订单ID=${body.data.id}")
+                    Result.success(body.data.id)
+                } else {
+                    val error = body?.msg ?: "购买失败"
+                    Log.e(TAG, error)
+                    Result.failure(Exception(error))
+                }
+            } else {
+                val error = "购买失败: ${response.code()}"
+                Log.e(TAG, error)
+                Result.failure(Exception(error))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ 购买商品异常", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
      * 获取金币增减记录
      */
     suspend fun getCoinIncreaseDecreaseRecord(

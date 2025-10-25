@@ -16,14 +16,15 @@ android {
         minSdk = 21
         targetSdk = 36
         versionCode = 1
-        versionName = "19.6"
+        versionName = "19.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -101,9 +102,6 @@ dependencies {
     
     // HTML 文本渲染支持
     implementation("androidx.compose.ui:ui-text-google-fonts")
-    
-    // WebSocket - 暂时注释掉，使用OkHttp WebSocket
-    // implementation(libs.websocket)
     
     // Protobuf - 只使用Lite版本避免冲突
     implementation("com.google.protobuf:protobuf-javalite:4.28.3")

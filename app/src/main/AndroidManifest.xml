@@ -264,6 +264,12 @@
             android:exported="false"
             android:label="金币明细"
             android:theme="@style/Theme.YhchatCanary" />
+
+        <activity
+            android:name=".ui.coin.ProductDetailActivity"
+            android:exported="false"
+            android:label="商品详情"
+            android:theme="@style/Theme.YhchatCanary" />
             
         <!-- 聊天背景设置 Activity -->
         <activity

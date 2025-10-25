@@ -2,14 +2,21 @@ package com.yhchat.canary.ui.settings
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -129,23 +136,7 @@ fun SettingsScreen(
             
             // 个性化设置
             item {
-                SettingsCard(
-                    title = "个性化",
-                    items = listOf(
-                        SettingsItem(
-                            icon = Icons.Default.Wallpaper,
-                            title = "聊天背景",
-                            subtitle = "设置全局聊天背景",
-                            onClick = {
-                                com.yhchat.canary.ui.background.ChatBackgroundActivity.start(
-                                    context,
-                                    "all",  // 设置全局背景
-                                    "全局"
-                                )
-                            }
-                        )
-                    )
-                )
+                PersonalizationSettingsCard(context = context)
             }
             
             // 关于应用
@@ -903,4 +894,410 @@ private fun MenuButtonsSettingItem(
             )
         }
     }
+}
+
+/**
+ * 个性化设置卡片
+ */
+@Composable
+private fun PersonalizationSettingsCard(
+    context: Context,
+    modifier: Modifier = Modifier
+) {
+    var showColorPickerDialog by remember { mutableStateOf(false) }
+    
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "个性化",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            
+            // 聊天背景设置
+            Card(
+                onClick = {
+                    com.yhchat.canary.ui.background.ChatBackgroundActivity.start(
+                        context,
+                        "all",
+                        "全局"
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Wallpaper,
+                        contentDescription = "聊天背景",
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    
+                    Spacer(modifier = Modifier.width(16.dp))
+                    
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "聊天背景",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "设置全局聊天背景",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    
+                    Icon(
+                        imageVector = Icons.Default.ArrowForward,
+                        contentDescription = "前往",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // 主题颜色设置
+            ThemeColorSettingItem(
+                context = context,
+                onColorPickerClick = { showColorPickerDialog = true }
+            )
+        }
+    }
+    
+    // 颜色选择对话框
+    if (showColorPickerDialog) {
+        ColorPickerDialog(
+            context = context,
+            onDismiss = { showColorPickerDialog = false }
+        )
+    }
+}
+
+/**
+ * 主题颜色设置项
+ */
+@Composable
+private fun ThemeColorSettingItem(
+    context: Context,
+    onColorPickerClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val prefs = remember { 
+        context.getSharedPreferences("theme_settings", Context.MODE_PRIVATE) 
+    }
+    
+    val currentColorInt = prefs.getInt("custom_primary_color", 0xFF6200EE.toInt())
+    val currentColor = Color(currentColorInt)
+    val isCustomColor = currentColorInt != 0xFF6200EE.toInt()
+    
+    Card(
+        onClick = onColorPickerClick,
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Palette,
+                contentDescription = "主题颜色",
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "主题颜色",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (isCustomColor) {
+                        "已自定义（会覆盖莫奈取色，需重启生效）"
+                    } else {
+                        "使用默认配色或莫奈取色（Android 12+）"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            // 当前颜色预览
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(currentColor)
+                    .border(2.dp, MaterialTheme.colorScheme.outline, CircleShape)
+            )
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = "编辑",
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/**
+ * 颜色选择对话框
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ColorPickerDialog(
+    context: Context,
+    onDismiss: () -> Unit
+) {
+    val prefs = remember { 
+        context.getSharedPreferences("theme_settings", Context.MODE_PRIVATE) 
+    }
+    
+    val currentColorInt = prefs.getInt("custom_primary_color", 0xFF6200EE.toInt())
+    var selectedColor by remember { mutableStateOf(Color(currentColorInt)) }
+    var colorInput by remember { 
+        mutableStateOf(String.format("#%06X", currentColorInt and 0xFFFFFF)) 
+    }
+    var errorMessage by remember { mutableStateOf("") }
+    
+    // 预设颜色
+    val presetColors = listOf(
+        Color(0xFF6200EE), // 默认紫色
+        Color(0xFFFF5722), // 橙红色
+        Color(0xFFF44336), // 红色
+        Color(0xFFE91E63), // 粉色
+        Color(0xFF9C27B0), // 紫色
+        Color(0xFF673AB7), // 深紫色
+        Color(0xFF3F51B5), // 靛蓝色
+        Color(0xFF2196F3), // 蓝色
+        Color(0xFF03A9F4), // 浅蓝色
+        Color(0xFF00BCD4), // 青色
+        Color(0xFF009688), // 蓝绿色
+        Color(0xFF4CAF50), // 绿色
+        Color(0xFF8BC34A), // 浅绿色
+        Color(0xFFCDDC39), // 黄绿色
+        Color(0xFFFFEB3B), // 黄色
+        Color(0xFFFFC107), // 琥珀色
+        Color(0xFFFF9800), // 橙色
+        Color(0xFF795548), // 棕色
+        Color(0xFF607D8B), // 蓝灰色
+        Color(0xFF000000)  // 黑色
+    )
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "自定义主题颜色",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 500.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 颜色预览
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(selectedColor)
+                            .border(3.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                    )
+                    
+                    Spacer(modifier = Modifier.width(16.dp))
+                    
+                    Column {
+                        Text(
+                            text = "当前颜色",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = colorInput,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
+                // 颜色输入框
+                OutlinedTextField(
+                    value = colorInput,
+                    onValueChange = { input ->
+                        colorInput = input.uppercase()
+                        errorMessage = ""
+                        
+                        // 验证并解析颜色
+                        if (input.matches(Regex("^#[0-9A-Fa-f]{6}$"))) {
+                            try {
+                                val colorInt = android.graphics.Color.parseColor(input)
+                                selectedColor = Color(colorInt)
+                            } catch (e: Exception) {
+                                errorMessage = "无效的颜色值"
+                            }
+                        } else if (input.isNotEmpty() && !input.startsWith("#")) {
+                            errorMessage = "颜色值必须以 # 开头"
+                        } else if (input.length > 7) {
+                            errorMessage = "颜色值格式: #RRGGBB (6位十六进制)"
+                        }
+                    },
+                    label = { Text("颜色值") },
+                    placeholder = { Text("#6200EE") },
+                    supportingText = {
+                        if (errorMessage.isNotEmpty()) {
+                            Text(
+                                text = errorMessage,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        } else {
+                            Text("格式: #RRGGBB (例如 #6200EE)")
+                        }
+                    },
+                    isError = errorMessage.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Tag,
+                            contentDescription = "颜色值"
+                        )
+                    }
+                )
+                
+                // 预设颜色选择器
+                Text(
+                    text = "快速选择",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                // 颜色网格
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    presetColors.chunked(5).forEach { rowColors ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowColors.forEach { color ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape)
+                                        .background(color)
+                                        .border(
+                                            width = if (color == selectedColor) 3.dp else 1.dp,
+                                            color = if (color == selectedColor) 
+                                                MaterialTheme.colorScheme.primary 
+                                            else 
+                                                MaterialTheme.colorScheme.outline,
+                                            shape = CircleShape
+                                        )
+                                        .clickable {
+                                            selectedColor = color
+                                            colorInput = String.format("#%06X", color.toArgb() and 0xFFFFFF)
+                                            errorMessage = ""
+                                        }
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // 重置按钮
+                TextButton(
+                    onClick = {
+                        selectedColor = Color(0xFF6200EE)
+                        colorInput = "#6200EE"
+                        errorMessage = ""
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "重置",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("重置为默认颜色")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    // 保存颜色
+                    if (colorInput.matches(Regex("^#[0-9A-Fa-f]{6}$"))) {
+                        val colorInt = android.graphics.Color.parseColor(colorInput)
+                        prefs.edit().putInt("custom_primary_color", colorInt).apply()
+                        android.widget.Toast.makeText(
+                            context,
+                            "主题颜色已保存，重启应用后生效",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                        onDismiss()
+                    } else {
+                        errorMessage = "请输入有效的颜色值"
+                    }
+                },
+                enabled = colorInput.matches(Regex("^#[0-9A-Fa-f]{6}$"))
+            ) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }

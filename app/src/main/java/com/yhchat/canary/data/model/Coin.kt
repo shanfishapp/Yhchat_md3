@@ -352,3 +352,32 @@ data class RewardComment(
     val createTimeText: String
 )
 
+/**
+ * 购买商品请求
+ */
+data class PurchaseProductRequest(
+    @SerializedName("productId")
+    val productId: Int,
+    
+    @SerializedName("price")
+    val price: Int
+)
+
+/**
+ * 购买商品响应
+ */
+data class PurchaseProductResponse(
+    @SerializedName("code")
+    val code: Int,
+    
+    @SerializedName("data")
+    val data: PurchaseProductData,
+    
+    @SerializedName("msg")
+    val msg: String
+)
+
+data class PurchaseProductData(
+    @SerializedName("id")
+    val id: Int  // 订单ID
+)

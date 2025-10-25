@@ -23,6 +23,7 @@ import com.yhchat.canary.data.model.BotEventEditRequest
 import com.yhchat.canary.data.model.BotIdRequest
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import kotlinx.coroutines.launch
+import android.widget.Toast
 
 class BotSettingsActivity : ComponentActivity() {
     companion object {
@@ -72,10 +73,12 @@ private fun BotSettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val api = remember { ApiClient.apiService }
+    val webApi = remember { ApiClient.webApiService }
     val tokenRepo = remember { RepositoryFactory.getTokenRepository(context) }
 
     var token by remember { mutableStateOf(initialBotToken) }
     var isLoading by remember { mutableStateOf(false) }
+    var isResettingLink by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
     // 事件订阅开关
@@ -226,6 +229,75 @@ private fun BotSettingsScreen(
                             Icon(imageVector = Icons.Default.Refresh, contentDescription = null)
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("重置")
+                        }
+                    }
+                }
+            }
+            
+            // 恢复订阅链接按钮
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "订阅链接管理",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    Text(
+                        text = "如果机器人订阅链接失效，可以使用此功能恢复",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                val userToken = tokenRepo.getTokenSync() ?: return@launch
+                                isResettingLink = true
+                                error = null
+                                runCatching {
+                                    webApi.resetBotLink(
+                                        token = userToken,
+                                        request = mapOf("botId" to botId)
+                                    )
+                                }.onSuccess { resp ->
+                                    isResettingLink = false
+                                    if (resp.body()?.code == 1) {
+                                        Toast.makeText(context, "订阅链接已恢复", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        val errorMsg = resp.body()?.message ?: "恢复失败"
+                                        error = errorMsg
+                                        Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                                    }
+                                }.onFailure { e ->
+                                    isResettingLink = false
+                                    error = e.message
+                                    Toast.makeText(context, "恢复失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isResettingLink && !isLoading
+                    ) {
+                        if (isResettingLink) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("恢复中...")
+                        } else {
+                            Text("恢复订阅链接")
                         }
                     }
                 }
