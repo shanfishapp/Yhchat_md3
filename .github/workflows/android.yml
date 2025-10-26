@@ -44,13 +44,13 @@ jobs:
       # 设置Java运行环境(temurin是开源jdk)，可以设置为: 1.8
       - uses: actions/setup-java@v3
         with:
-          distribution: temurin
-          java-version: 17
+          distribution: zulu
+          java-version: 21
 
       # 设置gradle环境(比如: 6.5)、打包命令
       - uses: gradle/gradle-build-action@v2
         with:
-          gradle-version: 8.13
+          gradle-version: 8.14.3
           
       - name: Permission
         run: chmod +x ./gradlew
