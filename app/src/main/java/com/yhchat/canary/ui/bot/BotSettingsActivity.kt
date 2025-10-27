@@ -24,6 +24,8 @@ import com.yhchat.canary.data.model.BotIdRequest
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import kotlinx.coroutines.launch
 import android.widget.Toast
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 
 class BotSettingsActivity : ComponentActivity() {
     companion object {
@@ -77,8 +79,10 @@ private fun BotSettingsScreen(
     val tokenRepo = remember { RepositoryFactory.getTokenRepository(context) }
 
     var token by remember { mutableStateOf(initialBotToken) }
+    var webhookUrl by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var isResettingLink by remember { mutableStateOf(false) }
+    var isSavingWebhook by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
     // 事件订阅开关
@@ -116,8 +120,19 @@ private fun BotSettingsScreen(
                 onSuccess = { bots ->
                     val found = bots.firstOrNull { it.botId == botId }
                     token = found?.token ?: ""
+                    webhookUrl = found?.link ?: ""
                 },
                 onFailure = { /* 忽略错误，保持空token */ }
+            )
+        } else {
+            // 如果已有token，也尝试获取webhook地址
+            val botRepo = RepositoryFactory.getBotRepository(context)
+            botRepo.getMyBotList().fold(
+                onSuccess = { bots ->
+                    val found = bots.firstOrNull { it.botId == botId }
+                    webhookUrl = found?.link ?: ""
+                },
+                onFailure = { /* 忽略错误 */ }
             )
         }
         // 2 拉取事件订阅设置（初次进入）
@@ -229,6 +244,90 @@ private fun BotSettingsScreen(
                             Icon(imageVector = Icons.Default.Refresh, contentDescription = null)
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("重置")
+                        }
+                    }
+                }
+            }
+            
+            // Webhook 订阅地址区域
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "Webhook 订阅地址",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    Text(
+                        text = "机器人接收消息事件的回调地址",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = webhookUrl,
+                            onValueChange = { webhookUrl = it },
+                            modifier = Modifier.weight(1f),
+                            placeholder = { Text("http(s)://ip(域名)...") },
+                            singleLine = true,
+                            enabled = !isSavingWebhook && !isLoading
+                        )
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    val userToken = tokenRepo.getTokenSync() ?: return@launch
+                                    isSavingWebhook = true
+                                    error = null
+                                    runCatching { 
+                                        api.editBotSubscribedLink(
+                                            userToken, 
+                                            com.yhchat.canary.data.api.EditBotSubscribedLinkRequest(
+                                                botId = botId,
+                                                link = webhookUrl
+                                            )
+                                        )
+                                    }.onSuccess { resp ->
+                                        isSavingWebhook = false
+                                        if (resp.body()?.code == 1) {
+                                            Toast.makeText(context, "Webhook地址保存成功", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            error = resp.body()?.message ?: "保存失败"
+                                        }
+                                    }.onFailure { e ->
+                                        isSavingWebhook = false
+                                        error = e.message
+                                    }
+                                }
+                            },
+                            enabled = !isSavingWebhook && !isLoading
+                        ) {
+                            if (isSavingWebhook) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("保存中...")
+                            } else {
+                                Text("保存")
+                            }
                         }
                     }
                 }

@@ -1,6 +1,7 @@
 package com.yhchat.canary.utils
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
@@ -36,7 +37,52 @@ object ImageUploadUtil {
         .build()
     
     /**
-     * 上传图片到七牛云
+     * 压缩图片为WebP格式
+     * @param context 上下文
+     * @param imageUri 原始图片URI
+     * @param quality 压缩质量 (0-100)
+     * @return 压缩后的字节数组
+     */
+    private suspend fun compressToWebP(
+        context: Context,
+        imageUri: Uri,
+        quality: Int = 95
+    ): ByteArray = withContext(Dispatchers.IO) {
+        Log.d(TAG, "🗜️ 开始压缩图片为WebP格式，质量: $quality%")
+        
+        // 读取原始图片
+        val inputStream = context.contentResolver.openInputStream(imageUri)
+            ?: throw Exception("无法读取图片")
+        
+        val originalBitmap = BitmapFactory.decodeStream(inputStream)
+        inputStream.close()
+        
+        if (originalBitmap == null) {
+            throw Exception("无法解码图片")
+        }
+        
+        Log.d(TAG, "✅ 原始图片尺寸: ${originalBitmap.width}x${originalBitmap.height}")
+        
+        // 压缩为WebP格式
+        val outputStream = java.io.ByteArrayOutputStream()
+        val success = originalBitmap.compress(Bitmap.CompressFormat.WEBP, quality, outputStream)
+        
+        if (!success) {
+            originalBitmap.recycle()
+            throw Exception("WebP压缩失败")
+        }
+        
+        val compressedBytes = outputStream.toByteArray()
+        originalBitmap.recycle()
+        outputStream.close()
+        
+        Log.d(TAG, "✅ WebP压缩完成，压缩后大小: ${compressedBytes.size} bytes")
+        
+        compressedBytes
+    }
+
+    /**
+     * 上传图片到七牛云（自动压缩为WebP格式）
      * 参考Python实现：tool.py中的upload方法
      * @param context 上下文
      * @param imageUri 图片URI
@@ -52,34 +98,29 @@ object ImageUploadUtil {
             Log.d(TAG, "📤 ========== 开始上传图片 ==========")
             Log.d(TAG, "📤 图片URI: $imageUri")
             
-            // 1. 读取图片数据
-            val inputStream = context.contentResolver.openInputStream(imageUri)
-                ?: return@withContext Result.failure(Exception("无法读取图片"))
+            // 1. 获取WebP压缩质量设置
+            val sharedPrefs = context.getSharedPreferences("image_settings", Context.MODE_PRIVATE)
+            val webpQuality = sharedPrefs.getInt("webp_quality", 95)
             
-            val imageBytes = inputStream.readBytes()
-            inputStream.close()
+            // 2. 压缩图片为WebP格式
+            val imageBytes = compressToWebP(context, imageUri, webpQuality)
             
-            Log.d(TAG, "✅ 图片读取成功，大小: ${imageBytes.size} bytes")
+            Log.d(TAG, "✅ WebP压缩完成，大小: ${imageBytes.size} bytes")
             
-            // 2. 计算MD5 - 参考Python: md5.hexdigest()
+            // 3. 计算MD5 - 参考Python: md5.hexdigest()
             val md5 = calculateMD5(imageBytes)
             Log.d(TAG, "✅ MD5计算完成: $md5")
             
-            // 3. 获取图片后缀和MIME类型
-            val mimeType = context.contentResolver.getType(imageUri) ?: "image/jpeg"
-            val extension = when (mimeType) {
-                "image/png" -> "png"
-                "image/gif" -> "gif"
-                "image/webp" -> "webp"
-                else -> "jpg"
-            }
+            // 4. 设置为WebP格式
+            val mimeType = "image/webp"
+            val extension = "webp"
             
             // 文件key = MD5.扩展名
             val fileKey = "$md5.$extension"
             Log.d(TAG, "✅ 文件key: $fileKey")
             Log.d(TAG, "✅ MIME类型: $mimeType")
             
-            // 4. 获取图片尺寸
+            // 5. 获取图片尺寸
             val options = BitmapFactory.Options().apply {
                 inJustDecodeBounds = true
             }
@@ -88,7 +129,7 @@ object ImageUploadUtil {
             val height = options.outHeight
             Log.d(TAG, "✅ 图片尺寸: ${width}x${height}")
             
-            // 5. 获取上传host - 参考Python实现
+            // 6. 获取上传host - 参考Python实现
             // uhost = httpx.get(f"https://api.qiniu.com/v4/query?ak={utoken.split(':')[0]}&bucket={bucket}").json()["hosts"][0]["up"]["domains"][0]
             val ak = uploadToken.split(":")[0]
             val queryUrl = "https://api.qiniu.com/v4/query?ak=$ak&bucket=$IMAGE_BUCKET"
@@ -114,7 +155,7 @@ object ImageUploadUtil {
             
             Log.d(TAG, "✅ 上传host: $uploadHost")
             
-            // 6. 保存图片到临时文件
+            // 7. 保存图片到临时文件
             val cacheDir = context.cacheDir
             val tempFile = File(cacheDir, fileKey)
             FileOutputStream(tempFile).use { outputStream ->
@@ -122,7 +163,7 @@ object ImageUploadUtil {
             }
             Log.d(TAG, "✅ 临时文件: ${tempFile.absolutePath}")
             
-            // 7. 构建multipart/form-data请求 - 参考Python实现
+            // 8. 构建multipart/form-data请求 - 参考Python实现
             // params = {
             //     "token": (None, utoken),
             //     "key": (None, name),
@@ -149,7 +190,7 @@ object ImageUploadUtil {
                 .post(requestBody)
                 .build()
             
-            // 8. 执行上传
+            // 9. 执行上传
             val response = client.newCall(request).execute()
             
             Log.d(TAG, "📥 七牛云响应码: ${response.code}")

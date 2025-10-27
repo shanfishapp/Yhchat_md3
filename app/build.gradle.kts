@@ -16,20 +16,22 @@ android {
         minSdk = 21
         targetSdk = 36
         versionCode = 1
-        versionName = "19.7"
+        versionName = "19.7.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
-        release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+        getByName("release") {
+            isMinifyEnabled = false
+            isShrinkResources = false
+        }
+        
+        getByName("debug") {
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21

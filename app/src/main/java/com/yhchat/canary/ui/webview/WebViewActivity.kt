@@ -278,18 +278,18 @@ fun WebViewScreen(
                     loadWithOverviewMode = prefs.getBoolean("allow_zoom", true)
                     useWideViewPort = prefs.getBoolean("allow_zoom", true)
                     builtInZoomControls = prefs.getBoolean("allow_zoom", true)
-                    displayZoomControls = false
+                    displayZoomControls = true
                     setSupportZoom(prefs.getBoolean("allow_zoom", true))
                     
                     // 现代化WebView设置
                     javaScriptCanOpenWindowsAutomatically = true
                     allowFileAccess = true
                     allowContentAccess = true
-                    allowUniversalAccessFromFileURLs = false
-                    allowFileAccessFromFileURLs = false
+                    allowUniversalAccessFromFileURLs = true
+                    allowFileAccessFromFileURLs = true
                     loadsImagesAutomatically = prefs.getBoolean("load_images", true)
-                    blockNetworkImage = false
-                    blockNetworkLoads = false
+                    blockNetworkImage = true
+                    blockNetworkLoads = true
                     
                     // 缓存设置
                     val cacheModeValue = prefs.getInt("cache_mode", 0)
@@ -302,7 +302,7 @@ fun WebViewScreen(
                     databaseEnabled = true
                     
                     // 媒体设置
-                    mediaPlaybackRequiresUserGesture = false
+                    mediaPlaybackRequiresUserGesture = true
                     
                     // User Agent设置
                     val userAgentValue = prefs.getString("user_agent", "default") ?: "default"

@@ -33,6 +33,10 @@ class ProfileViewModel(
     // 修改头像状态
     private val _changeAvatarState = MutableStateFlow(ChangeAvatarState())
     val changeAvatarState: StateFlow<ChangeAvatarState> = _changeAvatarState.asStateFlow()
+    
+    // 内测状态
+    private val _betaState = MutableStateFlow(BetaState())
+    val betaState: StateFlow<BetaState> = _betaState.asStateFlow()
 
     /**
      * 加载用户个人资料
@@ -48,6 +52,8 @@ class ProfileViewModel(
                         userProfile = profile,
                         error = null
                     )
+                    // 加载用户资料成功后，同时加载内测状态
+                    loadBetaInfo()
                 },
                 onFailure = { exception ->
                     Log.e("ProfileViewModel", "加载用户资料失败", exception)
@@ -57,6 +63,40 @@ class ProfileViewModel(
                     )
                 }
             )
+        }
+    }
+    
+    /**
+     * 加载内测状态
+     */
+    fun loadBetaInfo() {
+        viewModelScope.launch {
+            _betaState.value = _betaState.value.copy(isLoading = true, error = null)
+            
+            try {
+                val token = userRepository.getTokenSync() ?: ""
+                val response = com.yhchat.canary.data.api.ApiClient.apiService.getBetaInfo(token)
+                
+                if (response.isSuccessful && response.body()?.code == 1) {
+                    val betaInfo = response.body()?.data
+                    _betaState.value = _betaState.value.copy(
+                        isLoading = false,
+                        betaInfo = betaInfo,
+                        error = null
+                    )
+                } else {
+                    _betaState.value = _betaState.value.copy(
+                        isLoading = false,
+                        error = response.body()?.msg ?: "获取内测状态失败"
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("ProfileViewModel", "获取内测状态异常", e)
+                _betaState.value = _betaState.value.copy(
+                    isLoading = false,
+                    error = e.message ?: "获取内测状态异常"
+                )
+            }
         }
     }
 
@@ -254,5 +294,14 @@ data class ChangeNicknameState(
 data class ChangeAvatarState(
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false,
+    val error: String? = null
+)
+
+/**
+ * 内测状态
+ */
+data class BetaState(
+    val isLoading: Boolean = false,
+    val betaInfo: com.yhchat.canary.data.model.BetaInfo? = null,
     val error: String? = null
 )

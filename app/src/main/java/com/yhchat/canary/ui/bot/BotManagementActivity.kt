@@ -32,6 +32,9 @@ import com.yhchat.canary.data.model.MyBotListResponse
 import com.yhchat.canary.ui.components.ImageUtils
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import android.widget.Toast
 
 /**
  * 机器人管理Activity
@@ -94,6 +97,10 @@ private fun BotManagementScreen(
     // 缓存机器人列表数据
     var botList by remember { mutableStateOf<List<CreatedBot>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var isStoppingBot by remember { mutableStateOf(false) }
+    var isDeletingBot by remember { mutableStateOf(false) }
+    var botIsStop by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
     
     // 获取当前机器人的token
     val currentBotToken = remember(botList, botId) {
@@ -103,11 +110,13 @@ private fun BotManagementScreen(
         finalToken
     }
     
-    // 加载机器人列表
+    // 加载机器人列表和详细信息
     LaunchedEffect(Unit) {
         scope.launch {
             try {
                 val botRepo = RepositoryFactory.getBotRepository(context)
+                
+                // 加载机器人列表
                 botRepo.getMyBotList().fold(
                     onSuccess = { bots ->
                         botList = bots
@@ -121,6 +130,15 @@ private fun BotManagementScreen(
                         android.util.Log.e("BotManagement", "Failed to load bots: ${error.message}")
                     }
                 )
+                
+                // 获取当前机器人的详细信息（包括停用状态）
+                botRepo.getBotInfo(botId).fold(
+                    onSuccess = { botInfo ->
+                        botIsStop = botInfo.data.isStop == 1
+                    },
+                    onFailure = { /* 忽略错误 */ }
+                )
+                
             } catch (e: Exception) {
                 // 网络错误，保持空列表
             } finally {
@@ -157,6 +175,22 @@ private fun BotManagementScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // 错误提示
+            if (error != null) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Text(
+                        text = error ?: "",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
+            
             // 机器人基本信息卡片
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -254,14 +288,11 @@ private fun BotManagementScreen(
                 }
             }
             
-            // 危险操作卡片
+            // 机器人控制卡片
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-                )
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Column(
                     modifier = Modifier
@@ -269,24 +300,135 @@ private fun BotManagementScreen(
                         .padding(16.dp)
                 ) {
                     Text(
-                        text = "危险操作",
+                        text = "机器人控制",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                     
-                    // 删除机器人
-                    ManagementOption(
-                        icon = Icons.Default.Delete,
-                        title = "删除机器人",
-                        subtitle = "永久删除此机器人",
-                        onClick = {
-                            // TODO: 确认删除对话框
-                            android.widget.Toast.makeText(context, "删除功能待实现", android.widget.Toast.LENGTH_SHORT).show()
-                        },
-                        iconTint = MaterialTheme.colorScheme.error
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // 停用/启用机器人按钮
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    val tokenRepo = RepositoryFactory.getTokenRepository(context)
+                                    val userToken = tokenRepo.getTokenSync() ?: return@launch
+                                    isStoppingBot = true
+                                    error = null
+                                    
+                                    // 构建 protobuf 请求
+                                    val operation = if (botIsStop) 0 else 1 // 当前停用则启用，当前启用则停用
+                                    val request = yh_bot.Bot.bot_stop_send.newBuilder()
+                                        .setBotId(botId)
+                                        .setOperation(operation)
+                                        .build()
+                                    
+                                    val requestBody = request.toByteArray()
+                                        .toRequestBody("application/x-protobuf".toMediaType())
+                                    
+                                    runCatching {
+                                        ApiClient.apiService.stopBot(userToken, requestBody)
+                                    }.onSuccess { resp ->
+                                        isStoppingBot = false
+                                        if (resp.isSuccessful) {
+                                            val responseBody = resp.body()?.bytes()
+                                            if (responseBody != null) {
+                                                val status = yh_bot.Bot.Status.parseFrom(responseBody)
+                                                if (status.code == 1) {
+                                                    botIsStop = !botIsStop // 切换状态
+                                                    val action = if (botIsStop) "停用" else "启用"
+                                                    Toast.makeText(context, "机器人${action}成功", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    error = status.msg
+                                                }
+                                            }
+                                        } else {
+                                            error = "请求失败: ${resp.code()}"
+                                        }
+                                    }.onFailure { e ->
+                                        isStoppingBot = false
+                                        error = e.message
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            enabled = !isStoppingBot && !isLoading && !isDeletingBot,
+                            colors = if (botIsStop) {
+                                ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                )
+                            } else {
+                                ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                        ) {
+                            if (isStoppingBot) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("处理中...")
+                            } else {
+                                Text(if (botIsStop) "启用机器人" else "停用机器人")
+                            }
+                        }
+                        
+                        // 删除机器人按钮
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    val tokenRepo = RepositoryFactory.getTokenRepository(context)
+                                    val userToken = tokenRepo.getTokenSync() ?: return@launch
+                                    isDeletingBot = true
+                                    error = null
+                                    
+                                    val request = com.yhchat.canary.data.model.DeleteFriendRequest(
+                                        chatId = botId,
+                                        chatType = 3 // 机器人
+                                    )
+                                    
+                                    runCatching {
+                                        ApiClient.apiService.deleteFriend(userToken, request)
+                                    }.onSuccess { resp ->
+                                        isDeletingBot = false
+                                        if (resp.body()?.code == 1) {
+                                            Toast.makeText(context, "机器人删除成功", Toast.LENGTH_SHORT).show()
+                                            // 删除成功后返回上一页
+                                            onBackClick()
+                                        } else {
+                                            error = resp.body()?.message ?: "删除失败"
+                                        }
+                                    }.onFailure { e ->
+                                        isDeletingBot = false
+                                        error = e.message
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            enabled = !isDeletingBot && !isLoading && !isStoppingBot,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            if (isDeletingBot) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("删除中...")
+                            } else {
+                                Text("删除机器人")
+                            }
+                        }
+                    }
                 }
             }
         }

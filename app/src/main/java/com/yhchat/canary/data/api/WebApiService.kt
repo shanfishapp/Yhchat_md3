@@ -39,7 +39,6 @@ interface WebApiService {
     @POST("v1/bot/bot-group-list")
     suspend fun getMyBotList(
         @Header("token") token: String,
-        @Header("Referer") referer: String = "https://www.yhchat.com/"
     ): Response<MyBotListResponse>
     
     /**

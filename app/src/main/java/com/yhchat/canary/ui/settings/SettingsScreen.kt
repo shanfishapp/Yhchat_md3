@@ -318,6 +318,11 @@ private fun DisplaySettingsCard(
 
             // 菜单按钮栏显示开关
             MenuButtonsSettingItem(context = context)
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // WebP压缩质量设置
+            WebPQualitySettingItem(context = context)
         }
     }
 }
@@ -1300,4 +1305,98 @@ private fun ColorPickerDialog(
             }
         }
     )
+}
+
+/**
+ * WebP压缩质量设置项
+ */
+@Composable
+private fun WebPQualitySettingItem(
+    context: Context,
+    modifier: Modifier = Modifier
+) {
+    val prefs = remember { 
+        context.getSharedPreferences("image_settings", Context.MODE_PRIVATE) 
+    }
+    
+    var webpQuality by remember { 
+        mutableFloatStateOf(prefs.getInt("webp_quality", 95).toFloat()) 
+    }
+    
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Image,
+                    contentDescription = "图片压缩",
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "WebP压缩质量",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "当前: ${webpQuality.toInt()}% (数值越高质量越好，文件越大)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // 滑动条
+            Slider(
+                value = webpQuality,
+                onValueChange = { newValue ->
+                    webpQuality = newValue
+                },
+                onValueChangeFinished = {
+                    // 保存设置
+                    prefs.edit()
+                        .putInt("webp_quality", webpQuality.toInt())
+                        .apply()
+                },
+                valueRange = 10f..100f,
+                steps = 17, // 10-100，每5一个步长，共18个值，所以17个步长
+                modifier = Modifier.fillMaxWidth()
+            )
+            
+            // 质量说明
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "低质量 (10%)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "高质量 (100%)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
 }

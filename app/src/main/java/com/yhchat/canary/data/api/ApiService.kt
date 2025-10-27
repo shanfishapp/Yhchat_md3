@@ -903,6 +903,35 @@ interface ApiService {
         @Body request: MenuEventRequest
     ): Response<BaseResponse>
     
+    /**
+     * 获取内测状态
+     * POST /v1/beta/info
+     */
+    @POST("v1/beta/info")
+    suspend fun getBetaInfo(
+        @Header("token") token: String
+    ): Response<com.yhchat.canary.data.model.BetaInfoResponse>
+    
+    /**
+     * 设置机器人消息订阅接口
+     * POST /v1/bot/edit-subscribed-link
+     */
+    @POST("v1/bot/edit-subscribed-link")
+    suspend fun editBotSubscribedLink(
+        @Header("token") token: String,
+        @Body request: EditBotSubscribedLinkRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
+    /**
+     * 停用/启用机器人
+     * POST /v1/bot/stop-bot
+     */
+    @POST("v1/bot/stop-bot")
+    suspend fun stopBot(
+        @Header("token") token: String,
+        @Body request: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
+    
 }
 
 /**
@@ -1509,4 +1538,14 @@ data class RelateUserTagRequest(
     val userId: String,
     @SerializedName("tagGroupId")
     val tagGroupId: Long
+)
+
+/**
+ * 设置机器人消息订阅接口请求
+ */
+data class EditBotSubscribedLinkRequest(
+    @SerializedName("botId")
+    val botId: String,
+    @SerializedName("link")
+    val link: String
 )

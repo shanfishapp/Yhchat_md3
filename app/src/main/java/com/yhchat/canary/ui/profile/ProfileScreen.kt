@@ -59,6 +59,7 @@ fun ProfileScreen(
     val changeInviteCodeState by viewModel.changeInviteCodeState.collectAsStateWithLifecycle()
     val changeNicknameState by viewModel.changeNicknameState.collectAsStateWithLifecycle()
     val changeAvatarState by viewModel.changeAvatarState.collectAsStateWithLifecycle()
+    val betaState by viewModel.betaState.collectAsStateWithLifecycle()
     
     // 修改邀请码弹窗状态
     var showChangeInviteCodeDialog by remember { mutableStateOf(false) }
@@ -180,6 +181,7 @@ fun ProfileScreen(
                         onShowChangeNicknameDialog = { showChangeNicknameDialog = true },
                         imagePickerLauncher = imagePickerLauncher,
                         changeAvatarState = changeAvatarState,
+                        betaState = betaState,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -237,6 +239,7 @@ private fun UserProfileContent(
     onShowChangeNicknameDialog: () -> Unit = {},
     imagePickerLauncher: androidx.activity.result.ActivityResultLauncher<String>,
     changeAvatarState: ChangeAvatarState,
+    betaState: BetaState,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -355,31 +358,74 @@ private fun UserProfileContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
-                // VIP 标识
-                if (userProfile.isVip == 1) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .background(
-                                MaterialTheme.colorScheme.primary,
-                                RoundedCornerShape(16.dp)
+                // VIP 标识和内测标识
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    // VIP 标识
+                    if (userProfile.isVip == 1) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .background(
+                                    MaterialTheme.colorScheme.primary,
+                                    RoundedCornerShape(16.dp)
+                                )
+                                .padding(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = "VIP",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onPrimary
                             )
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = "VIP",
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "VIP",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            fontWeight = FontWeight.Bold
-                        )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "VIP",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    
+                    // 内测标识
+                    if (betaState.betaInfo?.isBetaUser == true) {
+                        var showBetaInfo by remember { mutableStateOf(false) }
+                        
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .background(
+                                    MaterialTheme.colorScheme.tertiary,
+                                    RoundedCornerShape(16.dp)
+                                )
+                                .clickable { showBetaInfo = true }
+                                .padding(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AccountCircle,
+                                contentDescription = "内测用户",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onTertiary
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "内测",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onTertiary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        
+                        // 内测信息弹窗
+                        if (showBetaInfo) {
+                            BetaInfoDialog(
+                                betaInfo = betaState.betaInfo!!,
+                                onDismiss = { showBetaInfo = false }
+                            )
+                        }
                     }
                 }
             }
@@ -972,6 +1018,63 @@ private fun ChangeNicknameDialog(
                 enabled = !changeNicknameState.isLoading
             ) {
                 Text("取消")
+            }
+        }
+    )
+}
+
+/**
+ * 内测信息弹窗
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BetaInfoDialog(
+    betaInfo: com.yhchat.canary.data.model.BetaInfo,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = "内测",
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.tertiary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "内测功能",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        text = {
+            Column {
+                Text(
+                    text = "恭喜您成为云湖内测用户！",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                
+                Text(
+                    text = betaInfo.info,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.2
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss
+            ) {
+                Text("我知道了")
             }
         }
     )

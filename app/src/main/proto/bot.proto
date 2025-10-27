@@ -3,7 +3,7 @@ syntax = "proto3";  // 指定使用proto3语法
 package yh_bot;    // 定义包名，防止命名冲突
 
     
-// 响应状态
+// 响应状态（共用区）
 message Status {
     int64 request_id = 1;
     int32 code = 2;
@@ -74,5 +74,11 @@ message create_bot {
     message BotData {
         string bot_id = 1;          // 创建的机器人ID
     }
+}
+
+// 停用/启用机器人
+message bot_stop_send {
+    string bot_id = 2;              // 机器人ID
+    int32 operation = 3;            // 操作类型：0-启用机器人，1-停用机器人
 }
 
