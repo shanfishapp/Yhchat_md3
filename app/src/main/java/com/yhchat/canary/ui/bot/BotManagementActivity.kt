@@ -320,7 +320,7 @@ private fun BotManagementScreen(
                                     error = null
                                     
                                     // 构建 protobuf 请求
-                                    val operation = if (botIsStop) 0 else 1 // 当前停用则启用，当前启用则停用
+                                    val operation = if (botIsStop) 0 else 1 // 当前停用则启用(0)，当前启用则停用(1)
                                     val request = yh_bot.Bot.bot_stop_send.newBuilder()
                                         .setBotId(botId)
                                         .setOperation(operation)
@@ -332,21 +332,38 @@ private fun BotManagementScreen(
                                     runCatching {
                                         ApiClient.apiService.stopBot(userToken, requestBody)
                                     }.onSuccess { resp ->
-                                        isStoppingBot = false
                                         if (resp.isSuccessful) {
                                             val responseBody = resp.body()?.bytes()
                                             if (responseBody != null) {
                                                 val status = yh_bot.Bot.Status.parseFrom(responseBody)
                                                 if (status.code == 1) {
-                                                    botIsStop = !botIsStop // 切换状态
-                                                    val action = if (botIsStop) "停用" else "启用"
+                                                    val action = if (operation == 1) "停用" else "启用"
                                                     Toast.makeText(context, "机器人${action}成功", Toast.LENGTH_SHORT).show()
+                                                    
+                                                    // 重新查询机器人状态
+                                                    val botRepo = RepositoryFactory.getBotRepository(context)
+                                                    botRepo.getBotInfo(botId).fold(
+                                                        onSuccess = { botInfo ->
+                                                            botIsStop = botInfo.data.isStop == 1
+                                                            isStoppingBot = false
+                                                        },
+                                                        onFailure = { 
+                                                            // 如果查询失败，使用预期状态
+                                                            botIsStop = !botIsStop
+                                                            isStoppingBot = false
+                                                        }
+                                                    )
                                                 } else {
                                                     error = status.msg
+                                                    isStoppingBot = false
                                                 }
+                                            } else {
+                                                error = "响应数据为空"
+                                                isStoppingBot = false
                                             }
                                         } else {
                                             error = "请求失败: ${resp.code()}"
+                                            isStoppingBot = false
                                         }
                                     }.onFailure { e ->
                                         isStoppingBot = false

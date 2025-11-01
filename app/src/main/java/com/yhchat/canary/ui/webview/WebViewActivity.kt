@@ -288,8 +288,8 @@ fun WebViewScreen(
                     allowUniversalAccessFromFileURLs = true
                     allowFileAccessFromFileURLs = true
                     loadsImagesAutomatically = prefs.getBoolean("load_images", true)
-                    blockNetworkImage = true
-                    blockNetworkLoads = true
+                    blockNetworkImage = false
+                    blockNetworkLoads = false
                     
                     // 缓存设置
                     val cacheModeValue = prefs.getInt("cache_mode", 0)

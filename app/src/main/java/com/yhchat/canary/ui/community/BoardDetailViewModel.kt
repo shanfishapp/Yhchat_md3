@@ -30,6 +30,9 @@ class BoardDetailViewModel @Inject constructor(
     private val _followState = MutableStateFlow(FollowState())
     val followState: StateFlow<FollowState> = _followState.asStateFlow()
     
+    private val _blockState = MutableStateFlow(BlockState())
+    val blockState: StateFlow<BlockState> = _blockState.asStateFlow()
+    
     /**
      * 加载分区详情
      */
@@ -156,6 +159,41 @@ class BoardDetailViewModel @Inject constructor(
         _boardDetailState.value = _boardDetailState.value.copy(error = null)
         _postListState.value = _postListState.value.copy(error = null)
         _followState.value = _followState.value.copy(error = null)
+        _blockState.value = _blockState.value.copy(error = null)
+    }
+    
+    /**
+     * 屏蔽用户
+     */
+    fun blockUser(token: String, authorId: String) {
+        viewModelScope.launch {
+            _blockState.value = _blockState.value.copy(isLoading = true, error = null)
+            
+            communityRepository.setBlackList(token, authorId, 1)
+                .onSuccess {
+                    _blockState.value = _blockState.value.copy(
+                        isLoading = false,
+                        isSuccess = true
+                    )
+                    // 从列表中移除被屏蔽用户的文章
+                    val currentPosts = _postListState.value.posts
+                    val filteredPosts = currentPosts.filter { it.senderId != authorId }
+                    _postListState.value = _postListState.value.copy(posts = filteredPosts)
+                }
+                .onFailure { error ->
+                    _blockState.value = _blockState.value.copy(
+                        isLoading = false,
+                        error = error.message
+                    )
+                }
+        }
+    }
+    
+    /**
+     * 重置屏蔽状态
+     */
+    fun resetBlockState() {
+        _blockState.value = BlockState()
     }
 }
 
@@ -185,6 +223,15 @@ data class PostListState(
  * 关注状态
  */
 data class FollowState(
+    val isLoading: Boolean = false,
+    val isSuccess: Boolean = false,
+    val error: String? = null
+)
+
+/**
+ * 屏蔽状态
+ */
+data class BlockState(
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false,
     val error: String? = null

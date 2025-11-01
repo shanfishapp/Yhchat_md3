@@ -398,7 +398,7 @@ private fun UserProfileContent(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .background(
-                                    MaterialTheme.colorScheme.tertiary,
+                                    MaterialTheme.colorScheme.primary,
                                     RoundedCornerShape(16.dp)
                                 )
                                 .clickable { showBetaInfo = true }
@@ -408,13 +408,13 @@ private fun UserProfileContent(
                                 imageVector = Icons.Default.AccountCircle,
                                 contentDescription = "内测用户",
                                 modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onTertiary
+                                tint = MaterialTheme.colorScheme.onPrimary
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "内测",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onTertiary,
+                                color = MaterialTheme.colorScheme.onPrimary,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -1042,7 +1042,7 @@ private fun BetaInfoDialog(
                     imageVector = Icons.Default.Star,
                     contentDescription = "内测",
                     modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.tertiary
+                    tint = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(

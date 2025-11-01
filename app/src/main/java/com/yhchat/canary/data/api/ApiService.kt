@@ -620,6 +620,24 @@ interface ApiService {
         @Header("token") token: String,
         @Body request: GroupListRequest
     ): GroupListResponse
+    
+    /**
+     * 屏蔽/取消屏蔽用户
+     */
+    @POST("v1/community/set-black-list")
+    suspend fun setBlackList(
+        @Header("token") token: String,
+        @Body request: SetBlackListRequest
+    ): Response<ApiStatus>
+    
+    /**
+     * 获取屏蔽用户列表
+     */
+    @POST("v1/community/black-list")
+    suspend fun getBlackList(
+        @Header("token") token: String,
+        @Body request: BlackListRequest
+    ): Response<com.yhchat.canary.data.model.BlockedUserListResponse>
 
     @POST("v1/user/invite/change-user-invite-code")
     suspend fun changeInviteCode(
@@ -1548,4 +1566,24 @@ data class EditBotSubscribedLinkRequest(
     val botId: String,
     @SerializedName("link")
     val link: String
+)
+
+/**
+ * 屏蔽/取消屏蔽用户请求
+ */
+data class SetBlackListRequest(
+    @SerializedName("isAdd")
+    val isAdd: Int, // 0-取消屏蔽，1-屏蔽
+    @SerializedName("authorId")
+    val authorId: String
+)
+
+/**
+ * 获取屏蔽用户列表请求
+ */
+data class BlackListRequest(
+    @SerializedName("size")
+    val size: Int = 20,
+    @SerializedName("page")
+    val page: Int = 1
 )

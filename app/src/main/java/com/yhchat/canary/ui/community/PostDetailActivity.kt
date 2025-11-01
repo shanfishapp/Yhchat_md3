@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -75,6 +76,16 @@ import com.yhchat.canary.data.model.CommunityBoard
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import android.content.Intent
+import androidx.compose.foundation.text.ClickableText
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.graphics.Color
+import com.yhchat.canary.utils.ChatAddLinkHandler
+import java.util.regex.Pattern
+import android.net.Uri
 
 /**
  * 文章详情Activity
@@ -214,11 +225,12 @@ fun PostContentCard(
                 modifier = Modifier.fillMaxWidth()
             )
         } else {
-            // 普通文本内容
-            Text(
+            // 普通文本内容 - 支持链接点击
+            ArticleLinkText(
                 text = post.content,
-                style = MaterialTheme.typography.bodyMedium,
-                lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.3,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.3
+                ),
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -232,12 +244,9 @@ fun PostContentCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            // 跳转到群聊详情页
-                            com.yhchat.canary.ui.group.GroupInfoActivity.start(
-                                context = context,
-                                groupId = group.groupId,
-                                groupName = group.name
-                            )
+                            // 使用统一链接处理器跳转到群聊添加页面
+                            val groupLink = "yunhu://chat-add?id=${group.groupId}&type=group"
+                            UnifiedLinkHandler.handleLink(context, groupLink)
                         },
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
@@ -1174,11 +1183,19 @@ fun PostDetailScreen(
                                     onValueChange = { commentText = it },
                                     modifier = Modifier.weight(1f),
                                     placeholder = { Text("写下你的评论...") },
-                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                                    minLines = 1,
+                                    maxLines = 5,
+                                    keyboardOptions = KeyboardOptions(
+                                        imeAction = ImeAction.Send,
+                                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Text
+                                    ),
                                     keyboardActions = KeyboardActions(
                                         onSend = {
                                             if (commentText.isNotBlank()) {
-                                                viewModel.commentPostWithToken(postId, commentText.trim())
+                                                // 处理换行符：保持原始换行符
+                                                val processedContent = commentText.trim()
+                                                android.util.Log.d("PostDetail", "发送评论: postId=$postId, content=$processedContent")
+                                                viewModel.commentPostWithToken(postId, processedContent)
                                                 commentText = ""
                                                 showCommentInput = false
                                             }
@@ -1191,7 +1208,9 @@ fun PostDetailScreen(
                                 IconButton(
                                     onClick = {
                                         if (commentText.isNotBlank()) {
-                                            viewModel.commentPostWithToken(postId, commentText.trim())
+                                            // 处理换行符：保持原始换行符
+                                            val processedContent = commentText.trim()
+                                            viewModel.commentPostWithToken(postId, processedContent)
                                             commentText = ""
                                             showCommentInput = false
                                         }
@@ -1229,4 +1248,93 @@ fun PostDetailScreen(
             }
         }
     }
+}
+
+/**
+ * 文章链接文本组件 - 支持 HTTP/HTTPS 链接点击，遇到中文停止识别
+ */
+@Composable
+fun ArticleLinkText(
+    text: String,
+    style: TextStyle = MaterialTheme.typography.bodyMedium,
+    linkColor: Color = MaterialTheme.colorScheme.primary,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    
+    // HTTP/HTTPS 链接正则表达式 - 遇到中文字符停止
+    val urlPattern = Pattern.compile(
+        "https?://[^\\s\\u4e00-\\u9fff]+",
+        Pattern.CASE_INSENSITIVE
+    )
+    
+    val annotatedString = buildAnnotatedString {
+        val matcher = urlPattern.matcher(text)
+        var lastEnd = 0
+        
+        while (matcher.find()) {
+            val start = matcher.start()
+            val end = matcher.end()
+            val url = matcher.group()
+            
+            // 添加链接前的普通文本
+            if (start > lastEnd) {
+                append(text.substring(lastEnd, start))
+            }
+            
+            // 添加链接文本 - 醒目的样式
+            pushStringAnnotation(tag = "URL", annotation = url)
+            withStyle(
+                style = SpanStyle(
+                    color = linkColor,
+                    textDecoration = TextDecoration.Underline,
+                    fontWeight = FontWeight.Medium
+                )
+            ) {
+                append(url)
+            }
+            pop()
+            
+            lastEnd = end
+        }
+        
+        // 添加剩余的普通文本
+        if (lastEnd < text.length) {
+            append(text.substring(lastEnd))
+        }
+    }
+    
+    ClickableText(
+        text = annotatedString,
+        style = style,
+        modifier = modifier,
+        onClick = { offset ->
+            annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
+                .firstOrNull()?.let { annotation ->
+                    val url = annotation.item
+                    
+                    // 优先使用应用内链接处理器
+                    when {
+                        YunhuLinkHandler.containsYunhuLink(url) -> {
+                            YunhuLinkHandler.handleYunhuLink(context, url)
+                        }
+                        ChatAddLinkHandler.isChatAddLink(url) -> {
+                            ChatAddLinkHandler.handleLink(context, url)
+                        }
+                        UnifiedLinkHandler.isHandleableLink(url) -> {
+                            UnifiedLinkHandler.handleLink(context, url)
+                        }
+                        else -> {
+                            // 使用系统浏览器打开其他链接
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "无法打开链接", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                }
+        }
+    )
 }

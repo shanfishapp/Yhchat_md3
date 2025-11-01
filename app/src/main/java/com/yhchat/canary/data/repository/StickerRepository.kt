@@ -110,7 +110,7 @@ class StickerRepository @Inject constructor(
             
             if (response.isSuccessful) {
                 val body = response.body()
-                if (body != null && body.code == 1) {
+                if (body != null && body.code == 200) {
                     Log.d(TAG, "✅ 添加贴纸包成功")
                     Result.success(true)
                     } else {
@@ -145,7 +145,7 @@ class StickerRepository @Inject constructor(
             
             if (response.isSuccessful) {
                 val body = response.body()
-                if (body != null && body.code == 1) {
+                if (body != null && body.code == 200) {
                     Log.d(TAG, "✅ 移除贴纸包成功")
                     Result.success(true)
                 } else {
@@ -191,7 +191,7 @@ class StickerRepository @Inject constructor(
             
             if (response.isSuccessful) {
                 val body = response.body()
-                if (body != null && body.code == 1) {
+                if (body != null && body.code == 200) {
                     Log.d(TAG, "✅ 贴纸包排序成功")
                     Result.success(true)
                 } else {

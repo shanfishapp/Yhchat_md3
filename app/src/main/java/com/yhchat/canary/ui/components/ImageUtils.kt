@@ -49,13 +49,18 @@ object ImageUtils {
                 .data(null)
                 .build()
         }
-        return ImageRequest.Builder(context)
+        val builder = ImageRequest.Builder(context)
             .data(url)
-            .setHeader("Referer", "https://myapp.jwznb.com")
-            .setHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
             .allowHardware(enableHardware)
             .crossfade(true)
-            .build()
+            
+        // 为相关域名添加Referer头
+        if (url.contains("chat-img.jwznb.com") || url.contains("jwznb.com") || url.contains("myapp.jwznb.com")) {
+            builder.setHeader("Referer", "https://myapp.jwznb.com")
+            builder.setHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
+        }
+        
+        return builder.build()
     }
     
     /**

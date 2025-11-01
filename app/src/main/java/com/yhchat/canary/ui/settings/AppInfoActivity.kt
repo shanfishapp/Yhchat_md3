@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -30,28 +31,33 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.yhchat.canary.R
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import com.yhchat.canary.utils.UnifiedLinkHandler
 import com.yhchat.canary.ui.components.ImageViewer
 import com.yhchat.canary.ui.chat.ChatActivity
+import dagger.hilt.android.AndroidEntryPoint
 
 /**
  * 应用详情 Activity
  */
+@AndroidEntryPoint
 class AppInfoActivity : ComponentActivity() {
     
     companion object {
-        // 应用版本信息（开发者可以在这里修改）
-        const val APP_VERSION = "Canary 19.7 With Patch 1"
+        const val APP_VERSION = "Canary 19.8"
         const val APP_NAME = "Yhchat Canary"
+
         const val DEVELOPER_NAME_1 = "Kauid323"
         const val DEVELOPER_NAME_2 = "那狗吧"
         const val DEVELOPER_URL_1 = "https://github.com/Kauid323/"
         const val DEVELOPER_URL_2 = "yunhu://chat-add?id=8516939&type=user"
         const val GITHUB_REPO_URL = "https://github.com/Kauid323/Yhchat_md3"
-        
+        const val DEFAULT_VERSION_TAG = "v0.0.19-8"
+        const val IS_LATEST_BUILD_PREVIEW = false
+
         fun start(context: Context) {
             val intent = Intent(context, AppInfoActivity::class.java)
             context.startActivity(intent)
@@ -63,13 +69,20 @@ class AppInfoActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             YhchatCanaryTheme {
+                val updateViewModel: UpdateViewModel = viewModel()
+                
                 AppInfoScreen(
+                    updateViewModel = updateViewModel,
+                    isLatestBuildPreview = IS_LATEST_BUILD_PREVIEW,
                     onBack = { finish() },
                     onDeveloperClick = { url ->
                         handleDeveloperClick(url)
                     },
                     onGithubClick = {
                         openUrl(GITHUB_REPO_URL)
+                    },
+                    onDownloadUpdate = { url ->
+                        openUrl(url)
                     }
                 )
             }
@@ -108,14 +121,19 @@ class AppInfoActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun AppInfoScreen(
+    updateViewModel: UpdateViewModel,
+    isLatestBuildPreview: Boolean,
     onBack: () -> Unit,
     onDeveloperClick: (String) -> Unit,
-    onGithubClick: () -> Unit
+    onGithubClick: () -> Unit,
+    onDownloadUpdate: (String) -> Unit
 ) {
     var showImageViewer by remember { mutableStateOf(false) }
     var currentImageUrl by remember { mutableStateOf("") }
     var showChatDebugDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    
+    val updateState by updateViewModel.updateState.collectAsState()
     
     Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
@@ -147,22 +165,19 @@ private fun AppInfoScreen(
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 应用图标（支持长按打开调试对话框）
             AsyncImage(
                 model = coil.request.ImageRequest.Builder(LocalContext.current)
                     .data(R.mipmap.ic_launcher)
                     .crossfade(true)
                     .build(),
-                contentDescription = "应用图标",
+                contentDescription = "AppIcon",
                 modifier = Modifier
                     .size(120.dp)
                     .clip(CircleShape)
                     .combinedClickable(
                         onClick = {
-                            // 短按不做任何事
                         },
                         onLongClick = {
-                            // 长按打开调试对话框
                             showChatDebugDialog = true
                         }
                     ),
@@ -189,12 +204,10 @@ private fun AppInfoScreen(
             
             Spacer(modifier = Modifier.height(32.dp))
             
-            // 分隔线
             HorizontalDivider()
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            // 开发者信息
             AppInfoItem(
                 icon = Icons.Default.Person,
                 title = "开发者",
@@ -210,7 +223,34 @@ private fun AppInfoScreen(
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            // GitHub 源代码
+            // 检查更新
+            AppInfoItem(
+                icon = Icons.Default.SystemUpdate,
+                title = if (isLatestBuildPreview) "检查更新(Pre)" else "检查更新",
+                content = if (isLatestBuildPreview) {
+                    {
+                        Text(
+                            text = "你用的是最新构建预览版",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                } else null,
+                onClick = {
+                    if (isLatestBuildPreview) {
+                        // 预览版模式直接显示 Toast
+                        android.widget.Toast.makeText(context, "你现在是最新版本了", android.widget.Toast.LENGTH_SHORT).show()
+                    } else {
+                        // 正常模式检查更新
+                        updateViewModel.checkForUpdate(isLatestBuildPreview)
+                    }
+                },
+                showArrow = true,
+                isLoading = updateState.isLoading
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
             AppInfoItem(
                 icon = Icons.Default.Code,
                 title = "GitHub 源代码",
@@ -234,8 +274,7 @@ private fun AppInfoScreen(
             )
             
             Spacer(modifier = Modifier.height(32.dp))
-            
-            // 底部说明文本
+
             Text(
                 text = "一个云湖第三方客户端，由 AI 强力驱动",
                 style = MaterialTheme.typography.bodySmall,
@@ -245,12 +284,10 @@ private fun AppInfoScreen(
         }
     }
     
-    // 聊天调试对话框
     if (showChatDebugDialog) {
         ChatDebugDialog(
             onDismiss = { showChatDebugDialog = false },
             onConfirm = { chatId, chatType ->
-                // 跳转到聊天界面
                 val intent = Intent(context, ChatActivity::class.java).apply {
                     putExtra("chatId", chatId)
                     putExtra("chatType", chatType)
@@ -260,12 +297,66 @@ private fun AppInfoScreen(
             }
         )
     }
+    
+    
+    // 更新对话框
+    updateState.updateInfo?.let { updateInfo ->
+        if (updateInfo.hasUpdate) {
+            UpdateDialog(
+                updateInfo = updateInfo,
+                isPreviewMode = isLatestBuildPreview,
+                onDismiss = {
+                    updateViewModel.clearUpdateInfo()
+                },
+                onUpdate = {
+                    onDownloadUpdate(updateInfo.downloadUrl)
+                    updateViewModel.clearUpdateInfo()
+                }
+            )
+        } else {
+            // 没有更新的提示
+            LaunchedEffect(updateInfo) {
+                // 这里可以显示一个 Toast 或者 Snackbar
+            }
+            
+            AlertDialog(
+                onDismissRequest = {
+                    updateViewModel.clearUpdateInfo()
+                },
+                title = { Text("检查更新") },
+                text = { Text("当前已是最新版本") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        updateViewModel.clearUpdateInfo()
+                    }) {
+                        Text("确定")
+                    }
+                }
+            )
+        }
+    }
+    
+    // 错误对话框
+    updateState.error?.let { error ->
+        AlertDialog(
+            onDismissRequest = {
+                updateViewModel.clearError()
+            },
+            title = { Text("检查更新失败") },
+            text = { Text(error) },
+            confirmButton = {
+                TextButton(onClick = {
+                    updateViewModel.clearError()
+                }) {
+                    Text("确定")
+                }
+            }
+        )
+    }
     }
 }
 
-/**
- * 聊天调试对话框
- */
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ChatDebugDialog(
@@ -280,7 +371,7 @@ private fun ChatDebugDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "调试：跳转到会话",
+                text = "test",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -290,31 +381,29 @@ private fun ChatDebugDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 会话ID输入框
                 OutlinedTextField(
                     value = chatId,
                     onValueChange = { 
                         chatId = it
                         errorMessage = ""
                     },
-                    label = { Text("会话ID") },
-                    placeholder = { Text("例如: 123456") },
+                    label = { Text("chatID") },
+                    placeholder = { Text("GunMu") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
-                
-                // 会话类型输入框
+
                 OutlinedTextField(
                     value = chatTypeText,
                     onValueChange = { 
                         chatTypeText = it
                         errorMessage = ""
                     },
-                    label = { Text("会话类型") },
+                    label = { Text("chatType") },
                     placeholder = { Text("1-user, 2-group, 3-bot") },
                     supportingText = {
                         Text(
-                            text = "1 = 用户私聊\n2 = 群聊\n3 = 机器人",
+                            text = "1 = user\n2 = group\n3 = bot",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -323,7 +412,6 @@ private fun ChatDebugDialog(
                     singleLine = true
                 )
                 
-                // 错误提示
                 if (errorMessage.isNotEmpty()) {
                     Text(
                         text = errorMessage,
@@ -336,19 +424,16 @@ private fun ChatDebugDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    // 验证输入
                     if (chatId.isBlank()) {
-                        errorMessage = "请输入会话ID"
+                        errorMessage = "chatId"
                         return@TextButton
                     }
                     
                     val chatType = chatTypeText.toIntOrNull()
                     if (chatType == null || chatType !in 1..3) {
-                        errorMessage = "会话类型必须是 1、2 或 3"
+                        errorMessage = "must be 1,2 or 3"
                         return@TextButton
                     }
-                    
-                    // 调用确认回调
                     onConfirm(chatId, chatType)
                 },
                 enabled = chatId.isNotBlank() && chatTypeText.isNotBlank()
@@ -373,7 +458,8 @@ private fun AppInfoItem(
     title: String,
     content: @Composable (() -> Unit)? = null,
     onClick: (() -> Unit)? = null,
-    showArrow: Boolean = false
+    showArrow: Boolean = false,
+    isLoading: Boolean = false
 ) {
     Row(
         modifier = Modifier
@@ -412,7 +498,12 @@ private fun AppInfoItem(
             }
         }
         
-        if (showArrow) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp
+            )
+        } else if (showArrow) {
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
@@ -457,5 +548,159 @@ private fun DeveloperText(
             modifier = Modifier.clickable(onClick = onDeveloper2Click)
         )
     }
+}
+
+/**
+ * 更新对话框
+ */
+@Composable
+private fun UpdateDialog(
+    updateInfo: com.yhchat.canary.data.model.UpdateInfo,
+    isPreviewMode: Boolean = false,
+    onDismiss: () -> Unit,
+    onUpdate: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Text(
+                    text = updateInfo.updateTitle,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                if (isPreviewMode) {
+                    Text(
+                        text = "预览版模式 - 显示最新版本",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = if (isPreviewMode) "最新版本: ${updateInfo.latestVersion}" else "发现新版本: ${updateInfo.latestVersion}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                
+                Text(
+                    text = "发布时间: ${updateInfo.publishTime}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "更新内容:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                
+                Text(
+                    text = updateInfo.updateContent,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onUpdate) {
+                Text(if (isPreviewMode) "下载最新版" else "立即更新")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(if (isPreviewMode) "关闭" else "稍后提醒")
+            }
+        }
+    )
+}
+
+/**
+ * 版本设置对话框
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VersionSettingDialog(
+    currentVersion: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var version by remember { mutableStateOf(currentVersion) }
+    var errorMessage by remember { mutableStateOf("") }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "设置当前版本",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "设置当前应用版本，用于检查更新时的版本比较。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                OutlinedTextField(
+                    value = version,
+                    onValueChange = { 
+                        version = it
+                        errorMessage = ""
+                    },
+                    label = { Text("版本号") },
+                    placeholder = { Text("例如: v0.0.19-7-1") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    supportingText = {
+                        Text(
+                            text = "格式: v主版本.次版本.修订版本-构建号",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                )
+                
+                if (errorMessage.isNotEmpty()) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (version.isBlank()) {
+                        errorMessage = "版本号不能为空"
+                        return@TextButton
+                    }
+                    onConfirm(version)
+                },
+                enabled = version.isNotBlank()
+            ) {
+                Text("确定")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }
 

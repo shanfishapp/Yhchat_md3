@@ -32,6 +32,7 @@ import coil.ImageLoader
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import android.os.Build
+import okhttp3.OkHttpClient
 
 /**
  * Markdown文本渲染组件
@@ -51,7 +52,7 @@ fun MarkdownText(
     val backgroundColorInt = backgroundColor.toArgb()
     
     val markwon = remember(context, isDarkTheme, textColorInt, onImageClick) {
-        // 创建支持GIF动画的ImageLoader
+        // 创建支持GIF动画和自定义referer的ImageLoader
         val imageLoader = ImageLoader.Builder(context)
             .components {
                 // 根据Android版本选择合适的GIF解码器
@@ -60,6 +61,24 @@ fun MarkdownText(
                 } else {
                     add(GifDecoder.Factory())  // Android 9以下使用GifDecoder
                 }
+            }
+            .okHttpClient {
+                okhttp3.OkHttpClient.Builder()
+                    .addInterceptor { chain ->
+                        val request = chain.request()
+                        val url = request.url.toString()
+                        
+                        // 为 *.jwznb.com 域名的图片添加 referer
+                        if (url.contains(".jwznb.com/")) {
+                            val newRequest = request.newBuilder()
+                                .addHeader("Referer", "https://myapp.jwznb.com")
+                                .build()
+                            chain.proceed(newRequest)
+                        } else {
+                            chain.proceed(request)
+                        }
+                    }
+                    .build()
             }
             .build()
         
@@ -74,16 +93,27 @@ fun MarkdownText(
                         if (onImageClick != null && (link.endsWith(".jpg") || link.endsWith(".jpeg") || 
                             link.endsWith(".png") || link.endsWith(".gif") || link.endsWith(".webp"))) {
                             onImageClick(link)
-                        } else if (UnifiedLinkHandler.isHandleableLink(link)) {
-                            // 使用统一的链接处理器
-                            UnifiedLinkHandler.handleLink(context, link)
                         } else {
-                            // 使用默认浏览器打开其他链接
-                            try {
-                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(link))
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                android.widget.Toast.makeText(context, "无法打开链接", android.widget.Toast.LENGTH_SHORT).show()
+                            // 优先使用应用内链接处理器
+                            when {
+                                com.yhchat.canary.util.YunhuLinkHandler.containsYunhuLink(link) -> {
+                                    com.yhchat.canary.util.YunhuLinkHandler.handleYunhuLink(context, link)
+                                }
+                                com.yhchat.canary.utils.ChatAddLinkHandler.isChatAddLink(link) -> {
+                                    com.yhchat.canary.utils.ChatAddLinkHandler.handleLink(context, link)
+                                }
+                                UnifiedLinkHandler.isHandleableLink(link) -> {
+                                    UnifiedLinkHandler.handleLink(context, link)
+                                }
+                                else -> {
+                                    // 使用默认浏览器打开其他链接
+                                    try {
+                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(link))
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        android.widget.Toast.makeText(context, "无法打开链接", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                }
                             }
                         }
                     }

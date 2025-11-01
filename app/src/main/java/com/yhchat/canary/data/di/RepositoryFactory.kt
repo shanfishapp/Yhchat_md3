@@ -231,6 +231,13 @@ object RepositoryFactory {
     }
     
     /**
+     * 获取更新仓库实例
+     */
+    fun getUpdateRepository(context: Context): com.yhchat.canary.data.repository.UpdateRepository {
+        return com.yhchat.canary.data.repository.UpdateRepository(context)
+    }
+    
+    /**
      * 获取ApiService实例
      */
 }

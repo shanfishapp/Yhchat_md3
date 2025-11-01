@@ -502,4 +502,58 @@ class CommunityRepository @Inject constructor(
             Result.failure(e)
         }
     }
+    
+    /**
+     * 屏蔽/取消屏蔽用户
+     */
+    suspend fun setBlackList(
+        token: String,
+        authorId: String,
+        isAdd: Int
+    ): Result<ApiStatus> {
+        return try {
+            val request = com.yhchat.canary.data.api.SetBlackListRequest(isAdd = isAdd, authorId = authorId)
+            val response = apiService.setBlackList(token, request)
+            
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null && body.code == 1) {
+                    Result.success(body)
+                } else {
+                    Result.failure(Exception("API返回错误: ${body?.message ?: "未知错误"}"))
+                }
+            } else {
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 获取屏蔽用户列表
+     */
+    suspend fun getBlackList(
+        token: String,
+        size: Int = 20,
+        page: Int = 1
+    ): Result<BlockedUserListResponse> {
+        return try {
+            val request = com.yhchat.canary.data.api.BlackListRequest(size = size, page = page)
+            val response = apiService.getBlackList(token, request)
+            
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null && body.code == 1) {
+                    Result.success(body)
+                } else {
+                    Result.failure(Exception("API返回错误: ${body?.msg ?: "未知错误"}"))
+                }
+            } else {
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

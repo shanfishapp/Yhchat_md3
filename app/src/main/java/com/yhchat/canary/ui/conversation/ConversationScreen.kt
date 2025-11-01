@@ -39,7 +39,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import com.yhchat.canary.data.model.Conversation
@@ -53,9 +52,15 @@ import com.yhchat.canary.ui.search.ComprehensiveSearchActivity
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.animation.*
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import java.text.SimpleDateFormat
 import java.util.*
 import com.yhchat.canary.ui.components.ConversationMenuDialog
+import com.yhchat.canary.R
 
 /**
  * 会话列表界面
@@ -103,14 +108,8 @@ fun ConversationScreen(
     // 列表状态
     val listState = rememberLazyListState()
 
-    // 置顶栏显示状态 - 使用key保持状态
-    var showStickyBar by remember(key1 = "sticky_bar") { mutableStateOf(true) }
-
     // 刷新状态 - 使用key保持状态
     var refreshing by remember(key1 = "refreshing") { mutableStateOf(false) }
-    
-    // 记录用户是否正在主动交互（滚动）
-    var isUserScrolling by remember { mutableStateOf(false) }
 
     // 下拉刷新状态
     val swipeRefreshState =
@@ -127,18 +126,7 @@ fun ConversationScreen(
     // 添加菜单 BottomSheet 状态
     var showAddMenuBottomSheet by remember { mutableStateOf(false) }
 
-    // 监听列表滚动位置，控制置顶栏显示
-    // 只有当用户主动滚动时才改变置顶栏状态
-    LaunchedEffect(listState.isScrollInProgress) {
-        if (listState.isScrollInProgress) {
-            // 用户开始滚动
-            isUserScrolling = true
-        } else if (isUserScrolling) {
-            // 用户停止滚动，根据当前位置决定是否显示置顶栏
-            showStickyBar = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 100
-            isUserScrolling = false
-        }
-    }
+    // 移除置顶栏滚动控制逻辑
     
     // 连接滚动行为到底部导航栏的显示/隐藏
     scrollBehavior?.let { behavior ->
@@ -224,39 +212,7 @@ fun ConversationScreen(
             }
         }
         
-        // 置顶会话（根据滚动状态和设置显示/隐藏，带动画效果）
-        AnimatedVisibility(
-            visible = showStickyBar && showStickyConversations && !stickyData?.sticky.isNullOrEmpty(),
-            enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
-        ) {
-            IntegratedStickyConversations(
-                stickyData = stickyData,
-                onConversationClick = onConversationClick,
-                onConversationLongClick = { chatId, chatType, chatName ->
-                    // 根据置顶会话创建临时Conversation对象
-                    val stickyItem = stickyData?.sticky?.find { it.chatId == chatId }
-                    if (stickyItem != null) {
-                        selectedConversation = Conversation(
-                            chatId = stickyItem.chatId,
-                            chatType = stickyItem.chatType,
-                            name = stickyItem.chatName,
-                            chatContent = "",
-                            timestampMs = 0L,
-                            unreadMessage = 0,
-                            at = 0,
-                            avatarUrl = stickyItem.avatarUrl,
-                            timestamp = 0L,
-                            certificationLevel = stickyItem.certificationLevel
-                        )
-                        coroutineScope.launch {
-                            isSelectedConversationSticky = true  // 置顶列表中的都是已置顶的
-                            showConversationMenu = true
-                        }
-                    }
-                }
-            )
-        }
+        // 移除单独的置顶会话组件，将在列表中集成显示
 
         // 会话列表（支持下拉刷新）
         SwipeRefresh(
@@ -287,6 +243,74 @@ fun ConversationScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
+                    // 置顶会话显示在列表最顶部 - 横向滑动样式
+                    if (showStickyConversations && !stickyData?.sticky.isNullOrEmpty()) {
+                        item(key = "sticky_conversations_section") {
+                            Column(
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                // 置顶会话标题
+                                Text(
+                                    text = "置顶会话",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                
+                                // 置顶会话横向列表
+                                androidx.compose.foundation.lazy.LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    items(
+                                        items = stickyData?.sticky ?: emptyList(),
+                                        key = { stickyItem -> "sticky_${stickyItem.chatId}" }
+                                    ) { stickyItem ->
+                                        StickyConversationCard(
+                                            stickyItem = stickyItem,
+                                            onClick = {
+                                                // 标记会话为已读
+                                                viewModel.markConversationAsRead(stickyItem.chatId, stickyItem.chatType)
+                                                
+                                                // 跳转到聊天界面
+                                                onConversationClick(stickyItem.chatId, stickyItem.chatType, stickyItem.chatName)
+                                            },
+                                            onLongClick = {
+                                                // 创建临时Conversation对象用于菜单
+                                                val stickyConversation = Conversation(
+                                                    chatId = stickyItem.chatId,
+                                                    chatType = stickyItem.chatType,
+                                                    name = stickyItem.chatName,
+                                                    chatContent = "",
+                                                    timestampMs = 0L,
+                                                    unreadMessage = 0,
+                                                    at = 0,
+                                                    avatarUrl = stickyItem.avatarUrl,
+                                                    timestamp = 0L,
+                                                    certificationLevel = stickyItem.certificationLevel
+                                                )
+                                                selectedConversation = stickyConversation
+                                                coroutineScope.launch {
+                                                    isSelectedConversationSticky = true
+                                                    showConversationMenu = true
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                                
+                                // 分隔线
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant
+                                )
+                            }
+                        }
+                    }
+                    
+                    // 普通会话列表
                     items(
                         items = pagedConversations,
                         key = { conversation -> "${conversation.chatId}_${conversation.timestampMs}" }
@@ -712,66 +736,54 @@ fun ChatTypeIcon(chatType: Int) {
 }
 
 /**
- * 集成的置顶会话组件
+ * 置顶会话卡片 - 小尺寸横向滑动样式
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun IntegratedStickyConversations(
-    stickyData: com.yhchat.canary.data.model.StickyData?,
-    onConversationClick: (String, Int, String) -> Unit,
-    onConversationLongClick: (String, Int, String) -> Unit = { _, _, _ -> },
+fun StickyConversationCard(
+    stickyItem: StickyItem,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    // 如果没有置顶会话，不显示组件
-    if (stickyData?.sticky.isNullOrEmpty()) {
-        return
-    }
-
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = Color.Transparent,
-        tonalElevation = 0.dp
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = 8.dp)
-        ) {
-            // 置顶会话标题
-            Text(
-                text = "置顶会话",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                color = MaterialTheme.colorScheme.onSurface
+    Column(
+        modifier = modifier
+            .width(72.dp)
+            .clickable { onClick() }
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
             )
-
-            // 置顶会话横向列表
-            androidx.compose.foundation.lazy.LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                stickyData.sticky?.let { stickyList ->
-                    items(stickyList) { stickyItem ->
-                        IntegratedStickyItem(
-                            stickyItem = stickyItem,
-                            onClick = {
-                                onConversationClick(
-                                    stickyItem.chatId,
-                                    stickyItem.chatType,
-                                    stickyItem.chatName
-                                )
-                            },
-                            onLongClick = {
-                                onConversationLongClick(
-                                    stickyItem.chatId,
-                                    stickyItem.chatType,
-                                    stickyItem.chatName
-                                )
-                            }
-                        )
-                    }
-                }
-            }
-        }
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // 头像
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(stickyItem.avatarUrl)
+                .crossfade(true)
+                .build(),
+            contentDescription = stickyItem.chatName,
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop,
+            placeholder = painterResource(R.drawable.ic_person),
+            error = painterResource(R.drawable.ic_person)
+        )
+        
+        Spacer(modifier = Modifier.height(2.dp))
+        
+        // 会话名称
+        Text(
+            text = stickyItem.chatName,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 

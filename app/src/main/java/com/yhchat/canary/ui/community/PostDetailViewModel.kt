@@ -300,7 +300,7 @@ class PostDetailViewModel @Inject constructor(
             communityRepository.commentPost(token, postId, content, commentId)
                 .onSuccess {
                     // 重新加载评论列表
-                    loadCommentList(token, postId)
+                    loadCommentList(token, postId, 1)
                 }
                 .onFailure { error ->
                     _commentListState.value = _commentListState.value.copy(error = error.message)

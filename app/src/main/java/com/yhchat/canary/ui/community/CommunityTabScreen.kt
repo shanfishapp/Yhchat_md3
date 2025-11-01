@@ -12,6 +12,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
@@ -139,6 +140,19 @@ fun CommunityTabScreen(
                             contentDescription = if (isSearching) "关闭搜索" else "搜索我的文章"
                         )
                     }
+                }
+                // 屏蔽用户按钮
+                IconButton(onClick = {
+                    // 跳转到屏蔽用户列表Activity
+                    val intent = Intent(context, BlockedUsersActivity::class.java).apply {
+                        putExtra("token", token)
+                    }
+                    context.startActivity(intent)
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.Block,
+                        contentDescription = "屏蔽用户"
+                    )
                 }
                 // 全局搜索按钮
                 IconButton(onClick = {

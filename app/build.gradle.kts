@@ -16,19 +16,13 @@ android {
         minSdk = 21
         targetSdk = 36
         versionCode = 1
-        versionName = "19.7.1"
+        versionName = "19.8"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
-        getByName("release") {
+        release {
             isMinifyEnabled = false
-            isShrinkResources = false
-        }
-        
-        getByName("debug") {
-            isMinifyEnabled = false
-            isShrinkResources = false
         }
     }
 

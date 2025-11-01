@@ -210,6 +210,13 @@
             android:exported="false"
             android:label="搜索"
             android:theme="@style/Theme.YhchatCanary" />
+            
+        <!-- 屏蔽用户列表 Activity -->
+        <activity
+            android:name=".ui.community.BlockedUsersActivity"
+            android:exported="false"
+            android:label="屏蔽用户"
+            android:theme="@style/Theme.YhchatCanary" />
         <activity
             android:name=".ui.settings.ChangePasswordActivity"
             android:exported="false"

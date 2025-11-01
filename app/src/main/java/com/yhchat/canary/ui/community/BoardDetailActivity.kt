@@ -5,7 +5,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -92,6 +94,11 @@ fun BoardDetailScreen(
     val boardDetailState by viewModel.boardDetailState.collectAsState()
     val postListState by viewModel.postListState.collectAsState()
     val followState by viewModel.followState.collectAsState()
+    val blockState by viewModel.blockState.collectAsState()
+    
+    // 显示屏蔽对话框的状态
+    var showBlockDialog by remember { mutableStateOf(false) }
+    var selectedPost by remember { mutableStateOf<CommunityPost?>(null) }
     
     // 加载数据
     LaunchedEffect(boardId, token) {
@@ -203,6 +210,10 @@ fun BoardDetailScreen(
                             putExtra("token", token)
                         }
                         context.startActivity(intent)
+                    },
+                    onLongClick = {
+                        selectedPost = post
+                        showBlockDialog = true
                     }
                 )
             }
@@ -283,6 +294,71 @@ fun BoardDetailScreen(
                 contentDescription = "发布文章"
             )
         }
+    }
+    
+    // 屏蔽用户对话框
+    if (showBlockDialog && selectedPost != null) {
+        AlertDialog(
+            onDismissRequest = { 
+                showBlockDialog = false
+                selectedPost = null
+            },
+            title = { Text("屏蔽用户") },
+            text = { Text("确定要屏蔽用户 ${selectedPost?.senderNickname} 吗？屏蔽后将不再看到该用户的文章。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        selectedPost?.let { post ->
+                            viewModel.blockUser(token, post.senderId)
+                        }
+                        showBlockDialog = false
+                        selectedPost = null
+                    },
+                    enabled = !blockState.isLoading
+                ) {
+                    if (blockState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("确定")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { 
+                        showBlockDialog = false
+                        selectedPost = null
+                    }
+                ) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+    
+    // 屏蔽成功提示
+    LaunchedEffect(blockState.isSuccess) {
+        if (blockState.isSuccess) {
+            // 显示成功提示
+            viewModel.resetBlockState()
+        }
+    }
+    
+    // 屏蔽错误提示
+    blockState.error?.let { error ->
+        AlertDialog(
+            onDismissRequest = { viewModel.resetBlockState() },
+            title = { Text("错误") },
+            text = { Text(error) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.resetBlockState() }) {
+                    Text("确定")
+                }
+            }
+        )
     }
     }
 }
@@ -422,16 +498,21 @@ private fun InfoItem(
 /**
  * 文章列表项
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun PostListItem(
     post: CommunityPost,
     onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onClick() },
+            .combinedClickable(
+                onClick = { onClick() },
+                onLongClick = { onLongClick() }
+            ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(

@@ -444,3 +444,42 @@ data class FollowingBoardListData(
     @SerializedName("total")
     val total: Int
 )
+
+/**
+ * 屏蔽用户
+ */
+data class BlockedUser(
+    @SerializedName("id")
+    val id: Int,
+    
+    @SerializedName("user_id")
+    val userId: String,
+    
+    @SerializedName("nickname")
+    val nickname: String,
+    
+    @SerializedName("avatar_url")
+    val avatarUrl: String
+)
+
+/**
+ * 屏蔽用户列表响应
+ */
+data class BlockedUserListResponse(
+    @SerializedName("code")
+    val code: Int,
+    
+    @SerializedName("data")
+    val data: BlockedUserListData,
+    
+    @SerializedName("msg")
+    val msg: String
+)
+
+data class BlockedUserListData(
+    @SerializedName("list")
+    val list: List<BlockedUser>,
+    
+    @SerializedName("total")
+    val total: Int
+)
