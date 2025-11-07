@@ -107,3 +107,17 @@ message address_book_list {
         }
     }
 }
+
+// 设备信息相关消息
+message DeviceInfo {
+    string user_id = 1;          // "8516939"
+    string platform = 3;         // "android"/"windows"/"Web"
+    string device_id = 4;        // 设备ID
+    int64 login_timestamp = 5;   // 上线时间戳
+}
+
+// 获取在线设备列表响应
+message OnlineDevicesResponse {
+    Status status = 1;           // 响应状态
+    repeated DeviceInfo devices = 2; // 设备列表（多个）
+}

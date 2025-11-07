@@ -6,10 +6,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -57,11 +61,20 @@ class GroupInfoActivity : ComponentActivity() {
                         viewModel = viewModel,
                         onBackClick = { finish() },
                         onSettingsClick = {
-                            val intent = Intent(this@GroupInfoActivity, GroupSettingsActivity::class.java).apply {
-                                putExtra(GroupSettingsActivity.EXTRA_GROUP_ID, groupId)
-                                putExtra(GroupSettingsActivity.EXTRA_GROUP_NAME, groupName)
+                            try {
+                                val intent = Intent(this@GroupInfoActivity, GroupSettingsActivity::class.java).apply {
+                                    putExtra(GroupSettingsActivity.EXTRA_GROUP_ID, groupId)
+                                    putExtra(GroupSettingsActivity.EXTRA_GROUP_NAME, groupName)
+                                }
+                                startActivity(intent)
+                            } catch (e: Exception) {
+                                android.util.Log.e("GroupInfoActivity", "Failed to open settings", e)
+                                android.widget.Toast.makeText(
+                                    this@GroupInfoActivity,
+                                    "无法打开群聊设置",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
                             }
-                            startActivity(intent)
                         },
                         onShareClick = {
                             // 分享功能已在GroupInfoScreen中集成

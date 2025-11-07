@@ -737,6 +737,47 @@ class UserRepository @Inject constructor(
     }
     
     /**
+     * 获取在线设备列表
+     */
+    suspend fun getOnlineDevices(): Result<List<com.yhchat.canary.data.model.DeviceInfo>> {
+        return try {
+            val token = getToken() ?: return Result.failure(Exception("未登录"))
+            val response = apiService.getOnlineDevices(token)
+            
+            if (response.isSuccessful) {
+                val responseBody = response.body()
+                if (responseBody != null) {
+                    // 解析 Protobuf 数据
+                    val bytes = responseBody.bytes()
+                    val onlineDevicesResponse = ProtoUser.OnlineDevicesResponse.parseFrom(bytes)
+                    
+                    // 检查响应状态
+                    if (onlineDevicesResponse.status.code == 1) {
+                        // 转换为数据模型
+                        val devices = onlineDevicesResponse.devicesList.map { protoDevice ->
+                            com.yhchat.canary.data.model.DeviceInfo(
+                                userId = protoDevice.userId,
+                                platform = protoDevice.platform,
+                                deviceId = protoDevice.deviceId,
+                                loginTimestamp = protoDevice.loginTimestamp
+                            )
+                        }
+                        Result.success(devices)
+                    } else {
+                        Result.failure(Exception("API返回错误: ${onlineDevicesResponse.status.msg}"))
+                    }
+                } else {
+                    Result.failure(Exception("响应体为空"))
+                }
+            } else {
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
      * 获取分享信息
      */
     suspend fun getShareInfo(key: String, ts: String): Result<ShareInfo> {

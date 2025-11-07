@@ -71,16 +71,16 @@ fun LoginScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .verticalScroll(scrollState)
-            .padding(24.dp),
+            .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // 添加顶部间距，确保内容不会贴顶
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         // Logo
         Box(
             modifier = Modifier
-                .size(80.dp)
+                .size(64.dp)
                 .background(
                     MaterialTheme.colorScheme.primary,
                     CircleShape
@@ -89,7 +89,7 @@ fun LoginScreen(
         ) {
             Text(
                 text = "云湖",
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onPrimary,
                 fontWeight = FontWeight.Bold
             )
@@ -98,12 +98,12 @@ fun LoginScreen(
         // 应用名称
         Text(
             text = "云湖聊天",
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         
         // 登录方式选择
         TabRow(
@@ -123,58 +123,49 @@ fun LoginScreen(
         }
         
         // 登录表单
-        Card(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
                 when (selectedTab) {
                     0 -> {
                         // 手机登录
                         
                         // 验证码图片显示 - 移到最上面
                         captchaData?.let { captcha ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Row(
+                                // 验证码图片
+                                androidx.compose.foundation.Image(
+                                    painter = rememberAsyncImagePainter(
+                                        model = android.util.Base64.decode(
+                                            captcha.b64s.substringAfter(","),
+                                            android.util.Base64.DEFAULT
+                                        ).let { bytes ->
+                                            coil.request.ImageRequest.Builder(LocalContext.current)
+                                                .data(bytes)
+                                                .build()
+                                        }
+                                    ),
+                                    contentDescription = "验证码图片",
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                        .height(48.dp)
+                                        .width(96.dp),
+                                    contentScale = ContentScale.Fit
+                                )
+                                
+                                // 刷新按钮
+                                OutlinedButton(
+                                    onClick = { viewModel.getCaptcha() },
+                                    enabled = !uiState.isLoading,
+                                    modifier = Modifier.height(36.dp)
                                 ) {
-                                    // 验证码图片
-                                    androidx.compose.foundation.Image(
-                                        painter = rememberAsyncImagePainter(
-                                            model = android.util.Base64.decode(
-                                                captcha.b64s.substringAfter(","),
-                                                android.util.Base64.DEFAULT
-                                            ).let { bytes ->
-                                                coil.request.ImageRequest.Builder(LocalContext.current)
-                                                    .data(bytes)
-                                                    .build()
-                                            }
-                                        ),
-                                        contentDescription = "验证码图片",
-                                        modifier = Modifier
-                                            .height(60.dp)
-                                            .width(120.dp),
-                                        contentScale = ContentScale.Fit
-                                    )
-                                    
-                                    // 刷新按钮
-                                    OutlinedButton(
-                                        onClick = { viewModel.getCaptcha() },
-                                        enabled = !uiState.isLoading,
-                                        modifier = Modifier.height(40.dp)
-                                    ) {
-                                        Text("刷新验证码")
-                                    }
+                                    Text("刷新", style = MaterialTheme.typography.bodySmall)
                                 }
                             }
                         }
@@ -186,8 +177,7 @@ fun LoginScreen(
                             label = { Text("手机号") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                             modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            supportingText = { Text("请输入11位手机号码") }
+                            singleLine = true
                         )
 
                         // 图片验证码输入
@@ -197,15 +187,14 @@ fun LoginScreen(
                             label = { Text("图片验证码") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                             modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            supportingText = { Text("请输入上方图片中的验证码") }
+                            singleLine = true
                         )
 
                         // 短信验证码输入和获取按钮
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.Top
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             OutlinedTextField(
                                 value = smsCaptcha,
@@ -213,8 +202,7 @@ fun LoginScreen(
                                 label = { Text("短信验证码") },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                supportingText = { Text("请输入6位短信验证码") }
+                                singleLine = true
                             )
 
                             Button(
@@ -222,27 +210,21 @@ fun LoginScreen(
                                     viewModel.getSmsCaptcha(mobile, imageCaptcha)
                                 },
                                 enabled = !uiState.isLoading && mobile.isNotBlank() && imageCaptcha.isNotBlank(),
-                                modifier = Modifier
-                                    .height(56.dp)
-                                    .padding(top = 8.dp)
+                                modifier = Modifier.height(56.dp)
                             ) {
-                                Text("获取短信")
+                                Text("获取短信", style = MaterialTheme.typography.bodyMedium)
                             }
                         }
                         
                         // 成功提示
                         if (uiState.smsSuccess) {
-                            Card(
+                            Text(
+                                text = "短信验证码发送成功，请查收",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                            ) {
-                                Text(
-                                    text = "短信验证码发送成功，请查收",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(12.dp)
-                                )
-                            }
+                                textAlign = TextAlign.Center
+                            )
                         }
                     }
                     1 -> {
@@ -287,34 +269,33 @@ fun LoginScreen(
                     )
                 }
                 
-                // 登录按钮
-                Button(
-                    onClick = {
-                        when (selectedTab) {
-                            0 -> viewModel.loginWithCaptcha(mobile, smsCaptcha)
-                            1 -> viewModel.loginWithEmail(email, password)
-                        }
-                    },
-                    enabled = !uiState.isLoading && (
-                        (selectedTab == 0 && mobile.isNotBlank() && smsCaptcha.isNotBlank()) ||
-                        (selectedTab == 1 && email.isNotBlank() && password.isNotBlank())
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                ) {
-                    if (uiState.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    } else {
-                        Text(
-                            text = "登录",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+            // 登录按钮
+            Button(
+                onClick = {
+                    when (selectedTab) {
+                        0 -> viewModel.loginWithCaptcha(mobile, smsCaptcha)
+                        1 -> viewModel.loginWithEmail(email, password)
                     }
+                },
+                enabled = !uiState.isLoading && (
+                    (selectedTab == 0 && mobile.isNotBlank() && smsCaptcha.isNotBlank()) ||
+                    (selectedTab == 1 && email.isNotBlank() && password.isNotBlank())
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text(
+                        text = "登录",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -328,6 +309,6 @@ fun LoginScreen(
         )
         
         // 添加底部间距，确保内容不会贴底
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }

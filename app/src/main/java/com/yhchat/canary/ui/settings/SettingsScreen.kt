@@ -99,6 +99,16 @@ fun SettingsScreen(
                     title = "账户设置",
                     items = listOf(
                         SettingsItem(
+                            icon = Icons.Default.Devices,
+                            title = "在线设备",
+                            subtitle = "查看当前登录的设备",
+                            onClick = {
+                                tokenRepository?.let { tokenRepo ->
+                                    OnlineDevicesActivity.start(context, tokenRepo)
+                                }
+                            }
+                        ),
+                        SettingsItem(
                             icon = Icons.Default.Lock,
                             title = "修改密码",
                             subtitle = "更改账户登录密码",

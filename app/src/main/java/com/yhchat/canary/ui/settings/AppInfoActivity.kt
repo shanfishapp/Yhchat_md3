@@ -47,7 +47,7 @@ import dagger.hilt.android.AndroidEntryPoint
 class AppInfoActivity : ComponentActivity() {
     
     companion object {
-        const val APP_VERSION = "Canary 19.8"
+        const val APP_VERSION = "Canary 19.9 Preview"
         const val APP_NAME = "Yhchat Canary"
 
         const val DEVELOPER_NAME_1 = "Kauid323"
@@ -55,8 +55,8 @@ class AppInfoActivity : ComponentActivity() {
         const val DEVELOPER_URL_1 = "https://github.com/Kauid323/"
         const val DEVELOPER_URL_2 = "yunhu://chat-add?id=8516939&type=user"
         const val GITHUB_REPO_URL = "https://github.com/Kauid323/Yhchat_md3"
-        const val DEFAULT_VERSION_TAG = "v0.0.19-8"
-        const val IS_LATEST_BUILD_PREVIEW = false
+        const val DEFAULT_VERSION_TAG = "v0.0.19-9-pre"
+        const val IS_LATEST_BUILD_PREVIEW = true
 
         fun start(context: Context) {
             val intent = Intent(context, AppInfoActivity::class.java)
@@ -178,7 +178,6 @@ private fun AppInfoScreen(
                         onClick = {
                         },
                         onLongClick = {
-                            showChatDebugDialog = true
                         }
                     ),
                 contentScale = ContentScale.Crop
@@ -226,11 +225,11 @@ private fun AppInfoScreen(
             // 检查更新
             AppInfoItem(
                 icon = Icons.Default.SystemUpdate,
-                title = if (isLatestBuildPreview) "检查更新(Pre)" else "检查更新",
+                title = if (isLatestBuildPreview) "检查更新 " else "检查更新",
                 content = if (isLatestBuildPreview) {
                     {
                         Text(
-                            text = "你用的是最新构建预览版",
+                            text = "你用的是最新预览版",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -314,7 +313,6 @@ private fun AppInfoScreen(
                 }
             )
         } else {
-            // 没有更新的提示
             LaunchedEffect(updateInfo) {
                 // 这里可以显示一个 Toast 或者 Snackbar
             }

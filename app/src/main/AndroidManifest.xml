@@ -67,7 +67,13 @@
             android:exported="false"
             android:label="标签详情"
             android:theme="@style/Theme.YhchatCanary" />
-        
+            
+        <activity
+            android:name=".ui.group.GroupMembersActivity"
+            android:exported="false"
+            android:label="成员列表"
+            android:theme="@style/Theme.YhchatCanary" />
+
         <activity
             android:name=".ui.group.GroupBotManagementActivity"
             android:exported="false"
@@ -201,6 +207,10 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="yunhu" 
                       android:host="chat-add" />
+                <data android:scheme="https" 
+                      android:host="yhfx.jwznb.com" />
+                <data android:scheme="yunhu" 
+                      android:host="jwznb.com" />
             </intent-filter>
         </activity>
             
@@ -216,6 +226,13 @@
             android:name=".ui.community.BlockedUsersActivity"
             android:exported="false"
             android:label="屏蔽用户"
+            android:theme="@style/Theme.YhchatCanary" />
+            
+        <!-- 在线设备 Activity -->
+        <activity
+            android:name=".ui.settings.OnlineDevicesActivity"
+            android:exported="false"
+            android:label="在线设备"
             android:theme="@style/Theme.YhchatCanary" />
         <activity
             android:name=".ui.settings.ChangePasswordActivity"

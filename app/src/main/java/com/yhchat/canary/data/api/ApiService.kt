@@ -638,6 +638,14 @@ interface ApiService {
         @Header("token") token: String,
         @Body request: BlackListRequest
     ): Response<com.yhchat.canary.data.model.BlockedUserListResponse>
+    
+    /**
+     * 获取在线设备列表 (Protobuf)
+     */
+    @GET("v1/user/clients")
+    suspend fun getOnlineDevices(
+        @Header("token") token: String
+    ): Response<okhttp3.ResponseBody>
 
     @POST("v1/user/invite/change-user-invite-code")
     suspend fun changeInviteCode(

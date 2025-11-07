@@ -43,6 +43,9 @@ object UnifiedLinkHandler {
                 url.startsWith("https://yhfx.jwznb.com/share") -> {
                     handleYhfxShareLink(context, url)
                 }
+                url.startsWith("yunhu://jwznb.com") -> {
+                    handleYhfxShareLink(context, url)
+                }
                 url.contains("https://www.yhchat.com/c/p/") -> {
                     handleWebArticleLink(context, url)
                 }
@@ -109,7 +112,7 @@ object UnifiedLinkHandler {
     }
     
     /**
-     * 处理 yhfx 分享链接
+     * 处理 yhfx,yunhu://jwznb网页 分享链接
      */
     private fun handleYhfxShareLink(context: Context, url: String) {
         val uri = Uri.parse(url)
@@ -117,7 +120,7 @@ object UnifiedLinkHandler {
         val ts = uri.getQueryParameter("ts")
         
         if (key.isNullOrEmpty() || ts.isNullOrEmpty()) {
-            Log.w(TAG, "Invalid yhfx share link: $url")
+            Log.w(TAG, "Invalid share link: $url")
             android.widget.Toast.makeText(context, "分享链接格式错误", android.widget.Toast.LENGTH_SHORT).show()
             return
         }

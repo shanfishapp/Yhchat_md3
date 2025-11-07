@@ -1,6 +1,7 @@
 package com.yhchat.canary.ui.components
 
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.runtime.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -29,7 +30,7 @@ class ScrollBehavior {
         lastScrollOffset = scrollOffset
         
         // 如果滚动距离太小，不做处理
-        if (kotlin.math.abs(scrollDelta) < 5) return
+        if (kotlin.math.abs(scrollDelta) < 3) return
         
         // 向下滚动时隐藏导航栏
         if (scrollDelta > 0 && _isVisible.value) {
@@ -68,7 +69,7 @@ class ScrollBehavior {
     private fun scheduleShowNavigation(coroutineScope: kotlinx.coroutines.CoroutineScope) {
         cancelHideTimer()
         hideTimer = coroutineScope.launch {
-            delay(2000) // 2秒后自动显示导航栏
+            delay(1500) // 1.5秒后自动显示导航栏
             _isVisible.value = true
         }
     }
@@ -102,5 +103,18 @@ fun LazyListState.HandleScrollBehavior(
         val scrollOffset = this@HandleScrollBehavior.firstVisibleItemIndex * 1000 + 
                           this@HandleScrollBehavior.firstVisibleItemScrollOffset
         scrollBehavior.handleScrollOffsetChange(scrollOffset, coroutineScope)
+    }
+}
+
+/**
+ * ScrollState 扩展函数，用于自动处理滚动行为
+ */
+@Composable
+fun ScrollState.HandleScrollBehavior(
+    scrollBehavior: ScrollBehavior,
+    coroutineScope: kotlinx.coroutines.CoroutineScope = rememberCoroutineScope()
+) {
+    LaunchedEffect(this.value) {
+        scrollBehavior.handleScrollOffsetChange(this@HandleScrollBehavior.value, coroutineScope)
     }
 }

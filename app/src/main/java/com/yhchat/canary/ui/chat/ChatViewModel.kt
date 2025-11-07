@@ -991,6 +991,55 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
+     * 发送表情包贴纸消息
+     */
+    fun sendStickerMessage(
+        stickerItem: com.yhchat.canary.data.model.StickerItem,
+        quoteMsgId: String? = null,
+        quoteMsgText: String? = null
+    ) {
+        if (currentChatId.isEmpty()) {
+            Log.w(tag, "Chat not initialized")
+            return
+        }
+        
+        viewModelScope.launch {
+            try {
+                Log.d(tag, "Sending sticker message: id=${stickerItem.id}, url=${stickerItem.url}")
+                
+                // 发送表情包贴纸消息（contentType=7）
+                val result = messageRepository.sendStickerMessage(
+                    chatId = currentChatId,
+                    chatType = currentChatType,
+                    stickerItem = stickerItem,
+                    quoteMsgId = quoteMsgId,
+                    quoteMsgText = quoteMsgText
+                )
+                
+                result.fold(
+                    onSuccess = { success ->
+                        if (success) {
+                            Log.d(tag, "Sticker message sent successfully")
+                            loadMessages(refresh = true)
+                        }
+                    },
+                    onFailure = { exception ->
+                        Log.e(tag, "Failed to send sticker message", exception)
+                        _uiState.value = _uiState.value.copy(
+                            error = exception.message ?: "发送表情包失败"
+                        )
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(tag, "Error sending sticker message", e)
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "发送表情包失败"
+                )
+            }
+        }
+    }
+    
+    /**
      * 发送草稿输入（输入框内容变化时调用）
      */
     fun sendDraftInput(inputText: String) {

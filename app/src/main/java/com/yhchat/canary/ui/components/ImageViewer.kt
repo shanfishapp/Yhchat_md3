@@ -1,15 +1,10 @@
 package com.yhchat.canary.ui.components
 
-import android.Manifest
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -35,8 +30,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
@@ -87,8 +80,13 @@ fun ImageViewer(
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(imageUrl)
-                    .setHeader("Referer", "https://myapp.jwznb.com")
-                    .setHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
+                    .apply {
+                        // 只对 jwznb.com 域名的图片添加 Referer
+                        if (imageUrl.contains(".jwznb.com")) {
+                            setHeader("Referer", "https://myapp.jwznb.com")
+                            setHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
+                        }
+                    }
                     .crossfade(true)
                     .build(),
                 contentDescription = "预览图片",
@@ -105,7 +103,7 @@ fun ImageViewer(
                         detectTransformGestures(
                             onGesture = { _, pan, zoom, rotate ->
                                 // 支持无限缩放，从0.1到20倍
-                                scale = (scale * zoom).coerceIn(0.1f, 20f)
+                                scale = (scale * zoom).coerceIn(0.1f, 100f)
                                 rotation += rotate
                                 
                                 // 跟手拖动 - 根据缩放比例动态调整拖动范围
@@ -167,8 +165,8 @@ fun ImageViewer(
                     // 下载按钮
                     FilledIconButton(
                         onClick = {
-                            // 实现下载功能，包含权限处理
-                            saveImageWithPermission(context, imageUrl)
+                            // 直接保存图片，不检查权限
+                            downloadImageToGallery(context, imageUrl)
                         },
                         colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
@@ -252,8 +250,13 @@ fun SimpleImageViewer(
             val painter = rememberAsyncImagePainter(
                 model = ImageRequest.Builder(context)
                     .data(imageUrl)
-                    .setHeader("Referer", "https://myapp.jwznb.com")
-                    .setHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
+                    .apply {
+                        // 只对 jwznb.com 域名的图片添加 Referer
+                        if (imageUrl.contains(".jwznb.com")) {
+                            setHeader("Referer", "https://myapp.jwznb.com")
+                            setHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
+                        }
+                    }
                     .crossfade(true)
                     .build()
             )
@@ -367,8 +370,13 @@ fun AdvancedImageViewer(
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(imageUrl)
-                    .setHeader("Referer", "https://myapp.jwznb.com")
-                    .setHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
+                    .apply {
+                        // 只对 jwznb.com 域名的图片添加 Referer
+                        if (imageUrl.contains(".jwznb.com")) {
+                            setHeader("Referer", "https://myapp.jwznb.com")
+                            setHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
+                        }
+                    }
                     .crossfade(true)
                     .build(),
                 contentDescription = "预览图片",
@@ -518,37 +526,6 @@ fun AdvancedImageViewer(
     }
 }
 
-/**
- * 保存图片 - 包含权限处理
- */
-private fun saveImageWithPermission(context: Context, imageUrl: String) {
-    if (context !is ComponentActivity) return
-    
-    // Android 13及以上不需要WRITE_EXTERNAL_STORAGE权限
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        // Android 13+直接保存
-        downloadImageToGallery(context, imageUrl)
-    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        // Android 6-12需要检查存储权限
-            if (ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            // 有权限，直接保存
-            downloadImageToGallery(context, imageUrl)
-        } else {
-            // 没有权限，跳转到设置页面
-            Toast.makeText(context, "需要存储权限才能保存图片，请在设置中授予权限", Toast.LENGTH_LONG).show()
-            val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-            intent.data = Uri.fromParts("package", context.packageName, null)
-            context.startActivity(intent)
-        }
-    } else {
-        // Android 6以下直接保存
-        downloadImageToGallery(context, imageUrl)
-    }
-}
 
 /**
  * 下载图片到相册
@@ -584,11 +561,13 @@ private fun downloadImageToGallery(context: Context, imageUrl: String) {
                     counter++
                 }
                 
-            // 下载图片（带Referer头）
+            // 下载图片（只对 jwznb.com 域名添加Referer头）
                 val url = URL(imageUrl)
             val connection = url.openConnection() as java.net.HttpURLConnection
-            connection.setRequestProperty("Referer", "https://myapp.jwznb.com")
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
+            if (imageUrl.contains(".jwznb.com")) {
+                connection.setRequestProperty("Referer", "https://myapp.jwznb.com")
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
+            }
             connection.connect()
             
             connection.inputStream.use { input ->
@@ -628,8 +607,10 @@ private fun shareImage(context: Context, imageUrl: String) {
             
             val url = URL(imageUrl)
             val connection = url.openConnection() as java.net.HttpURLConnection
-            connection.setRequestProperty("Referer", "https://myapp.jwznb.com")
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
+            if (imageUrl.contains(".jwznb.com")) {
+                connection.setRequestProperty("Referer", "https://myapp.jwznb.com")
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
+            }
             connection.connect()
             
             connection.inputStream.use { input ->

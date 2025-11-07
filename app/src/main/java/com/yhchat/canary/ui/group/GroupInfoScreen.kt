@@ -1,37 +1,43 @@
 package com.yhchat.canary.ui.group
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Report
-import androidx.compose.material.icons.filled.Wallpaper
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.yhchat.canary.data.model.GroupMemberInfo
 import com.yhchat.canary.ui.components.ImageUtils
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,80 +54,49 @@ fun GroupInfoScreenRoot(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showShareDialog by remember { mutableStateOf(false) }
-    var isSearching by remember { mutableStateOf(false) }
-    var searchKeyword by remember { mutableStateOf("") }
-    
+    var showReportDialog by remember { mutableStateOf(false) }
+    var showInviteDialog by remember { mutableStateOf(false) }
+    var showExitGroupDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(groupId) {
         viewModel.loadGroupInfo(groupId)
     }
-    
-    // 搜索时自动触发
-    LaunchedEffect(searchKeyword) {
-        if (isSearching) {
-            viewModel.searchMembers(groupId, searchKeyword)
-        }
-    }
-    
+
     YhchatCanaryTheme {
         Scaffold(
             topBar = {
                 Column {
                     TopAppBar(
-                        title = { 
-                            if (!isSearching) {
-                                Text(groupName, fontWeight = FontWeight.Bold)
-                            } else {
-                                TextField(
-                                    value = searchKeyword,
-                                    onValueChange = { searchKeyword = it },
-                                    placeholder = { Text("搜索群成员...") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    colors = TextFieldDefaults.colors(
-                                        focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        unfocusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                                        unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
-                                    )
+                        title = {
+                            Column {
+                                Text(
+                                    text = groupName,
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "群聊详情",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         },
                         navigationIcon = {
-                            IconButton(onClick = {
-                                if (isSearching) {
-                                    isSearching = false
-                                    searchKeyword = ""
-                                    viewModel.clearSearch(groupId)
-                                } else {
-                                    onBackClick()
-                                }
-                            }) {
+                            IconButton(onClick = onBackClick) {
                                 Icon(
-                                    imageVector = if (isSearching) Icons.Default.Close else Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = if (isSearching) "取消搜索" else "返回"
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "返回"
                                 )
                             }
                         },
                         actions = {
-                            if (!isSearching) {
-                                IconButton(onClick = { isSearching = true }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Search,
-                                        contentDescription = "搜索"
-                                    )
-                                }
-                                IconButton(onClick = { showShareDialog = true }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Share,
-                                        contentDescription = "分享"
-                                    )
-                                }
-                                IconButton(onClick = onSettingsClick) {
-                                    Icon(
-                                        imageVector = Icons.Default.Settings,
-                                        contentDescription = "群聊设置"
-                                    )
-                                }
+                            IconButton(onClick = onSettingsClick) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "群聊设置"
+                                )
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
@@ -163,6 +138,8 @@ fun GroupInfoScreenRoot(
                     uiState.groupInfo != null -> {
                         GroupInfoContent(
                             groupId = groupId,
+                            groupName = groupName,
+                            context = context,
                             groupInfo = uiState.groupInfo!!,
                             members = uiState.members,
                             isLoadingMembers = uiState.isLoadingMembers,
@@ -173,6 +150,10 @@ fun GroupInfoScreenRoot(
                             onRemoveMember = { userId -> viewModel.removeMember(groupId, userId) },
                             onGagMember = { userId, gagTime -> viewModel.gagMember(groupId, userId, gagTime) },
                             onSetMemberRole = { userId, userLevel -> viewModel.setMemberRole(groupId, userId, userLevel) },
+                            onShareClick = { showShareDialog = true },
+                            onReportClick = { showReportDialog = true },
+                            onInviteClick = { showInviteDialog = true },
+                            onExitClick = { showExitGroupDialog = true },
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -180,15 +161,6 @@ fun GroupInfoScreenRoot(
             }
         }
         
-        // 分享对话框
-        if (showShareDialog) {
-            com.yhchat.canary.ui.components.ShareDialog(
-                chatId = groupId,
-                chatType = 2,  // 群聊
-                chatName = groupName,
-                onDismiss = { showShareDialog = false }
-            )
-        }
     }
     
     // 显示成功消息
@@ -206,11 +178,72 @@ fun GroupInfoScreenRoot(
             viewModel.clearError()
         }
     }
+    
+    // 分享弹窗
+    if (showShareDialog) {
+        com.yhchat.canary.ui.components.ShareDialog(
+            chatId = groupId,
+            chatType = 2, // 群聊
+            chatName = groupName,
+            onDismiss = { showShareDialog = false }
+        )
+    }
+    
+    // 举报弹窗
+    if (showReportDialog) {
+        com.yhchat.canary.ui.components.ReportDialog(
+            chatId = groupId,
+            chatType = 2, // 群聊
+            chatName = groupName,
+            onDismiss = { showReportDialog = false },
+            onSuccess = {
+                android.widget.Toast.makeText(context, "举报已提交", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+    
+    // 邀请好友弹窗
+    if (showInviteDialog) {
+        com.yhchat.canary.ui.components.InviteToGroupDialog(
+            groupId = groupId,
+            groupName = groupName,
+            onDismiss = { showInviteDialog = false },
+            onSuccess = {
+                android.widget.Toast.makeText(context, "邀请已发送", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+    
+    // 退出群聊弹窗
+    if (showExitGroupDialog) {
+        ExitGroupDialog(
+            groupName = groupName,
+            onConfirm = {
+                // 实现退出群聊逻辑
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                    val userRepository = com.yhchat.canary.data.di.RepositoryFactory.getUserRepository(context)
+                    userRepository.deleteFriend(groupId, 2).fold(
+                        onSuccess = { _: Boolean ->
+                            android.widget.Toast.makeText(context, "已退出群聊", android.widget.Toast.LENGTH_SHORT).show()
+                            onBackClick()
+                        },
+                        onFailure = { error: Throwable ->
+                            android.widget.Toast.makeText(context, "退出失败：${error.message}", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                }
+                showExitGroupDialog = false
+            },
+            onDismiss = { showExitGroupDialog = false }
+        )
+    }
 }
 
 @Composable
 private fun GroupInfoContent(
     groupId: String,
+    groupName: String,
+    context: android.content.Context,
     groupInfo: com.yhchat.canary.data.model.GroupDetail,
     members: List<GroupMemberInfo>,
     isLoadingMembers: Boolean,
@@ -221,6 +254,10 @@ private fun GroupInfoContent(
     onRemoveMember: (String) -> Unit = {},
     onGagMember: (String, Int) -> Unit = { _, _ -> },
     onSetMemberRole: (String, Int) -> Unit = { _, _ -> },
+    onShareClick: () -> Unit = {},
+    onReportClick: () -> Unit = {},
+    onInviteClick: () -> Unit = {},
+    onExitClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -244,22 +281,31 @@ private fun GroupInfoContent(
         }
     }
     
+    // 捕获变量以在 LazyColumn 作用域中使用
+    val currentContext = context
+    val currentGroupId = groupId
+    val currentGroupName = groupName
+    
     LazyColumn(
         state = listState,
         modifier = modifier,
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 群聊头像和基本信息
+        // 群聊基本信息卡片 - 紧凑版
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // 群头像
                     AsyncImage(
                         model = ImageUtils.createImageRequest(
                             context = LocalContext.current,
@@ -267,20 +313,64 @@ private fun GroupInfoContent(
                         ),
                         contentDescription = "群头像",
                         modifier = Modifier
-                            .size(100.dp)
+                            .size(60.dp)
                             .clip(CircleShape),
                         contentScale = ContentScale.Crop
                     )
                     
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
                     
-                    Text(
-                        text = groupInfo.name,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
+                    // 群信息
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = groupInfo.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "ID: ${groupInfo.groupId}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${groupInfo.memberCount} 名成员",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     
-                    if (groupInfo.introduction.isNotEmpty()) {
+                    // 分享按钮
+                    IconButton(
+                        onClick = onShareClick
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "分享群聊",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
+        
+        // 群聊简介卡片
+        if (groupInfo.introduction.isNotEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "群聊简介",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = groupInfo.introduction,
@@ -292,113 +382,124 @@ private fun GroupInfoContent(
             }
         }
         
-        // 群聊详细信息
+        // 成员按钮
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    InfoRow("群ID", groupInfo.groupId)
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    InfoRow("成员数量", "${groupInfo.memberCount} 人")
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    InfoRow("群分类", groupInfo.categoryName)
-                    if (groupInfo.communityName.isNotEmpty()) {
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                        InfoRow("所属社区", groupInfo.communityName)
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    InfoRow("免审核进群", if (groupInfo.directJoin) "是" else "否")
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    InfoRow("查看历史消息", if (groupInfo.historyMsgEnabled) "是" else "否")
-                    if (groupInfo.isPrivate) {
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                        InfoRow("群聊类型", "私有群聊")
-                    }
-                }
-            }
-        }
-        
-        // 成员列表
-        item {
-            Text(
-                text = "成员列表 (${groupInfo.memberCount})",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-        }
-        
-        if (isLoadingMembers && members.isEmpty()) {
-            // 首次加载显示加载指示器
-            item {
-                Box(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
-        } else {
-            // 显示成员列表
-            items(members) { member ->
-                MemberItem(
-                    member = member,
-                    currentUserPermission = currentUserPermission,
-                    groupId = groupId,
-                    onRemoveMember = onRemoveMember,
-                    onGagMember = onGagMember,
-                    onSetMemberRole = onSetMemberRole
-                )
-            }
-            
-            // 加载更多指示器
-            if (isLoadingMoreMembers) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = "加载更多成员...",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        .clickable {
+                            GroupMembersActivity.start(
+                                context = currentContext,
+                                groupId = currentGroupId,
+                                groupName = currentGroupName
                             )
                         }
-                    }
-                }
-            } else if (!hasMoreMembers && members.isNotEmpty()) {
-                // 没有更多数据时显示提示
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "已加载全部成员",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.People,
+                        contentDescription = "群成员",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        text = "群成员",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = "${groupInfo.memberCount}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "查看",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }
+        
+        // 功能选项
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    // 举报群聊
+                    FunctionMenuItem(
+                        icon = Icons.Default.Report,
+                        text = "举报群聊",
+                        onClick = onReportClick
+                    )
+                    
+                    // 设置聊天背景
+                    FunctionMenuItem(
+                        icon = Icons.Default.Wallpaper,
+                        text = "设置聊天背景",
+                        onClick = {
+                            com.yhchat.canary.ui.background.ChatBackgroundActivity.start(
+                                currentContext,
+                                currentGroupId,
+                                currentGroupName
+                            )
+                        }
+                    )
+                    
+                    // 群网盘
+                    FunctionMenuItem(
+                        icon = Icons.Default.Folder,
+                        text = "群网盘",
+                        onClick = {
+                            com.yhchat.canary.ui.disk.GroupDiskActivity.start(currentContext, currentGroupId, currentGroupName)
+                        }
+                    )
+                    
+                    // 邀请好友
+                    FunctionMenuItem(
+                        icon = Icons.Default.PersonAdd,
+                        text = "邀请好友",
+                        onClick = onInviteClick
+                    )
+                    
+                    // 群聊设置
+                    FunctionMenuItem(
+                        icon = Icons.Default.Settings,
+                        text = "群聊设置",
+                        onClick = {
+                            val intent = android.content.Intent(currentContext, com.yhchat.canary.ui.group.GroupSettingsActivity::class.java)
+                            intent.putExtra(com.yhchat.canary.ui.group.GroupSettingsActivity.EXTRA_GROUP_ID, currentGroupId)
+                            intent.putExtra(com.yhchat.canary.ui.group.GroupSettingsActivity.EXTRA_GROUP_NAME, currentGroupName)
+                            currentContext.startActivity(intent)
+                        }
+                    )
+                    
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    
+                    // 退出群聊 (危险操作)
+                    FunctionMenuItem(
+                        icon = Icons.Default.ExitToApp,
+                        text = "退出群聊",
+                        onClick = onExitClick,
+                        isDangerous = true
+                    )
+                }
+            }
+        }
+        
     }
 }
 
@@ -422,268 +523,166 @@ private fun InfoRow(label: String, value: String) {
 }
 
 @Composable
-private fun MemberItem(
-    member: GroupMemberInfo,
-    currentUserPermission: Int = 0,
-    groupId: String = "",
-    onRemoveMember: ((String) -> Unit)? = null,
-    onGagMember: ((String, Int) -> Unit)? = null,
-    onSetMemberRole: ((String, Int) -> Unit)? = null
+private fun InfoRowModern(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface
 ) {
-    val context = LocalContext.current
-    var showMenu by remember { mutableStateOf(false) }
-    var showGagDialog by remember { mutableStateOf(false) }
-    
-    // 判断是否显示管理菜单：除了群主外的所有成员都显示
-    val showAdminMenu = member.permissionLevel < 100
-    
-    Card(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable {
-                // 点击成员卡片跳转到用户详情页
-                com.yhchat.canary.ui.profile.UserProfileActivity.start(
-                    context = context,
-                    userId = member.userId,
-                    userName = member.name
-                )
-            },
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AsyncImage(
-                model = ImageUtils.createAvatarImageRequest(
-                    context = LocalContext.current,
-                    url = member.avatarUrl
-                ),
-                contentDescription = member.name,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
-            
-            Spacer(modifier = Modifier.width(12.dp))
-            
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = member.name,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium
-                    )
-                    
-                    // 群主/管理员标签
-                    when (member.permissionLevel) {
-                        100 -> {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = MaterialTheme.shapes.small,
-                                color = MaterialTheme.colorScheme.primary
-                            ) {
-                                Text(
-                                    text = "群主",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                        2 -> {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = MaterialTheme.shapes.small,
-                                color = MaterialTheme.colorScheme.secondary
-                            ) {
-                                Text(
-                                    text = "管理员",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSecondary,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
-                    
-                    // VIP标签
-                    if (member.isVip) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Surface(
-                            shape = MaterialTheme.shapes.small,
-                            color = MaterialTheme.colorScheme.tertiaryContainer
-                        ) {
-                            Text(
-                                text = "VIP",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                }
-                
-                Text(
-                    text = "ID: ${member.userId}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                
-                // 禁言状态
-                if (member.isGag) {
-                    Text(
-                        text = "🔇 被禁言",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-            }
-            
-            // 管理菜单（除了群主外的所有成员都显示）
-            if (showAdminMenu) {
-                Box {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "管理"
-                        )
-                    }
-                    
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        // 根据成员权限显示上任/卸任管理员
-                        if (member.permissionLevel == 2) {
-                            // 管理员，显示卸任选项
-                            DropdownMenuItem(
-                                text = { Text("卸任管理员") },
-                                onClick = {
-                                    showMenu = false
-                                    onSetMemberRole?.invoke(member.userId, 0)
-                                }
-                            )
-                        } else if (member.permissionLevel == 0) {
-                            // 普通成员，显示上任选项
-                            DropdownMenuItem(
-                                text = { Text("设为管理员") },
-                                onClick = {
-                                    showMenu = false
-                                    onSetMemberRole?.invoke(member.userId, 2)
-                                }
-                            )
-                        }
-                        
-                        DropdownMenuItem(
-                            text = { Text("踢出群聊") },
-                            onClick = {
-                                showMenu = false
-                                onRemoveMember?.invoke(member.userId)
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("禁言") },
-                            onClick = {
-                                showMenu = false
-                                showGagDialog = true
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    }
-    
-    // 禁言对话框
-    if (showGagDialog) {
-        GroupMemberGagDialog(
-            memberName = member.name,
-            onConfirm = { gagTime ->
-                onGagMember?.invoke(member.userId, gagTime)
-                showGagDialog = false
-            },
-            onDismiss = { showGagDialog = false }
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
+            color = valueColor
         )
     }
 }
 
 @Composable
-fun EditCategoryDialog(
-    categoryName: String,
-    onCategoryNameChange: (String) -> Unit,
-    onSave: () -> Unit,
+private fun QuickActionButton(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            modifier = Modifier
+                .size(56.dp)
+                .shadow(4.dp, CircleShape)
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+data class QuickAction(
+    val icon: ImageVector,
+    val label: String,
+    val onClick: () -> Unit
+)
+
+@Composable
+private fun FunctionMenuItem(
+    icon: ImageVector,
+    text: String,
+    onClick: () -> Unit,
+    isDangerous: Boolean = false
+) {
+    val iconColor = if (isDangerous) {
+        MaterialTheme.colorScheme.error
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    
+    val textColor = if (isDangerous) {
+        MaterialTheme.colorScheme.error
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = text,
+            tint = iconColor,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = textColor,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = "进入",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+/**
+ * 退出群聊确认对话框
+ */
+@Composable
+fun ExitGroupDialog(
+    groupName: String,
+    onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(text = "编辑群分类")
-        },
-        text = {
-            OutlinedTextField(
-                value = categoryName,
-                onValueChange = onCategoryNameChange,
-                label = { Text("分类名称") },
-                modifier = Modifier.fillMaxWidth()
+            Text(
+                text = "退出群聊",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
             )
         },
-        confirmButton = {
-            Button(onClick = {
-                onSave()
-                onDismiss()
-            }) {
-                Text("保存")
-            }
-        },
-        dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
-                Text("取消")
-            }
-        }
-    )
-}
-
-/**
- * 群成员禁言对话框
- */
-@Composable
-private fun GroupMemberGagDialog(
-    memberName: String,
-    onConfirm: (Int) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val gagOptions = listOf(
-        0 to "取消禁言",
-        600 to "禁言10分钟",
-        3600 to "禁言1小时",
-        21600 to "禁言6小时",
-        43200 to "禁言12小时",
-        1 to "永久禁言"
-    )
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("禁言 $memberName") },
         text = {
-            Column {
-                Text("选择禁言时长：", style = MaterialTheme.typography.bodyMedium)
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                gagOptions.forEach { (gagTime, label) ->
-                    TextButton(
-                        onClick = { onConfirm(gagTime) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(label, modifier = Modifier.fillMaxWidth())
-                    }
-                }
+            Text("确定要退出群聊「$groupName」吗？")
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("退出", color = MaterialTheme.colorScheme.onError)
             }
         },
-        confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("取消")
@@ -691,4 +690,5 @@ private fun GroupMemberGagDialog(
         }
     )
 }
+
 

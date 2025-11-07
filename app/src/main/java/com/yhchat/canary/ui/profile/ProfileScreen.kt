@@ -35,6 +35,8 @@ import com.yhchat.canary.ui.settings.NavigationSettingsActivity
 import android.text.TextUtils
 import java.text.SimpleDateFormat
 import java.util.*
+import com.yhchat.canary.ui.components.ScrollBehavior
+import com.yhchat.canary.ui.components.HandleScrollBehavior
 
 /**
  * 我的界面
@@ -45,7 +47,8 @@ fun ProfileScreen(
     modifier: Modifier = Modifier,
     userRepository: UserRepository? = null,
     tokenRepository: com.yhchat.canary.data.repository.TokenRepository? = null,
-    navigationRepository: NavigationRepository? = null
+    navigationRepository: NavigationRepository? = null,
+    scrollBehavior: ScrollBehavior? = null
 ) {
     val context = LocalContext.current
     val viewModel = remember {
@@ -123,6 +126,11 @@ fun ProfileScreen(
         )
         
         val scrollState = rememberScrollState()
+        
+        // 连接滚动行为到底部导航栏的显示/隐藏
+        scrollBehavior?.let { behavior ->
+            scrollState.HandleScrollBehavior(scrollBehavior = behavior)
+        }
         
         Column(
             modifier = Modifier

@@ -4,12 +4,16 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -20,7 +24,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * 群聊菜单BottomSheet
+ * 菜单项数据类
+ */
+data class MenuItemData(
+    val icon: ImageVector,
+    val text: String,
+    val onClick: () -> Unit
+)
+
+/**
+ * 群聊菜单BottomSheet - 支持全屏扩展
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,124 +43,144 @@ fun GroupMenuBottomSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true  // 完全展开，不显示部分展开状态
+    val bottomSheetState = rememberStandardBottomSheetState(
+        initialValue = SheetValue.PartiallyExpanded,
+        confirmValueChange = { true },
+        skipHiddenState = false
     )
+    
+    // 监听 sheet 状态变化
+    LaunchedEffect(bottomSheetState.targetValue) {
+        android.util.Log.d("GroupMenuBottomSheet", "Sheet state: ${bottomSheetState.targetValue}")
+        if (bottomSheetState.targetValue == SheetValue.Hidden) {
+            onDismiss()
+        }
+    }
     var showReportDialog by remember { mutableStateOf(false) }
     var showShareDialog by remember { mutableStateOf(false) }
     var showInviteDialog by remember { mutableStateOf(false) }
     var showExitGroupDialog by remember { mutableStateOf(false) }
     
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState
+    // 菜单项数据
+    val menuItems = remember {
+        listOf(
+            MenuItemData(Icons.Default.Report, "举报群聊") { showReportDialog = true },
+            MenuItemData(Icons.Default.Wallpaper, "设置聊天背景") {
+                com.yhchat.canary.ui.background.ChatBackgroundActivity.start(
+                    context,
+                    groupId,
+                    groupName
+                )
+                onDismiss()
+            },
+            MenuItemData(Icons.Default.Folder, "群网盘") {
+                GroupDiskActivity.start(context, groupId, groupName)
+                onDismiss()
+            },
+            MenuItemData(Icons.Default.PersonAdd, "邀请好友") { showInviteDialog = true },
+            MenuItemData(Icons.Default.Share, "分享群聊") { showShareDialog = true },
+            MenuItemData(Icons.Default.Info, "群聊详情") {
+                onDismiss()
+                val intent = Intent(context, com.yhchat.canary.ui.group.GroupInfoActivity::class.java)
+                intent.putExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_ID, groupId)
+                intent.putExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_NAME, groupName)
+                context.startActivity(intent)
+            },
+            MenuItemData(Icons.Default.Settings, "群聊设置") {
+                onDismiss()
+                val intent = Intent(context, com.yhchat.canary.ui.group.GroupSettingsActivity::class.java)
+                intent.putExtra(com.yhchat.canary.ui.group.GroupSettingsActivity.EXTRA_GROUP_ID, groupId)
+                intent.putExtra(com.yhchat.canary.ui.group.GroupSettingsActivity.EXTRA_GROUP_NAME, groupName)
+                context.startActivity(intent)
+            }
+        )
+    }
+    
+    val dangerousItems = remember {
+        listOf(
+            MenuItemData(Icons.Default.ExitToApp, "退出群聊") { showExitGroupDialog = true }
+        )
+    }
+    
+    BottomSheetScaffold(
+        scaffoldState = rememberBottomSheetScaffoldState(
+            bottomSheetState = bottomSheetState
+        ),
+        sheetContent = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 200.dp) // 最小高度
+            ) {
+                // 拖拽手柄
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        modifier = Modifier.size(width = 32.dp, height = 4.dp),
+                        shape = RoundedCornerShape(2.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    ) {}
+                }
+                
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(bottom = 32.dp)
+                ) {
+                    // 标题
+                    item {
+                        Text(
+                            text = "群聊选项",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+                        )
+                    }
+                    
+                    // 普通菜单项
+                    items(menuItems) { menuItem ->
+                        GroupMenuItem(
+                            icon = menuItem.icon,
+                            text = menuItem.text,
+                            onClick = menuItem.onClick
+                        )
+                    }
+                    
+                    // 分隔线
+                    item {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    }
+                    
+                    // 危险操作菜单项
+                    items(dangerousItems) { menuItem ->
+                        GroupMenuItem(
+                            icon = menuItem.icon,
+                            text = menuItem.text,
+                            onClick = menuItem.onClick,
+                            isDangerous = true
+                        )
+                    }
+                }
+            }
+        },
+        sheetPeekHeight = 200.dp, // 初始显示高度
+        modifier = Modifier.fillMaxSize()
     ) {
-        Column(
+        // 背景遮罩
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp)
-        ) {
-            // 标题
-            Text(
-                text = "群聊选项",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
-            )
-            
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            
-            // 举报群聊
-            GroupMenuItem(
-                icon = Icons.Default.Report,
-                text = "举报群聊",
-                onClick = {
-                    showReportDialog = true
+                .fillMaxSize()
+                .clickable { 
+                    CoroutineScope(Dispatchers.Main).launch {
+                        bottomSheetState.hide()
+                    }
                 }
-            )
-            
-            // 设置聊天背景
-            GroupMenuItem(
-                icon = Icons.Default.Wallpaper,
-                text = "设置聊天背景",
-                onClick = {
-                    com.yhchat.canary.ui.background.ChatBackgroundActivity.start(
-                        context,
-                        groupId,
-                        groupName
-                    )
-                    onDismiss()
-                }
-            )
-            
-            // 群网盘
-            GroupMenuItem(
-                icon = Icons.Default.Folder,
-                text = "群网盘",
-                onClick = {
-                    GroupDiskActivity.start(context, groupId, groupName)
-                    onDismiss()
-                }
-            )
-            
-            // 邀请好友
-            GroupMenuItem(
-                icon = Icons.Default.PersonAdd,
-                text = "邀请好友",
-                onClick = {
-                    showInviteDialog = true
-                }
-            )
-            
-            // 分享群聊
-            GroupMenuItem(
-                icon = Icons.Default.Share,
-                text = "分享群聊",
-                onClick = {
-                    showShareDialog = true
-                }
-            )
-            
-            // 群聊详情
-            GroupMenuItem(
-                icon = Icons.Default.Info,
-                text = "群聊详情",
-                onClick = {
-                    onDismiss()
-                    val intent = Intent(context, com.yhchat.canary.ui.group.GroupInfoActivity::class.java)
-                    intent.putExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_ID, groupId)
-                    intent.putExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_NAME, groupName)
-                    context.startActivity(intent)
-                }
-            )
-            
-            // 群聊设置
-            GroupMenuItem(
-                icon = Icons.Default.Settings,
-                text = "群聊设置",
-                onClick = {
-                    onDismiss()
-                    val intent = Intent(context, com.yhchat.canary.ui.group.GroupSettingsActivity::class.java)
-                    intent.putExtra(com.yhchat.canary.ui.group.GroupSettingsActivity.EXTRA_GROUP_ID, groupId)
-                    intent.putExtra(com.yhchat.canary.ui.group.GroupSettingsActivity.EXTRA_GROUP_NAME, groupName)
-                    context.startActivity(intent)
-                }
-            )
-            
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            
-            // 退出群聊
-            GroupMenuItem(
-                icon = Icons.Default.ExitToApp,
-                text = "退出群聊",
-                onClick = {
-                    showExitGroupDialog = true
-                }
-            )
-            
-            // 底部间距
-            Spacer(modifier = Modifier.height(16.dp))
-        }
+        )
     }
     
     // 举报对话框
@@ -268,8 +301,21 @@ fun ExitGroupDialog(
 fun GroupMenuItem(
     icon: ImageVector,
     text: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    isDangerous: Boolean = false
 ) {
+    val iconColor = if (isDangerous) {
+        MaterialTheme.colorScheme.error
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    
+    val textColor = if (isDangerous) {
+        MaterialTheme.colorScheme.error
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -281,12 +327,13 @@ fun GroupMenuItem(
         Icon(
             imageVector = icon,
             contentDescription = text,
-            tint = MaterialTheme.colorScheme.onSurface,
+            tint = iconColor,
             modifier = Modifier.size(24.dp)
         )
         Text(
             text = text,
-            style = MaterialTheme.typography.bodyLarge
+            style = MaterialTheme.typography.bodyLarge,
+            color = textColor
         )
     }
 }

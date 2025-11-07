@@ -59,7 +59,6 @@ import com.yhchat.canary.ui.bot.BotInfoActivity
 import com.yhchat.canary.ui.components.MarkdownText
 import com.yhchat.canary.ui.components.HtmlWebView
 import com.yhchat.canary.ui.components.ChatInputBar
-import com.yhchat.canary.ui.components.GroupMenuBottomSheet
 import com.yhchat.canary.ui.components.ImageUtils
 import com.yhchat.canary.ui.components.ImageViewer
 import com.yhchat.canary.ui.components.LinkText
@@ -149,8 +148,6 @@ fun ChatScreen(
     // 机器人看板展开状态
     var showBotBoard by remember { mutableStateOf(false) }
     
-    // 群聊菜单BottomSheet状态
-    var showGroupMenuSheet by remember { mutableStateOf(false) }
     
     // 初始化聊天
     LaunchedEffect(chatId, chatType, userId) {
@@ -352,11 +349,15 @@ fun ChatScreen(
                 // 群聊信息菜单（只在群聊时显示）
                 if (chatType == 2) {
                     IconButton(onClick = {
-                        showGroupMenuSheet = true
+                        android.util.Log.d("ChatScreen", "Opening group info: chatId=$chatId, chatName=$chatName")
+                        val intent = Intent(context, com.yhchat.canary.ui.group.GroupInfoActivity::class.java)
+                        intent.putExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_ID, chatId)
+                        intent.putExtra(com.yhchat.canary.ui.group.GroupInfoActivity.EXTRA_GROUP_NAME, chatName)
+                        context.startActivity(intent)
                     }) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
-                            contentDescription = "群聊菜单"
+                            contentDescription = "群聊详情"
                         )
                     }
                 }
@@ -772,6 +773,17 @@ fun ChatScreen(
                     quotedMessageId = null
                     quotedMessageText = null
                 },
+                onStickerClick = { stickerItem ->
+                    // 发送表情包贴纸消息（contentType=7）
+                    viewModel.sendStickerMessage(
+                        stickerItem = stickerItem,
+                        quoteMsgId = quotedMessageId,
+                        quoteMsgText = quotedMessageText
+                    )
+                    // 清除引用状态
+                    quotedMessageId = null
+                    quotedMessageText = null
+                },
                 onInstructionClick = { instruction ->
                     android.util.Log.d("ChatScreen", "🎯 用户点击指令: /${instruction.name} (id=${instruction.id}, type=${instruction.type})")
                     
@@ -864,14 +876,6 @@ fun ChatScreen(
         )
     }
     
-    // 群聊菜单BottomSheet
-    if (showGroupMenuSheet && chatType == 2) {
-        GroupMenuBottomSheet(
-            groupId = chatId,
-            groupName = chatName,
-            onDismiss = { showGroupMenuSheet = false }
-        )
-    }
 }
 
 /**

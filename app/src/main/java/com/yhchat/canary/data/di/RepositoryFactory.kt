@@ -237,6 +237,8 @@ object RepositoryFactory {
         return com.yhchat.canary.data.repository.UpdateRepository(context)
     }
     
+
+    
     /**
      * 获取ApiService实例
      */

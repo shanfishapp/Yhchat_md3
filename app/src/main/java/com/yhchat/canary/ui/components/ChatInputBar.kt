@@ -60,6 +60,7 @@ fun ChatInputBar(
     quotedMessageText: String? = null, // 引用的消息文本
     onClearQuote: (() -> Unit)? = null, // 清除引用
     onExpressionClick: ((com.yhchat.canary.data.model.Expression) -> Unit)? = null,  // 表情点击回调
+    onStickerClick: ((com.yhchat.canary.data.model.StickerItem) -> Unit)? = null,  // 表情包贴纸点击回调
     onInstructionClick: ((com.yhchat.canary.data.model.Instruction) -> Unit)? = null,  // 指令点击回调
     groupId: String? = null,  // 群聊ID，用于加载指令
     selectedInstruction: com.yhchat.canary.data.model.Instruction? = null, // 选中的指令
@@ -287,6 +288,10 @@ fun ChatInputBar(
             ExpressionPicker(
                 onExpressionClick = { expression ->
                     onExpressionClick?.invoke(expression)
+                    showExpressionPicker = false
+                },
+                onStickerClick = { stickerItem ->
+                    onStickerClick?.invoke(stickerItem)
                     showExpressionPicker = false
                 },
                 onDismiss = { showExpressionPicker = false }
