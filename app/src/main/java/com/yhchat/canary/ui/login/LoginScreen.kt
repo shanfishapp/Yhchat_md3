@@ -47,6 +47,8 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var showTokenDialog by remember { mutableStateOf(false) }
+    var tokenInput by remember { mutableStateOf("") }
     
     // 处理登录成功
     LaunchedEffect(uiState.loginSuccess) {
@@ -298,6 +300,22 @@ fun LoginScreen(
                     )
                 }
             }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Token登录按钮
+            OutlinedButton(
+                onClick = { showTokenDialog = true },
+                enabled = !uiState.isLoading,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Text(
+                    text = "使用Token登录",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
         }
         
         // 底部说明
@@ -311,4 +329,71 @@ fun LoginScreen(
         // 添加底部间距，确保内容不会贴底
         Spacer(modifier = Modifier.height(16.dp))
     }
+    
+    // Token登录对话框
+    if (showTokenDialog) {
+        TokenLoginDialog(
+            tokenInput = tokenInput,
+            onTokenChange = { tokenInput = it },
+            onConfirm = {
+                if (tokenInput.isNotBlank()) {
+                    viewModel.loginWithToken(tokenInput)
+                    showTokenDialog = false
+                    tokenInput = ""
+                }
+            },
+            onDismiss = {
+                showTokenDialog = false
+                tokenInput = ""
+            }
+        )
+    }
+}
+
+/**
+ * Token登录对话框
+ */
+@Composable
+private fun TokenLoginDialog(
+    tokenInput: String,
+    onTokenChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Token登录") },
+        text = {
+            Column {
+                Text(
+                    text = "请输入用户Token进行登录",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = tokenInput,
+                    onValueChange = onTokenChange,
+                    label = { Text("用户Token") },
+                    placeholder = { Text("请输入Token...") },
+                    singleLine = false,
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = tokenInput.isNotBlank()
+            ) {
+                Text("确定")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }

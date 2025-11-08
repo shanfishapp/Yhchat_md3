@@ -46,8 +46,6 @@ import com.yhchat.canary.data.model.StickyData
 import com.yhchat.canary.data.model.StickyItem
 import com.yhchat.canary.data.model.ChatType
 import com.yhchat.canary.data.repository.TokenRepository
-import com.yhchat.canary.ui.components.ScrollBehavior
-import com.yhchat.canary.ui.components.HandleScrollBehavior
 import com.yhchat.canary.ui.search.ComprehensiveSearchActivity
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.animation.*
@@ -75,7 +73,6 @@ fun ConversationScreen(
     onMenuClick: () -> Unit,
     tokenRepository: TokenRepository? = null,
     viewModel: ConversationViewModel = viewModel(),
-    scrollBehavior: ScrollBehavior? = null,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -127,11 +124,6 @@ fun ConversationScreen(
     var showAddMenuBottomSheet by remember { mutableStateOf(false) }
 
     // 移除置顶栏滚动控制逻辑
-    
-    // 连接滚动行为到底部导航栏的显示/隐藏
-    scrollBehavior?.let { behavior ->
-        listState.HandleScrollBehavior(scrollBehavior = behavior)
-    }
     
     // 移除自动滚动逻辑，让用户自己控制滚动位置
 

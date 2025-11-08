@@ -1017,7 +1017,8 @@ private fun MessageItem(
                     contentType = message.contentType,
                     isMyMessage = isMyMessage,
                     modifier = Modifier.padding(12.dp),
-                    onImageClick = onImageClick
+                    onImageClick = onImageClick,
+                    onLongClick = { showContextMenu = true }
                 )
             }
 
@@ -1490,6 +1491,7 @@ private fun TipMessageItem(
 /**
  * 消息内容视图
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MessageContentView(
     message: ChatMessage,
@@ -1497,7 +1499,8 @@ private fun MessageContentView(
     contentType: Int,
     isMyMessage: Boolean,
     modifier: Modifier = Modifier,
-    onImageClick: (String) -> Unit = {}
+    onImageClick: (String) -> Unit = {},
+    onLongClick: () -> Unit = {}
 ) {
     val textColor = if (isMyMessage) {
                                 MaterialTheme.colorScheme.onPrimary 
@@ -1552,7 +1555,10 @@ private fun MessageContentView(
                             modifier = Modifier
                                 .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable { onImageClick(imageUrl) },
+                            .combinedClickable(
+                                onClick = { onImageClick(imageUrl) },
+                                onLongClick = onLongClick
+                            ),
                             contentScale = ContentScale.Crop
                         )
                     }

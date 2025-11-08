@@ -27,8 +27,6 @@ import coil.compose.AsyncImage
 import com.yhchat.canary.ui.chat.ChatActivity
 import com.yhchat.canary.ui.components.ImageUtils
 import com.yhchat.canary.ui.search.SearchActivity
-import com.yhchat.canary.ui.components.ScrollBehavior
-import com.yhchat.canary.ui.components.HandleScrollBehavior
 import androidx.compose.foundation.lazy.rememberLazyListState
 
 /**
@@ -37,18 +35,13 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ContactsScreen(
-    scrollBehavior: ScrollBehavior? = null,
     modifier: Modifier = Modifier,
     viewModel: ContactsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
-    
-    // 连接滚动行为到底部导航栏的显示/隐藏
-    scrollBehavior?.let { behavior ->
-        listState.HandleScrollBehavior(scrollBehavior = behavior)
-    }
+
     
     Scaffold(
         topBar = {

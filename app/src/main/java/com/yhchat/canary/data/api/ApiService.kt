@@ -958,6 +958,16 @@ interface ApiService {
         @Body request: okhttp3.RequestBody
     ): Response<okhttp3.ResponseBody>
     
+    /**
+     * 获取 WebDAV 挂载点列表
+     * POST /v1/mount-setting/list
+     */
+    @POST("v1/mount-setting/list")
+    suspend fun getMountSettingList(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.MountSettingRequest
+    ): Response<com.yhchat.canary.data.model.MountSettingResponse>
+    
 }
 
 /**

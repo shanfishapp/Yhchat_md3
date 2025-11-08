@@ -309,6 +309,13 @@
             android:label="群网盘"
             android:theme="@style/Theme.YhchatCanary" />
             
+        <!-- WebDAV 浏览器 Activity -->
+        <activity
+            android:name=".ui.disk.webdav.WebDAVBrowserActivity"
+            android:exported="false"
+            android:label="WebDAV"
+            android:theme="@style/Theme.YhchatCanary" />
+            
         <!-- 综合搜索 Activity -->
 
         <activity

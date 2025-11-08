@@ -35,8 +35,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import com.yhchat.canary.data.model.CommunityBoard
 import com.yhchat.canary.data.model.CommunityPost
-import com.yhchat.canary.ui.components.ScrollBehavior
-import com.yhchat.canary.ui.components.HandleScrollBehavior
 import androidx.compose.foundation.lazy.rememberLazyListState
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
@@ -49,7 +47,6 @@ import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 fun CommunityTabScreen(
     token: String,
     modifier: Modifier = Modifier,
-    scrollBehavior: ScrollBehavior? = null,
     viewModel: CommunityViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -230,7 +227,6 @@ fun CommunityTabScreen(
                             boards = boardListState.boards,
                             isLoading = boardListState.isLoading,
                             error = boardListState.error,
-                            scrollBehavior = scrollBehavior,
                             onBoardClick = { board ->
                                 val intent = Intent(context, BoardDetailActivity::class.java).apply {
                                     putExtra("board_id", board.id)
@@ -253,7 +249,6 @@ fun CommunityTabScreen(
                             boards = followingBoardListState.boards,
                             isLoading = followingBoardListState.isLoading,
                             error = followingBoardListState.error,
-                            scrollBehavior = scrollBehavior,
                             onBoardClick = { board ->
                                 val intent = Intent(context, BoardDetailActivity::class.java).apply {
                                     putExtra("board_id", board.id)
@@ -289,7 +284,6 @@ fun CommunityTabScreen(
                             posts = filteredPosts,
                             isLoading = myPostListState.isLoading,
                             error = myPostListState.error,
-                            scrollBehavior = scrollBehavior,
                             searchQuery = searchQuery,
                             onPostClick = { post ->
                                 // 跳转到文章详情
@@ -322,16 +316,10 @@ fun BoardListContent(
     isLoading: Boolean,
     error: String?,
     onBoardClick: (CommunityBoard) -> Unit,
-    scrollBehavior: ScrollBehavior? = null,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
-    
-    // 连接滚动行为到底部导航栏的显示/隐藏
-    scrollBehavior?.let { behavior ->
-        listState.HandleScrollBehavior(scrollBehavior = behavior)
-    }
     
     Column(
         modifier = modifier.fillMaxSize()
@@ -416,17 +404,11 @@ fun MyPostListContent(
     onDeletePost: (Int) -> Unit,
     context: android.content.Context,
     token: String,
-    scrollBehavior: ScrollBehavior? = null,
     searchQuery: String = "",
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
-    
-    // 连接滚动行为到底部导航栏的显示/隐藏
-    scrollBehavior?.let { behavior ->
-        listState.HandleScrollBehavior(scrollBehavior = behavior)
-    }
     
     Column(
         modifier = modifier.fillMaxSize()

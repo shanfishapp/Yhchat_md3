@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +38,7 @@ import com.yhchat.canary.data.model.DiskFile
 import com.yhchat.canary.data.repository.DiskRepository
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import com.yhchat.canary.utils.ImageUploadUtil
+import com.yhchat.canary.ui.disk.webdav.WebDAVBrowserActivity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -137,6 +139,17 @@ fun GroupDiskScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = {
+                            WebDAVBrowserActivity.start(context, groupId, groupName)
+                        },
+                        enabled = !uiState.isLoading
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Cloud,
+                            contentDescription = "WebDAV"
+                        )
+                    }
                     IconButton(
                         onClick = { showCreateFolderDialog = true },
                         enabled = !uiState.isLoading
@@ -665,7 +678,7 @@ private fun DownloadConfirmDialog(
                 
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "文件将保存到：下载/yhchat/ 文件夹",
+                    text = "文件将保存到 : /storage/emulated/0/Download/yhchat/ 目录下",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

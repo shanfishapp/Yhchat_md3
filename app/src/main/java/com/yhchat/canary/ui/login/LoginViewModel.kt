@@ -175,6 +175,41 @@ class LoginViewModel @Inject constructor(
     }
     
     /**
+     * Token登录
+     */
+    fun loginWithToken(token: String) {
+        if (token.isBlank()) {
+            _uiState.value = _uiState.value.copy(error = "请输入Token")
+            return
+        }
+        
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            
+            try {
+                // 直接保存Token并标记登录成功
+                tokenRepository?.saveToken(token)
+                
+                // 创建LoginData对象
+                val loginData = LoginData(
+                    token = token
+                )
+                
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    loginSuccess = true,
+                    loginData = loginData
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "Token登录失败: ${e.message}"
+                )
+            }
+        }
+    }
+    
+    /**
      * 清除错误信息
      */
     fun clearError() {

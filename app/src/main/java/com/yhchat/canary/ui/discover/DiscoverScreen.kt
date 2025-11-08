@@ -28,8 +28,6 @@ import com.yhchat.canary.data.model.RecommendGroup
 import com.yhchat.canary.data.model.RecommendBot
 import com.yhchat.canary.ui.components.ImageUtils
 import kotlinx.coroutines.launch
-import com.yhchat.canary.ui.components.ScrollBehavior
-import com.yhchat.canary.ui.components.HandleScrollBehavior
 import androidx.compose.foundation.lazy.rememberLazyListState
 
 /**
@@ -38,7 +36,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscoverScreen(
-    scrollBehavior: ScrollBehavior? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -46,11 +43,6 @@ fun DiscoverScreen(
     val discoverRepo = remember { RepositoryFactory.getDiscoverRepository(context) }
     val listState = rememberLazyListState()
     
-    // 连接滚动行为到底部导航栏的显示/隐藏
-    scrollBehavior?.let { behavior ->
-        listState.HandleScrollBehavior(scrollBehavior = behavior)
-    }
-
     var groups by remember { mutableStateOf<List<RecommendGroup>>(emptyList()) }
     var bots by remember { mutableStateOf<List<RecommendBot>>(emptyList()) }
     var isLoadingGroups by remember { mutableStateOf(true) }

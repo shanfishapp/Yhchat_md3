@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,8 +37,6 @@ import com.yhchat.canary.ui.settings.NavigationSettingsActivity
 import android.text.TextUtils
 import java.text.SimpleDateFormat
 import java.util.*
-import com.yhchat.canary.ui.components.ScrollBehavior
-import com.yhchat.canary.ui.components.HandleScrollBehavior
 
 /**
  * 我的界面
@@ -48,7 +48,6 @@ fun ProfileScreen(
     userRepository: UserRepository? = null,
     tokenRepository: com.yhchat.canary.data.repository.TokenRepository? = null,
     navigationRepository: NavigationRepository? = null,
-    scrollBehavior: ScrollBehavior? = null
 ) {
     val context = LocalContext.current
     val viewModel = remember {
@@ -126,11 +125,6 @@ fun ProfileScreen(
         )
         
         val scrollState = rememberScrollState()
-        
-        // 连接滚动行为到底部导航栏的显示/隐藏
-        scrollBehavior?.let { behavior ->
-            scrollState.HandleScrollBehavior(scrollBehavior = behavior)
-        }
         
         Column(
             modifier = Modifier
@@ -457,12 +451,16 @@ private fun UserProfileContent(
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
                 
-                // 手机号
+                // 手机号（带显示/隐藏切换）
                 if (!TextUtils.isEmpty(userProfile.phone)) {
-                    ProfileInfoItem(
+                    var showFullPhone by remember { mutableStateOf(false) }
+                    
+                    ProfileInfoItemWithToggle(
                         icon = Icons.Default.Phone,
                         label = "手机号",
-                        value = userProfile.phone!!
+                        value = userProfile.phone!!,
+                        isVisible = showFullPhone,
+                        onToggleVisibility = { showFullPhone = !showFullPhone }
                     )
                 }
 
@@ -1085,5 +1083,83 @@ private fun BetaInfoDialog(
                 Text("我知道了")
             }
         }
+    )
+}
+
+/**
+ * 格式化手机号，隐藏中间4位
+ */
+private fun formatPhoneNumber(phone: String): String {
+    return if (phone.length == 11) {
+        // 中国手机号格式：138****5678
+        "${phone.substring(0, 3)}****${phone.substring(7)}"
+    } else if (phone.length > 7) {
+        // 其他长度：保留前3位和后4位
+        val start = phone.substring(0, 3)
+        val end = phone.substring(phone.length - 4)
+        "$start****$end"
+    } else {
+        // 长度不足，直接返回
+        phone
+    }
+}
+
+/**
+ * 带显示/隐藏切换的资料项（用于手机号）
+ */
+@Composable
+private fun ProfileInfoItemWithToggle(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    isVisible: Boolean,
+    onToggleVisibility: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        
+        Spacer(modifier = Modifier.width(12.dp))
+        
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = if (isVisible) value else formatPhoneNumber(value),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        
+        IconButton(
+            onClick = onToggleVisibility,
+            modifier = Modifier.size(40.dp)
+        ) {
+            Icon(
+                imageVector = if (isVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                contentDescription = if (isVisible) "隐藏手机号" else "显示手机号",
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 32.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     )
 }
