@@ -238,10 +238,8 @@ private fun AppInfoScreen(
                 } else null,
                 onClick = {
                     if (isLatestBuildPreview) {
-                        // 预览版模式直接显示 Toast
                         android.widget.Toast.makeText(context, "你现在是最新版本了", android.widget.Toast.LENGTH_SHORT).show()
                     } else {
-                        // 正常模式检查更新
                         updateViewModel.checkForUpdate(isLatestBuildPreview)
                     }
                 },
@@ -259,14 +257,13 @@ private fun AppInfoScreen(
             )
             
             Spacer(modifier = Modifier.height(16.dp))
-            
-            // 许可证
+
             AppInfoItem(
                 icon = Icons.Default.Description,
                 title = "许可证",
                 content = {
                     Text(
-                        text = "MIT License",
+                        text = "AGPL Licence",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -276,7 +273,7 @@ private fun AppInfoScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             Text(
-                text = "一个云湖第三方客户端，由 AI 强力驱动",
+                text = "全球首款纯净自由的云湖第三方客户端，由坚如磐石的AGPL协议与世界顶级人工智能技术强力驱动。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp)
@@ -315,7 +312,6 @@ private fun AppInfoScreen(
             )
         } else {
             LaunchedEffect(updateInfo) {
-                // 这里可以显示一个 Toast 或者 Snackbar
             }
             
             AlertDialog(
@@ -334,8 +330,7 @@ private fun AppInfoScreen(
             )
         }
     }
-    
-    // 错误对话框
+
     updateState.error?.let { error ->
         AlertDialog(
             onDismissRequest = {
