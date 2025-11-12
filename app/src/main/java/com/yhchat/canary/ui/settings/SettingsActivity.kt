@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,7 +37,7 @@ import kotlinx.coroutines.launch
 /**
  * 设置页面Activity
  */
-class SettingsActivity : ComponentActivity() {
+class SettingsActivity : BaseActivity() {
     
     companion object {
         private const val EXTRA_HAS_NAVIGATION_REPO = "has_navigation_repo"

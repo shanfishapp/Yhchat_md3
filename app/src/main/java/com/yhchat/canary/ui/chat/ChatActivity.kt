@@ -13,13 +13,14 @@ import androidx.core.view.WindowCompat
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 
 @AndroidEntryPoint
-class ChatActivity : ComponentActivity() {
+class ChatActivity : BaseActivity() {
     
     // 使用状态管理会话参数，以便在 onNewIntent 中更新
     private var chatId by mutableStateOf("")

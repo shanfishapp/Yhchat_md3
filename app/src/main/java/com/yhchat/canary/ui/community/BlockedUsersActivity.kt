@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -33,7 +34,7 @@ import dagger.hilt.android.AndroidEntryPoint
  * 屏蔽用户列表Activity
  */
 @AndroidEntryPoint
-class BlockedUsersActivity : ComponentActivity() {
+class BlockedUsersActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

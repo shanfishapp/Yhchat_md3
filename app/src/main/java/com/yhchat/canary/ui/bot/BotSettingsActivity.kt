@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -27,7 +28,7 @@ import android.widget.Toast
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 
-class BotSettingsActivity : ComponentActivity() {
+class BotSettingsActivity : BaseActivity() {
     companion object {
         private const val EXTRA_BOT_ID = "extra_bot_id"
         private const val EXTRA_BOT_NAME = "extra_bot_name"

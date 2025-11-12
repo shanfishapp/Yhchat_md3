@@ -143,7 +143,7 @@ class FileDownloadService : Service() {
         serviceScope.launch(Dispatchers.IO) {
             try {
                 // 先下载到临时文件
-                val tempFile = File(downloadDir, "${fileName}.tmp")
+                val tempFile = File(downloadDir, "${fileName}")
                 downloadFileWithProgress(fileUrl, tempFile, fileName, fileSize)
                 
                 // 计算下载文件的SHA256
@@ -312,7 +312,7 @@ class FileDownloadService : Service() {
     private fun findFileWithSameHash(directory: File, targetHash: String, excludeFileName: String): File? {
         val files = directory.listFiles { file ->
             file.isFile && 
-            !file.name.endsWith(".tmp") && 
+            !file.name.endsWith("${file.name}") && 
             !file.name.startsWith(excludeFileName) // 排除同名文件
         } ?: return null
         

@@ -1,15 +1,35 @@
 package com.yhchat.canary.ui.login
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -68,67 +88,107 @@ fun LoginScreen(
     
     val scrollState = rememberScrollState()
     
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(scrollState)
-            .padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.surface
+                    )
+                )
+            )
     ) {
-        // 添加顶部间距，确保内容不会贴顶
-        Spacer(modifier = Modifier.height(24.dp))
-        // Logo
-        Box(
+        // 应用名称 - 左上角，下调一些
+        Column(
             modifier = Modifier
-                .size(64.dp)
-                .background(
-                    MaterialTheme.colorScheme.primary,
-                    CircleShape
-                ),
-            contentAlignment = Alignment.Center
+                .align(Alignment.TopStart)
+                .padding(start = 24.dp, end = 24.dp, top = 60.dp, bottom = 24.dp)
         ) {
             Text(
-                text = "云湖",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onPrimary,
-                fontWeight = FontWeight.Bold
+                text = "云湖聊天",
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = "连接你我，畅享沟通",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         
-        // 应用名称
-        Text(
-            text = "云湖聊天",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        // 登录方式选择
-        TabRow(
-            selectedTabIndex = selectedTab,
-            modifier = Modifier.fillMaxWidth()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(24.dp)
+                .padding(top = 120.dp), // 为顶部标题留出更多空间，整体下调
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Tab(
-                selected = selectedTab == 0,
-                onClick = { selectedTab = 0 },
-                text = { Text("手机登录") }
-            )
-            Tab(
-                selected = selectedTab == 1,
-                onClick = { selectedTab = 1 },
-                text = { Text("邮箱登录") }
-            )
+            // 登录方式选择
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
+            ) {
+            TabRow(
+                selectedTabIndex = selectedTab,
+                modifier = Modifier.fillMaxWidth(),
+                containerColor = Color.Transparent,
+                indicator = { tabPositions ->
+                    TabRowDefaults.Indicator(
+                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                        color = MaterialTheme.colorScheme.primary,
+                        height = 3.dp
+                    )
+                }
+            ) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = { 
+                        Text(
+                            "手机登录",
+                            fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal
+                        ) 
+                    }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = { 
+                        Text(
+                            "邮箱登录",
+                            fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal
+                        ) 
+                    }
+                )
+            }
         }
+        
+        Spacer(modifier = Modifier.height(16.dp))
         
         // 登录表单
-        Column(
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 when (selectedTab) {
                     0 -> {
                         // 手机登录
@@ -248,9 +308,9 @@ fun LoginScreen(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                             trailingIcon = {
                                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                    Text(
-                                        text = if (passwordVisible) "隐藏" else "显示",
-                                        style = MaterialTheme.typography.bodySmall
+                                    Icon(
+                                        imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                        contentDescription = if (passwordVisible) "隐藏密码" else "显示密码"
                                     )
                                 }
                             },
@@ -271,37 +331,44 @@ fun LoginScreen(
                     )
                 }
                 
-            // 登录按钮
-            Button(
-                onClick = {
-                    when (selectedTab) {
-                        0 -> viewModel.loginWithCaptcha(mobile, smsCaptcha)
-                        1 -> viewModel.loginWithEmail(email, password)
+                // 登录按钮
+                Button(
+                    onClick = {
+                        when (selectedTab) {
+                            0 -> viewModel.loginWithCaptcha(mobile, smsCaptcha)
+                            1 -> viewModel.loginWithEmail(email, password)
+                        }
+                    },
+                    enabled = !uiState.isLoading && (
+                        (selectedTab == 0 && mobile.isNotBlank() && smsCaptcha.isNotBlank()) ||
+                        (selectedTab == 1 && email.isNotBlank() && password.isNotBlank())
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    if (uiState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Text(
+                            text = "登录",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
-                },
-                enabled = !uiState.isLoading && (
-                    (selectedTab == 0 && mobile.isNotBlank() && smsCaptcha.isNotBlank()) ||
-                    (selectedTab == 1 && email.isNotBlank() && password.isNotBlank())
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-            ) {
-                if (uiState.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Text(
-                        text = "登录",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
                 }
             }
+        }
             
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             
             // Token登录按钮
             OutlinedButton(
@@ -309,25 +376,28 @@ fun LoginScreen(
                 enabled = !uiState.isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
                     text = "使用Token登录",
                     style = MaterialTheme.typography.titleMedium
                 )
             }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // 底部说明
+            Text(
+                text = "登录即表示同意用户协议和隐私政策",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            
+            // 添加底部间距，确保内容不会贴底
+            Spacer(modifier = Modifier.height(24.dp))
         }
-        
-        // 底部说明
-        Text(
-            text = "登录即表示同意用户协议和隐私政策",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-        
-        // 添加底部间距，确保内容不会贴底
-        Spacer(modifier = Modifier.height(16.dp))
     }
     
     // Token登录对话框

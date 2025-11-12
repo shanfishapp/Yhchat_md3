@@ -28,19 +28,24 @@ object WebDAVClient {
     suspend fun listFiles(
         mountSetting: MountSetting,
         path: String = ""
-    ): Result<List<WebDAVFile>> {
-        return try {
+    ): Result<List<WebDAVFile>> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        return@withContext try {
             val client = OkHttpClient()
             
             // 构建完整的 URL
+            // webdavUrl + webdavRootPath 就是完整的默认路径
             val baseUrl = mountSetting.webdavUrl.trimEnd('/')
-            val rootPath = mountSetting.webdavRootPath.trimStart('/').trimEnd('/')
-            val fullPath = if (rootPath.isNotEmpty()) {
-                "/$rootPath/$path".replace("//", "/").trimEnd('/')
+            val rootPath = mountSetting.webdavRootPath.trimStart('/')
+            
+            // 直接拼接 webdavUrl + webdavRootPath
+            val defaultPath = "$baseUrl/$rootPath".replace("//", "/").replace("http:/", "http://").replace("https:/", "https://")
+            
+            // 如果有额外的子路径，则拼接
+            val url = if (path.isNotEmpty()) {
+                "$defaultPath/${path.trimStart('/').trimEnd('/')}"
             } else {
-                "/$path".replace("//", "/").trimEnd('/')
-            }
-            val url = "$baseUrl$fullPath"
+                defaultPath
+            }.replace("//", "/").replace("http:/", "http://").replace("https:/", "https://")
             
             Log.d(TAG, "WebDAV PROPFIND: $url")
             
@@ -68,13 +73,19 @@ object WebDAVClient {
             val response = client.newCall(request).execute()
             
             if (!response.isSuccessful) {
-                return Result.failure(Exception("WebDAV 请求失败: ${response.code} ${response.message}"))
+                return@withContext Result.failure(Exception("WebDAV 请求失败: ${response.code} ${response.message}"))
             }
             
-            val responseBody = response.body?.string() ?: return Result.failure(Exception("响应体为空"))
+            val responseBody = response.body?.string() ?: return@withContext Result.failure(Exception("响应体为空"))
             
             // 解析 XML 响应
-            val files = parsePropfindResponse(responseBody, mountSetting, fullPath)
+            // currentPath 是完整的路径，用于在解析响应时过滤当前目录
+            val currentPath = if (path.isNotEmpty()) {
+                "/$rootPath/$path".replace("//", "/").trimEnd('/')
+            } else {
+                "/$rootPath".replace("//", "/").trimEnd('/')
+            }
+            val files = parsePropfindResponse(responseBody, mountSetting, currentPath)
             
             Result.success(files)
         } catch (e: Exception) {

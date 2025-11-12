@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,7 +35,7 @@ import kotlinx.coroutines.launch
  * 在线设备Activity
  */
 @AndroidEntryPoint
-class OnlineDevicesActivity : ComponentActivity() {
+class OnlineDevicesActivity : BaseActivity() {
     
     companion object {
         private const val EXTRA_HAS_TOKEN_REPO = "has_token_repo"

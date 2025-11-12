@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -53,7 +54,7 @@ import java.util.*
  * 基于 yhapi/web/v1/user.md 和 yhapi/v1/friend.md
  */
 @AndroidEntryPoint
-class UserProfileActivity : ComponentActivity() {
+class UserProfileActivity : BaseActivity() {
 
     companion object {
         private const val EXTRA_USER_ID = "extra_user_id"

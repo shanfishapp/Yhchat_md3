@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -49,7 +50,7 @@ import java.util.*
 /**
  * 群网盘Activity
  */
-class GroupDiskActivity : ComponentActivity() {
+class GroupDiskActivity : BaseActivity() {
     
     companion object {
         const val EXTRA_GROUP_ID = "extra_group_id"

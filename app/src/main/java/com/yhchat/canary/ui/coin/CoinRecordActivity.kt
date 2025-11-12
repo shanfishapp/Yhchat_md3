@@ -3,6 +3,7 @@ package com.yhchat.canary.ui.coin
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,7 +35,7 @@ import java.util.*
  * 金币明细Activity
  * 包含三个Tab：金币增减、文章打赏、评论打赏
  */
-class CoinRecordActivity : ComponentActivity() {
+class CoinRecordActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

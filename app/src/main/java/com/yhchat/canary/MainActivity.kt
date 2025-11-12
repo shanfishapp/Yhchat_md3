@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import dagger.hilt.android.AndroidEntryPoint
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
@@ -40,18 +41,15 @@ import com.yhchat.canary.utils.ChatAddLinkHandler
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : BaseActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 应用字体大小设置
-        applyFontScale()
-        
         // 处理 Deep Link
         handleDeepLink()
-        
+
         // 配置Coil ImageLoader，为chat-img.jwznb.com添加Referer，支持GIF和WebP
         setupImageLoader()
-        
+
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
@@ -339,21 +337,6 @@ class MainActivity : ComponentActivity() {
         }
     }
     
-    /**
-     * 应用字体大小设置
-     */
-    private fun applyFontScale() {
-        val prefs = getSharedPreferences("display_settings", MODE_PRIVATE)
-        val fontScale = prefs.getFloat("font_scale", 100f)
-        
-        // 将百分比转换为系统字体缩放因子 (1-100% -> 0.01-1.0)
-        val scaleFactor = fontScale / 100f
-        
-        // 应用字体缩放
-        val configuration = resources.configuration
-        configuration.fontScale = scaleFactor
-        resources.updateConfiguration(configuration, resources.displayMetrics)
-    }
     
     /**
      * 配置 ImageLoader

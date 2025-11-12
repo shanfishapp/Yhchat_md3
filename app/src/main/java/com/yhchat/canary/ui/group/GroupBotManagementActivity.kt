@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -51,7 +52,7 @@ import kotlinx.coroutines.launch
 /**
  * 群聊机器人管理Activity
  */
-class GroupBotManagementActivity : ComponentActivity() {
+class GroupBotManagementActivity : BaseActivity() {
     
     companion object {
         private const val EXTRA_GROUP_ID = "group_id"

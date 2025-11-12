@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -44,7 +45,7 @@ import dagger.hilt.android.AndroidEntryPoint
  * 应用详情 Activity
  */
 @AndroidEntryPoint
-class AppInfoActivity : ComponentActivity() {
+class AppInfoActivity : BaseActivity() {
     
     companion object {
         const val APP_VERSION = "Canary 20 Preview"

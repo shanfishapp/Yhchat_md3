@@ -33,6 +33,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,12 +66,21 @@ fun ChatInputBar(
     onInstructionClick: ((com.yhchat.canary.data.model.Instruction) -> Unit)? = null,  // 指令点击回调
     groupId: String? = null,  // 群聊ID，用于加载指令
     selectedInstruction: com.yhchat.canary.data.model.Instruction? = null, // 选中的指令
-    onClearInstruction: (() -> Unit)? = null // 清除指令
+    onClearInstruction: (() -> Unit)? = null, // 清除指令
+    focusRequester: FocusRequester? = null, // 焦点请求器
+    shouldShowKeyboard: Boolean = false // 是否应该显示键盘
 ) {
     var showAttachMenu by remember { mutableStateOf(false) }
     var showExpressionPicker by remember { mutableStateOf(false) }
     var showInstructionPicker by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
+    
+    // 监听键盘显示请求
+    LaunchedEffect(shouldShowKeyboard) {
+        if (shouldShowKeyboard) {
+            keyboardController?.show()
+        }
+    }
     
     Column {
         // 主输入栏容器
@@ -142,7 +153,14 @@ fun ChatInputBar(
                     modifier = Modifier
                         .weight(1f)
                             .heightIn(min = 36.dp, max = 90.dp)
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                            .padding(horizontal = 8.dp, vertical = 8.dp)
+                            .let { modifier ->
+                                if (focusRequester != null) {
+                                    modifier.focusRequester(focusRequester)
+                                } else {
+                                    modifier
+                                }
+                            },
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
                             color = MaterialTheme.colorScheme.onSurface
                         ),

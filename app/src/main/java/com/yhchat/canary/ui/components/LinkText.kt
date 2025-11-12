@@ -3,6 +3,7 @@ package com.yhchat.canary.ui.components
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
@@ -20,6 +21,7 @@ import java.util.regex.Pattern
 @Composable
 fun LinkText(
     text: String,
+    modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.bodyMedium,
     linkColor: Color = MaterialTheme.colorScheme.primary
 ) {
@@ -69,6 +71,7 @@ fun LinkText(
     
     ClickableText(
         text = annotatedString,
+        modifier = modifier,
         style = style,
         onClick = { offset ->
                 annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)

@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -75,7 +76,7 @@ import androidx.compose.foundation.layout.height
 /**
  * 机器人详细信息 Activity
  */
-class BotDetailActivity : ComponentActivity() {
+class BotDetailActivity : BaseActivity() {
     
     private lateinit var viewModel: BotDetailViewModel
     

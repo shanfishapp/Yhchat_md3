@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -40,7 +41,7 @@ import android.widget.Toast
  * 机器人管理Activity
  * 用于管理我创建的机器人
  */
-class BotManagementActivity : ComponentActivity() {
+class BotManagementActivity : BaseActivity() {
     
     companion object {
         const val EXTRA_BOT_ID = "botId"

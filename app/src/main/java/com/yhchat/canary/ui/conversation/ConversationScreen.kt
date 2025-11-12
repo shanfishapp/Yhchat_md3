@@ -28,7 +28,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
-import androidx.compose.animation.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -39,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import com.yhchat.canary.data.model.Conversation
@@ -51,10 +51,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.animation.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import java.text.SimpleDateFormat
 import java.util.*
 import com.yhchat.canary.ui.components.ConversationMenuDialog
@@ -258,7 +254,7 @@ fun ConversationScreen(
                                 ) {
                                     items(
                                         items = stickyData?.sticky ?: emptyList(),
-                                        key = { stickyItem -> "sticky_${stickyItem.chatId}" }
+                                        key = { stickyItem -> "sticky_${stickyItem.chatId}_${stickyItem.id}" }
                                     ) { stickyItem ->
                                         StickyConversationCard(
                                             stickyItem = stickyItem,
@@ -305,7 +301,7 @@ fun ConversationScreen(
                     // 普通会话列表
                     items(
                         items = pagedConversations,
-                        key = { conversation -> "${conversation.chatId}_${conversation.timestampMs}" }
+                        key = { conversation -> "conversation_${conversation.chatId}" }
                     ) { conversation ->
                         // 使用remember确保点击时获取最新的conversation数据
                         val chatId = conversation.chatId
@@ -563,11 +559,7 @@ fun ConversationItem(
                             .crossfade(true)
                             .build()
                     } else {
-                        ImageRequest.Builder(LocalContext.current)
-                            .data("https://chat-img.jwznb.com/default-avatar.png")
-                            .addHeader("Referer", "https://myapp.jwznb.com")
-                            .crossfade(true)
-                            .build()
+                        null
                     },
                     contentDescription = "头像",
                     modifier = Modifier
@@ -749,12 +741,9 @@ fun StickyConversationCard(
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 头像
+        // 头像 - 优化GIF性能
         AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(stickyItem.avatarUrl)
-                .crossfade(true)
-                .build(),
+            model = stickyItem.avatarUrl,
             contentDescription = stickyItem.chatName,
             modifier = Modifier
                 .size(48.dp)
@@ -773,7 +762,7 @@ fun StickyConversationCard(
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
         )
     }
@@ -803,7 +792,7 @@ fun IntegratedStickyItem(
         // 头像
         Box {
             AsyncImage(
-                model = coil.request.ImageRequest.Builder(LocalContext.current)
+                model = ImageRequest.Builder(LocalContext.current)
                     .data(stickyItem.avatarUrl)
                     .addHeader("Referer", "https://myapp.jwznb.com")
                     .crossfade(true)
@@ -813,7 +802,7 @@ fun IntegratedStickyItem(
                     .size(42.dp)
                     .clip(CircleShape),
                 contentScale = ContentScale.Crop,
-                error = androidx.compose.ui.res.painterResource(id = com.yhchat.canary.R.drawable.ic_person)
+                error = painterResource(id = com.yhchat.canary.R.drawable.ic_person)
             )
 
             // 认证标识

@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -30,7 +31,7 @@ import com.yhchat.canary.ui.settings.HtmlSettingsActivity
 /**
  * WebView Activity - 用于显示网页链接
  */
-class WebViewActivity : ComponentActivity() {
+class WebViewActivity : BaseActivity() {
     
     companion object {
         private const val EXTRA_URL = "extra_url"

@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -46,7 +47,7 @@ import yh_user.User
 /**
  * 用户详情Activity
  */
-class UserDetailActivity : ComponentActivity() {
+class UserDetailActivity : BaseActivity() {
     
     companion object {
         private const val EXTRA_USER_ID = "user_id"

@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -43,7 +44,7 @@ import kotlinx.coroutines.launch
 /**
  * 聊天背景设置Activity
  */
-class ChatBackgroundActivity : ComponentActivity() {
+class ChatBackgroundActivity : BaseActivity() {
     
     companion object {
         const val EXTRA_CHAT_ID = "extra_chat_id"

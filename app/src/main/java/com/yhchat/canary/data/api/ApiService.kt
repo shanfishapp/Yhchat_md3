@@ -640,6 +640,15 @@ interface ApiService {
     ): Response<com.yhchat.canary.data.model.BlockedUserListResponse>
     
     /**
+     * 举报文章
+     */
+    @POST("v1/community/report")
+    suspend fun reportPost(
+        @Header("token") token: String,
+        @Body request: ReportPostRequest
+    ): Response<ApiStatus>
+    
+    /**
      * 获取在线设备列表 (Protobuf)
      */
     @GET("v1/user/clients")
@@ -1604,4 +1613,18 @@ data class BlackListRequest(
     val size: Int = 20,
     @SerializedName("page")
     val page: Int = 1
+)
+
+/**
+ * 举报文章请求
+ */
+data class ReportPostRequest(
+    @SerializedName("typ")
+    val typ: Int = 1, // 类型默认1
+    @SerializedName("id")
+    val id: Int, // 文章id
+    @SerializedName("content")
+    val content: String, // 举报原因
+    @SerializedName("url")
+    val url: String? = null // 举报图片url，可选
 )

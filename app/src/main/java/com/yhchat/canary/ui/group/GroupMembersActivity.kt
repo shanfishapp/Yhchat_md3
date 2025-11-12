@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,7 +16,7 @@ import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
-class GroupMembersActivity : ComponentActivity() {
+class GroupMembersActivity : BaseActivity() {
     
     private val viewModel: GroupInfoViewModel by viewModels()
     

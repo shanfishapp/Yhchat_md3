@@ -8,6 +8,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -40,7 +41,7 @@ import kotlinx.coroutines.launch
 /**
  * 创建群聊/机器人 Activity
  */
-class CreateActivity : ComponentActivity() {
+class CreateActivity : BaseActivity() {
     
     companion object {
         private const val EXTRA_INITIAL_TAB = "initial_tab"

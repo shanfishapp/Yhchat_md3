@@ -6,6 +6,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.unit.dp
 import com.yhchat.canary.data.model.NavigationItem
 
 /**
@@ -20,6 +22,7 @@ fun BottomNavigationBar(
 ) {
     NavigationBar(
         modifier = modifier
+            .padding(horizontal = 2.dp) // 通过外部padding减少间距
     ) {
         visibleItems.forEach { item ->
             NavigationBarItem(

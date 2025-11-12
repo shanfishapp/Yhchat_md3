@@ -97,6 +97,7 @@ fun GroupTagDetailScreen(
     
     LaunchedEffect(groupId, tagId) {
         viewModel.loadMembers(groupId, tagId)
+        viewModel.loadGroupMembers(groupId)
     }
     
     Scaffold(
@@ -204,8 +205,15 @@ fun GroupTagDetailScreen(
                 groupId = groupId,
                 tagId = tagId,
                 currentMembers = uiState.members,
+                groupMembers = uiState.groupMembers,
+                isLoadingGroupMembers = uiState.isLoadingGroupMembers,
+                hasMoreGroupMembers = uiState.hasMoreGroupMembers,
+                isLoadingMoreGroupMembers = uiState.isLoadingMoreGroupMembers,
                 onAddMember = { userId ->
                     viewModel.addTagToUser(userId, tagId, groupId)
+                },
+                onLoadMoreGroupMembers = {
+                    viewModel.loadMoreGroupMembers(groupId)
                 },
                 onDismiss = { showAddMemberDialog = false }
             )
@@ -218,30 +226,15 @@ fun AddMemberToTagDialog(
     groupId: String,
     tagId: Long,
     currentMembers: List<TagMemberInfo>,
+    groupMembers: List<GroupMemberInfo>,
+    isLoadingGroupMembers: Boolean,
+    hasMoreGroupMembers: Boolean,
+    isLoadingMoreGroupMembers: Boolean,
     onAddMember: (String) -> Unit,
+    onLoadMoreGroupMembers: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var groupMembers by remember { mutableStateOf<List<GroupMemberInfo>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
     var searchQuery by remember { mutableStateOf("") }
-    
-    // 获取群成员列表
-    LaunchedEffect(groupId) {
-        scope.launch {
-            val groupRepo = RepositoryFactory.getGroupRepository(context)
-            groupRepo.getGroupMembers(groupId).fold(
-                onSuccess = { members: List<GroupMemberInfo> ->
-                    groupMembers = members
-                    isLoading = false
-                },
-                onFailure = { _: Throwable ->
-                    isLoading = false
-                }
-            )
-        }
-    }
     
     // 过滤掉已经在标签中的成员
     val currentMemberIds = currentMembers.map { it.userId }.toSet()
@@ -278,12 +271,12 @@ fun AddMemberToTagDialog(
                     .height(400.dp)
             ) {
                 when {
-                    isLoading -> {
+                    isLoadingGroupMembers -> {
                         CircularProgressIndicator(
                             modifier = Modifier.align(Alignment.Center)
                         )
                     }
-                    availableMembers.isEmpty() -> {
+                    availableMembers.isEmpty() && !isLoadingGroupMembers -> {
                         Text(
                             text = if (searchQuery.isBlank()) "没有可添加的成员" else "未找到匹配的成员",
                             modifier = Modifier.align(Alignment.Center),
@@ -312,7 +305,7 @@ fun AddMemberToTagDialog(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         AsyncImage(
-                                            model = ImageUtils.createAvatarImageRequest(context, member.avatarUrl),
+                                            model = ImageUtils.createAvatarImageRequest(LocalContext.current, member.avatarUrl),
                                             contentDescription = "头像",
                                             modifier = Modifier
                                                 .size(40.dp)
@@ -365,6 +358,28 @@ fun AddMemberToTagDialog(
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // 加载更多指示器
+                            if (hasMoreGroupMembers) {
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (isLoadingMoreGroupMembers) {
+                                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                        } else {
+                                            TextButton(
+                                                onClick = onLoadMoreGroupMembers
+                                            ) {
+                                                Text("加载更多")
+                                            }
                                         }
                                     }
                                 }

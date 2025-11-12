@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -39,7 +40,7 @@ import kotlinx.coroutines.launch
 /**
  * 商品详情Activity
  */
-class ProductDetailActivity : ComponentActivity() {
+class ProductDetailActivity : BaseActivity() {
     
     companion object {
         private const val EXTRA_PRODUCT_ID = "product_id"

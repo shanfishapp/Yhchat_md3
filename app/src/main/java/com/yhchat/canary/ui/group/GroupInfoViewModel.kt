@@ -334,11 +334,9 @@ class GroupInfoViewModel @Inject constructor(
                         else -> "角色设置成功"
                     }
                     Log.d(tag, "✅ Member role set successfully: $message")
-                    android.widget.Toast.makeText(
-                        android.app.Application().applicationContext,
-                        message,
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
+                    _uiState.value = _uiState.value.copy(
+                        successMessage = message
+                    )
                     // 重新加载群成员列表
                     loadGroupMembers(groupId)
                 },

@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,11 +50,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.lazy.LazyItemScope
 import com.yhchat.canary.ui.bot.BotInfoActivity
 import com.yhchat.canary.ui.components.MarkdownText
@@ -144,6 +149,12 @@ fun ChatScreen(
     // 编辑消息状态
     var showEditDialog by remember { mutableStateOf(false) }
     var messageToEdit by remember { mutableStateOf<ChatMessage?>(null) }
+    
+    // 输入框焦点请求器
+    val inputFocusRequester = remember { FocusRequester() }
+    
+    // 键盘显示状态
+    var shouldShowKeyboard by remember { mutableStateOf(false) }
     
     // 机器人看板展开状态
     var showBotBoard by remember { mutableStateOf(false) }
@@ -529,9 +540,9 @@ fun ChatScreen(
                     items(
                         count = reversedMessages.size,
                         key = { index -> 
-                            // 使用msgId和sendTime组合作为唯一key，避免重复
+                            // 使用多个字段组合确保key的唯一性，包括索引位置
                             val message = reversedMessages[index]
-                            "${message.msgId}_${message.sendTime}"
+                            "${message.msgId}_${message.sendTime}_${message.sender.chatId}_${index}_${System.nanoTime()}"
                         }
                     ) { index ->
                         val message = reversedMessages[index]
@@ -544,11 +555,11 @@ fun ChatScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .animateItem(
-                                    fadeInSpec = tween(durationMillis = 300),
-                                    fadeOutSpec = tween(durationMillis = 300),
-                                    placementSpec = spring(
-                                        dampingRatio = Spring.DampingRatioNoBouncy,
-                                        stiffness = Spring.StiffnessMediumLow
+                                    fadeInSpec = null, // 移除渐变动画，提升性能
+                                    fadeOutSpec = null, // 移除渐变动画，提升性能
+                                    placementSpec = tween(
+                                        durationMillis = 150, // 缩短动画时间
+                                        easing = FastOutSlowInEasing // 使用高性能缓动函数
                                     )
                                 ),
                             onImageClick = { imageUrl ->
@@ -576,6 +587,16 @@ fun ChatScreen(
                                 val quotedText = "$senderName : $content"
                                 quotedMessageId = msgId
                                 quotedMessageText = quotedText
+                                
+                                // 自动聚焦输入框并显示键盘
+                                coroutineScope.launch {
+                                    inputFocusRequester.requestFocus()
+                                    // 触发键盘显示
+                                    shouldShowKeyboard = true
+                                    // 延迟重置状态，避免重复触发
+                                    delay(100)
+                                    shouldShowKeyboard = false
+                                }
                             },
                             onRecall = { msgId ->
                                 // 撤回消息
@@ -830,6 +851,8 @@ fun ChatScreen(
                     selectedInstruction = null
                     inputText = ""
                 },
+                focusRequester = inputFocusRequester,  // 传递焦点请求器
+                shouldShowKeyboard = shouldShowKeyboard,  // 传递键盘显示状态
                 modifier = Modifier
                     .navigationBarsPadding()  // 自适应导航栏
                     .padding(
@@ -1525,6 +1548,10 @@ private fun MessageContentView(
                         onImageClick = onImageClick,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .combinedClickable(
+                                onClick = { },
+                                onLongClick = onLongClick
+                            )
                             .pointerInput(Unit) {
                                 awaitPointerEventScope {
                                     while (true) {
@@ -1579,16 +1606,19 @@ private fun MessageContentView(
                     Surface(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable {
-                                content.fileUrl?.let { fileUrl ->
-                                    handleFileDownload(
-                                        context = context,
-                                        fileUrl = fileUrl,
-                                        fileName = fileName,
-                                        fileSize = content.fileSize ?: 0L
-                                    )
-                                }
-                            },
+                            .combinedClickable(
+                                onClick = {
+                                    content.fileUrl?.let { fileUrl ->
+                                        handleFileDownload(
+                                            context = context,
+                                            fileUrl = fileUrl,
+                                            fileName = fileName,
+                                            fileSize = content.fileSize ?: 0L
+                                        )
+                                    }
+                                },
+                                onLongClick = onLongClick
+                            ),
                         color = textColor.copy(alpha = 0.1f)
                     ) {
                         Row(
@@ -1652,7 +1682,12 @@ private fun MessageContentView(
                         },
                         backgroundColor = Color.Transparent, // 使用透明背景，继承消息气泡背景
                         onImageClick = onImageClick,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .combinedClickable(
+                                onClick = { },
+                                onLongClick = onLongClick
+                            )
                     )
                 }
             }
@@ -1691,21 +1726,24 @@ private fun MessageContentView(
                         modifier = Modifier
                             .size(120.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable {
-                                if (isPersonalExpression) {
-                                    // 个人表情：打开图片预览
-                                onImageClick(imageUrl)
-                                } else if (isStickerPack) {
-                                    // 表情包：跳转到表情包详情
-                                    com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
-                                        context = context,
-                                        stickerPackId = stickerPackId?.toString() ?: ""
-                                    )
-                                } else {
-                                    // 默认：图片预览
+                            .combinedClickable(
+                                onClick = {
+                                    if (isPersonalExpression) {
+                                        // 个人表情：打开图片预览
                                     onImageClick(imageUrl)
-                                }
-                            },
+                                    } else if (isStickerPack) {
+                                        // 表情包：跳转到表情包详情
+                                        com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
+                                            context = context,
+                                            stickerPackId = stickerPackId?.toString() ?: ""
+                                        )
+                                    } else {
+                                        // 默认：图片预览
+                                        onImageClick(imageUrl)
+                                    }
+                                },
+                                onLongClick = onLongClick
+                            ),
                         contentScale = ContentScale.Fit
                     )
                 } ?: run {
@@ -1726,18 +1764,21 @@ private fun MessageContentView(
                             modifier = Modifier
                                 .size(120.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    if (isPersonalExpression) {
-                                    onImageClick(fullUrl)
-                                    } else if (isStickerPack) {
-                                        com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
-                                            context = context,
-                                            stickerPackId = stickerPackId?.toString() ?: ""
-                                        )
-                                    } else {
+                                .combinedClickable(
+                                    onClick = {
+                                        if (isPersonalExpression) {
                                         onImageClick(fullUrl)
-                                    }
-                                },
+                                        } else if (isStickerPack) {
+                                            com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
+                                                context = context,
+                                                stickerPackId = stickerPackId?.toString() ?: ""
+                                            )
+                                        } else {
+                                            onImageClick(fullUrl)
+                                        }
+                                    },
+                                    onLongClick = onLongClick
+                                ),
                             contentScale = ContentScale.Fit
                         )
                     }
@@ -1775,14 +1816,22 @@ private fun MessageContentView(
                                 MaterialTheme.colorScheme.primaryContainer
                             } else {
                                 MaterialTheme.colorScheme.primary
-                            }
+                            },
+                            modifier = Modifier.combinedClickable(
+                                onClick = { },
+                                onLongClick = onLongClick
+                            )
                         )
                     } else {
                         // 普通文本
                         Text(
                             text = text,
                             color = textColor,
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.combinedClickable(
+                                onClick = { },
+                                onLongClick = onLongClick
+                            )
                         )
                     }
                 }

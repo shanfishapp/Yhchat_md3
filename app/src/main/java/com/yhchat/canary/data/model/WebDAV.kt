@@ -79,7 +79,7 @@ data class WebDAVFile(
     val isDirectory: Boolean,
     val size: Long = 0,
     val lastModified: Long = 0,
-    val mountSetting: MountSetting? = null
+    val mountSetting: MountSetting
 ) {
     fun getFormattedSize(): String {
         if (isDirectory) return "-"

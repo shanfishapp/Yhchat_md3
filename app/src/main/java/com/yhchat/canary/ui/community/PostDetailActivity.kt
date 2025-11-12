@@ -2,6 +2,7 @@ package com.yhchat.canary.ui.community
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
@@ -24,6 +25,8 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.Report
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.MonetizationOn
 import androidx.compose.material.icons.outlined.ThumbUp
@@ -84,13 +87,26 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.graphics.Color
 import com.yhchat.canary.utils.ChatAddLinkHandler
+import com.yhchat.canary.utils.ImageUploadUtil
+import com.yhchat.canary.data.api.QiniuUploadResponse
 import java.util.regex.Pattern
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.MediaType.Companion.toMediaType
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 
 /**
  * 文章详情Activity
  */
-class PostDetailActivity : ComponentActivity() {
+class PostDetailActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -142,11 +158,13 @@ fun PostContentCard(
     onCollectClick: () -> Unit,
     onCommentClick: () -> Unit = {},
     onRewardClick: () -> Unit = {},
+    onReportClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var showImageViewer by remember { mutableStateOf(false) }
     var currentImageUrl by remember { mutableStateOf("") }
+    var showReportDialog by remember { mutableStateOf(false) }
     
     Column(
         modifier = modifier
@@ -229,7 +247,8 @@ fun PostContentCard(
             ArticleLinkText(
                 text = post.content,
                 style = MaterialTheme.typography.bodyMedium.copy(
-                    lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.3
+                    lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.3,
+                    color = MaterialTheme.colorScheme.onSurface // 确保使用正确的主题颜色
                 ),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -387,6 +406,14 @@ fun PostContentCard(
                     isActive = post.isReward == 1,
                     onClick = onRewardClick
                 )
+                
+                ActionButton(
+                    icon = Icons.Filled.Report,
+                    text = "举报",
+                    count = 0, // 举报不显示数量
+                    isActive = false,
+                    onClick = { showReportDialog = true }
+                )
             }
         }
     }
@@ -396,6 +423,19 @@ fun PostContentCard(
         ImageViewer(
             imageUrl = currentImageUrl,
             onDismiss = { showImageViewer = false }
+        )
+    }
+    
+    // 举报对话框
+    if (showReportDialog) {
+        ReportDialog(
+            postId = post.id,
+            token = token,
+            onDismiss = { showReportDialog = false },
+            onReportSuccess = {
+                // 举报成功后的处理
+                onReportClick()
+            }
         )
     }
 }
@@ -991,6 +1031,7 @@ fun PostDetailScreen(
     
     // Token状态
     var currentToken by remember { mutableStateOf("") }
+    var isTokenLoaded by remember { mutableStateOf(false) }
     
     // 加载数据
     LaunchedEffect(postId) {
@@ -998,6 +1039,8 @@ fun PostDetailScreen(
             viewModel.loadPostDetailWithToken(postId)
             // 获取token
             currentToken = viewModel.getTokenAsync()
+            isTokenLoaded = true
+            android.util.Log.d("PostDetailActivity", "🔑 Token加载完成: ${currentToken.take(10)}...")
         }
     }
     
@@ -1093,7 +1136,7 @@ fun PostDetailScreen(
                                 PostContentCard(
                                     post = post,
                                     board = postDetailState.board,
-                                    token = currentToken,
+                                    token = if (isTokenLoaded) currentToken else "",
                                     onLikeClick = {
                                         viewModel.likePostWithToken(postId)
                                     },
@@ -1306,7 +1349,7 @@ fun ArticleLinkText(
     
     ClickableText(
         text = annotatedString,
-        style = style,
+        style = style.copy(color = MaterialTheme.colorScheme.onSurface), // 确保使用正确的主题颜色
         modifier = modifier,
         onClick = { offset ->
             annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
@@ -1337,4 +1380,301 @@ fun ArticleLinkText(
                 }
         }
     )
+}
+
+/**
+ * 举报对话框
+ */
+@Composable
+fun ReportDialog(
+    postId: Int,
+    token: String,
+    onDismiss: () -> Unit,
+    onReportSuccess: () -> Unit
+) {
+    // 检查token是否有效
+    if (token.isBlank()) {
+        LaunchedEffect(Unit) {
+            android.util.Log.w("ReportDialog", "⚠️ Token为空，无法进行举报操作")
+        }
+    }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var reportReason by remember { mutableStateOf("") }
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var isUploading by remember { mutableStateOf(false) }
+    var isReporting by remember { mutableStateOf(false) }
+    
+    // 图片选择器
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        selectedImageUri = uri
+    }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("举报文章")
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 举报原因输入框
+                OutlinedTextField(
+                    value = reportReason,
+                    onValueChange = { reportReason = it },
+                    label = { Text("举报原因") },
+                    placeholder = { Text("请输入举报原因...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3,
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Done
+                    )
+                )
+                
+                // 图片上传区域
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { imagePickerLauncher.launch("image/*") },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        if (selectedImageUri != null) {
+                            AsyncImage(
+                                model = selectedImageUri,
+                                contentDescription = "举报图片",
+                                modifier = Modifier
+                                    .size(100.dp)
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "点击更换图片",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Filled.Image,
+                                contentDescription = "添加图片",
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "点击添加举报图片（可选）",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                
+                if (isUploading) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "正在上传图片...",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (reportReason.isBlank()) {
+                        Toast.makeText(context, "请输入举报原因", Toast.LENGTH_SHORT).show()
+                        return@TextButton
+                    }
+                    
+                    scope.launch {
+                        isReporting = true
+                        try {
+                            var imageUrl: String? = null
+                            
+                            // 如果有选择图片，先上传图片
+                            if (selectedImageUri != null) {
+                                isUploading = true
+                                try {
+                                    // 检查用户token是否有效
+                                    if (token.isBlank()) {
+                                        Toast.makeText(context, "用户未登录，无法上传图片", Toast.LENGTH_SHORT).show()
+                                        isUploading = false
+                                        isReporting = false
+                                        return@launch
+                                    }
+                                    
+                                    // 先获取七牛云上传token
+                                    val uploadToken = getQiniuUploadToken(token)
+                                    if (uploadToken.isNullOrBlank()) {
+                                        Toast.makeText(context, "获取上传token失败，请检查网络连接", Toast.LENGTH_SHORT).show()
+                                        isUploading = false
+                                        isReporting = false
+                                        return@launch
+                                    }
+                                    
+                                    val uploadResult = ImageUploadUtil.uploadImage(
+                                        context = context,
+                                        imageUri = selectedImageUri!!,
+                                        uploadToken = uploadToken
+                                    )
+                                    
+                                    uploadResult.fold(
+                                        onSuccess = { response ->
+                                            // 构建完整的图片URL
+                                            imageUrl = "https://chat-img.jwznb.com/${response.key}"
+                                        },
+                                        onFailure = { error ->
+                                            Toast.makeText(context, "图片上传失败: ${error.message}", Toast.LENGTH_SHORT).show()
+                                            isUploading = false
+                                            isReporting = false
+                                            return@launch
+                                        }
+                                    )
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "图片上传失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    isUploading = false
+                                    isReporting = false
+                                    return@launch
+                                }
+                                isUploading = false
+                            }
+                            
+                            // 调用举报API
+                            val result = reportPost(
+                                postId = postId,
+                                content = reportReason,
+                                imageUrl = imageUrl,
+                                token = token
+                            )
+                            
+                            if (result) {
+                                Toast.makeText(context, "举报成功", Toast.LENGTH_SHORT).show()
+                                onReportSuccess()
+                                onDismiss()
+                            } else {
+                                Toast.makeText(context, "举报失败", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "举报失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                        } finally {
+                            isReporting = false
+                        }
+                    }
+                },
+                enabled = !isReporting && !isUploading && token.isNotBlank()
+            ) {
+                if (isReporting) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                } else {
+                    Text("提交举报")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+/**
+ * 举报文章API调用
+ */
+private suspend fun reportPost(
+    postId: Int,
+    content: String,
+    imageUrl: String?,
+    token: String
+): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val client = OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .build()
+        
+        val requestBody = JSONObject().apply {
+            put("typ", 1)
+            put("id", postId)
+            put("content", content)
+            if (imageUrl != null) {
+                put("url", imageUrl)
+            }
+        }
+        
+        val request = Request.Builder()
+            .url("https://chat-go.jwzhd.com/v1/community/report")
+            .addHeader("token", token)
+            .addHeader("Content-Type", "application/json")
+            .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+        
+        val response = client.newCall(request).execute()
+        response.isSuccessful
+    } catch (e: Exception) {
+        false
+    }
+}
+
+/**
+ * 获取七牛云上传token
+ */
+private suspend fun getQiniuUploadToken(token: String): String? = withContext(Dispatchers.IO) {
+    try {
+        android.util.Log.d("PostDetailActivity", "🔑 开始获取七牛云上传token")
+        android.util.Log.d("PostDetailActivity", "🔑 用户token: ${token.take(10)}...")
+        
+        val client = OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
+        
+        val request = Request.Builder()
+            .url("https://chat-go.jwzhd.com/v1/misc/qiniu-token")
+            .addHeader("token", token)
+            .addHeader("Content-Type", "application/json")
+            .get()
+            .build()
+        
+        android.util.Log.d("PostDetailActivity", "🔑 发送请求到: ${request.url}")
+        
+        val response = client.newCall(request).execute()
+        val responseCode = response.code
+        val responseBody = response.body?.string()
+        
+        android.util.Log.d("PostDetailActivity", "🔑 响应码: $responseCode")
+        android.util.Log.d("PostDetailActivity", "🔑 响应体: $responseBody")
+        
+        if (response.isSuccessful && responseBody != null) {
+            val jsonObject = JSONObject(responseBody)
+            val uploadToken = jsonObject.optString("token", null)
+            android.util.Log.d("PostDetailActivity", "🔑 获取到上传token: ${uploadToken?.take(20)}...")
+            uploadToken
+        } else {
+            android.util.Log.e("PostDetailActivity", "🔑 获取token失败: $responseCode - $responseBody")
+            null
+        }
+    } catch (e: Exception) {
+        android.util.Log.e("PostDetailActivity", "🔑 获取token异常: ${e.message}", e)
+        null
+    }
 }
