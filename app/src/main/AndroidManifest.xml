@@ -81,6 +81,18 @@
             android:theme="@style/Theme.YhchatCanary" />
         
         <activity
+            android:name=".ui.group.ChatSearchActivity"
+            android:exported="false"
+            android:label="群聊历史记录搜索"
+            android:theme="@style/Theme.YhchatCanary" />
+        
+        <activity
+            android:name=".ui.community.MyPostsActivity"
+            android:exported="false"
+            android:label="我的文章"
+            android:theme="@style/Theme.YhchatCanary" />
+        
+        <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"

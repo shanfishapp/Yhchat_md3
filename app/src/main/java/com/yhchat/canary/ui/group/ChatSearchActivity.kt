@@ -1,0 +1,70 @@
+package com.yhchat.canary.ui.group
+
+import android.content.Intent
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import com.yhchat.canary.ui.base.BaseActivity
+import com.yhchat.canary.ui.theme.YhchatCanaryTheme
+import dagger.hilt.android.AndroidEntryPoint
+
+@AndroidEntryPoint
+class ChatSearchActivity : BaseActivity() {
+    
+    private val viewModel: ChatSearchViewModel by viewModels()
+    
+    companion object {
+        const val EXTRA_CHAT_ID = "chatId"
+        const val EXTRA_CHAT_TYPE = "chatType"
+        const val EXTRA_CHAT_NAME = "chatName"
+        
+        fun start(context: android.content.Context, chatId: String, chatType: Int, chatName: String) {
+            val intent = Intent(context, ChatSearchActivity::class.java).apply {
+                putExtra(EXTRA_CHAT_ID, chatId)
+                putExtra(EXTRA_CHAT_TYPE, chatType)
+                putExtra(EXTRA_CHAT_NAME, chatName)
+            }
+            context.startActivity(intent)
+        }
+    }
+    
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        
+        val chatId = intent.getStringExtra(EXTRA_CHAT_ID) ?: run {
+            android.util.Log.e("ChatSearchActivity", "Missing chatId in intent")
+            finish()
+            return
+        }
+        
+        val chatType = intent.getIntExtra(EXTRA_CHAT_TYPE, 2)
+        val chatName = intent.getStringExtra(EXTRA_CHAT_NAME) ?: "聊天"
+        
+        android.util.Log.d("ChatSearchActivity", "Opening chat search: id=$chatId, type=$chatType, name=$chatName")
+        
+        setContent {
+            YhchatCanaryTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    ChatSearchScreen(
+                        chatId = chatId,
+                        chatType = chatType,
+                        chatName = chatName,
+                        viewModel = viewModel,
+                        onBackClick = { finish() }
+                    )
+                }
+            }
+        }
+    }
+}

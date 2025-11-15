@@ -49,6 +49,7 @@ fun GroupInfoScreenRoot(
     onSettingsClick: () -> Unit = {},
     onShareClick: () -> Unit = {},
     onReportClick: () -> Unit = {},
+    onSearchChatClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -152,6 +153,7 @@ fun GroupInfoScreenRoot(
                             onSetMemberRole = { userId, userLevel -> viewModel.setMemberRole(groupId, userId, userLevel) },
                             onShareClick = { showShareDialog = true },
                             onReportClick = { showReportDialog = true },
+                            onSearchChatClick = onSearchChatClick,
                             onInviteClick = { showInviteDialog = true },
                             onExitClick = { showExitGroupDialog = true },
                             modifier = Modifier.fillMaxSize()
@@ -256,6 +258,7 @@ private fun GroupInfoContent(
     onSetMemberRole: (String, Int) -> Unit = { _, _ -> },
     onShareClick: () -> Unit = {},
     onReportClick: () -> Unit = {},
+    onSearchChatClick: () -> Unit = {},
     onInviteClick: () -> Unit = {},
     onExitClick: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -439,6 +442,13 @@ private fun GroupInfoContent(
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    // 搜索聊天记录
+                    FunctionMenuItem(
+                        icon = Icons.Default.Search,
+                        text = "搜索聊天记录",
+                        onClick = onSearchChatClick
+                    )
+                    
                     // 举报群聊
                     FunctionMenuItem(
                         icon = Icons.Default.Report,

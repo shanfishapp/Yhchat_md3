@@ -27,6 +27,10 @@ class CommunityViewModel @Inject constructor(
     private val _followingBoardListState = MutableStateFlow(BoardListState())
     val followingBoardListState: StateFlow<BoardListState> = _followingBoardListState.asStateFlow()
     
+    // 全部分区列表状态
+    private val _allBoardListState = MutableStateFlow(BoardListState())
+    val allBoardListState: StateFlow<BoardListState> = _allBoardListState.asStateFlow()
+    
     // 我的文章列表状态
     private val _myPostListState = MutableStateFlow(MyPostListState())
     val myPostListState: StateFlow<MyPostListState> = _myPostListState.asStateFlow()
@@ -102,6 +106,38 @@ class CommunityViewModel @Inject constructor(
                     _followingBoardListState.value = _followingBoardListState.value.copy(
                         isLoading = false,
                         error = error.message ?: "加载关注分区列表失败"
+                    )
+                }
+            )
+        }
+    }
+    
+    /**
+     * 加载全部分区列表
+     */
+    fun loadAllBoardList(token: String) {
+        viewModelScope.launch {
+            _allBoardListState.value = _allBoardListState.value.copy(isLoading = true, error = null)
+            
+            communityRepository.getFollowingBoardList(
+                token = token,
+                typ = 4, // 使用typ=4获取全部分区
+                size = 1000,
+                page = 1
+            ).fold(
+                onSuccess = { response ->
+                    _allBoardListState.value = _allBoardListState.value.copy(
+                        isLoading = false,
+                        boards = response.data.boards,
+                        total = response.data.total,
+                        currentPage = 1,
+                        hasMore = false
+                    )
+                },
+                onFailure = { error ->
+                    _allBoardListState.value = _allBoardListState.value.copy(
+                        isLoading = false,
+                        error = error.message ?: "加载全部分区列表失败"
                     )
                 }
             )
@@ -435,6 +471,38 @@ class CommunityViewModel @Inject constructor(
     }
     
     /**
+     * 刷新全部分区列表
+     */
+    fun refreshAllBoardList(token: String) {
+        viewModelScope.launch {
+            _allBoardListState.value = _allBoardListState.value.copy(isRefreshing = true, error = null)
+            
+            communityRepository.getFollowingBoardList(
+                token = token,
+                typ = 4, // 使用typ=4获取全部分区
+                size = 1000,
+                page = 1
+            ).fold(
+                onSuccess = { response ->
+                    _allBoardListState.value = _allBoardListState.value.copy(
+                        isRefreshing = false,
+                        boards = response.data.boards,
+                        total = response.data.total,
+                        currentPage = 1,
+                        hasMore = false
+                    )
+                },
+                onFailure = { error ->
+                    _allBoardListState.value = _allBoardListState.value.copy(
+                        isRefreshing = false,
+                        error = error.message ?: "刷新全部分区列表失败"
+                    )
+                }
+            )
+        }
+    }
+    
+    /**
      * 关注/取消关注分区
      */
     fun followBoard(token: String, boardId: Int) {
@@ -456,9 +524,37 @@ class CommunityViewModel @Inject constructor(
     /**
      * 清除错误
      */
+    /**
+     * 创建分区
+     */
+    fun createBoard(token: String, name: String, avatar: String, onSuccess: (Int) -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                communityRepository.createBoard(token, name, avatar).fold(
+                    onSuccess = { response ->
+                        if (response.code == 1) {
+                            onSuccess(response.data.id)
+                            // 刷新分区列表
+                            loadBoardList(token)
+                            loadAllBoardList(token)
+                        } else {
+                            onError(response.msg)
+                        }
+                    },
+                    onFailure = { error ->
+                        onError(error.message ?: "创建分区失败")
+                    }
+                )
+            } catch (e: Exception) {
+                onError("创建分区失败: ${e.message}")
+            }
+        }
+    }
+    
     fun clearError() {
         _boardListState.value = _boardListState.value.copy(error = null)
         _followingBoardListState.value = _followingBoardListState.value.copy(error = null)
+        _allBoardListState.value = _allBoardListState.value.copy(error = null)
         _myPostListState.value = _myPostListState.value.copy(error = null)
         _postListState.value = _postListState.value.copy(error = null)
         _postDetailState.value = _postDetailState.value.copy(error = null)

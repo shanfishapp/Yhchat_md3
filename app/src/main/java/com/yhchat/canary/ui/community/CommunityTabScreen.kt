@@ -19,7 +19,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshotFlow
@@ -54,18 +55,15 @@ fun CommunityTabScreen(
     // 获取状态
     val boardListState by viewModel.boardListState.collectAsState()
     val followingBoardListState by viewModel.followingBoardListState.collectAsState()
-    val myPostListState by viewModel.myPostListState.collectAsState()
+    val allBoardListState by viewModel.allBoardListState.collectAsState()
     
     // 页面状态
-    val pagerState = rememberPagerState { 3 }
+    val pagerState = rememberPagerState { 4 }
     var selectedTab by remember { mutableStateOf(0) }
     
-    // 搜索状态（仅用于"我的文章"标签）
-    var isSearching by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
     
     // 标签页标题
-    val tabTitles = listOf("分区列表", "关注分区", "我的文章")
+    val tabTitles = listOf("热门", "全部", "关注", "更多")
     
     // 监听页面变化，使用snapshotFlow来获得更好的响应性
     LaunchedEffect(pagerState) {
@@ -84,73 +82,19 @@ fun CommunityTabScreen(
         }
     }
     
-    // 重置搜索状态当切换标签时
-    LaunchedEffect(selectedTab) {
-        if (selectedTab != 2) {
-            isSearching = false
-            searchQuery = ""
-        }
-    }
-    
     Column(
         modifier = modifier.fillMaxSize()
     ) {
         // 顶部应用栏
         TopAppBar(
             title = {
-                if (isSearching && selectedTab == 2) {
-                    // 搜索模式：显示搜索输入框
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("搜索我的文章...") },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
-                } else {
-                    Text(
-                        text = "社区",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Text(
+                    text = "社区",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
             },
             actions = {
-                // 如果是"我的文章"标签，显示搜索我的文章按钮
-                if (selectedTab == 2) {
-                    IconButton(onClick = {
-                        if (isSearching) {
-                            // 退出搜索模式
-                            isSearching = false
-                            searchQuery = ""
-                        } else {
-                            // 进入搜索模式
-                            isSearching = true
-                        }
-                    }) {
-                        Icon(
-                            imageVector = if (isSearching) Icons.Default.Close else Icons.Default.Search,
-                            contentDescription = if (isSearching) "关闭搜索" else "搜索我的文章"
-                        )
-                    }
-                }
-                // 屏蔽用户按钮
-                IconButton(onClick = {
-                    // 跳转到屏蔽用户列表Activity
-                    val intent = Intent(context, BlockedUsersActivity::class.java).apply {
-                        putExtra("token", token)
-                    }
-                    context.startActivity(intent)
-                }) {
-                    Icon(
-                        imageVector = Icons.Default.Block,
-                        contentDescription = "屏蔽用户"
-                    )
-                }
                 // 全局搜索按钮
                 IconButton(onClick = {
                     // 跳转到搜索Activity
@@ -205,7 +149,7 @@ fun CommunityTabScreen(
             if (token.isNotEmpty()) {
                 viewModel.loadBoardList(token)
                 viewModel.loadFollowingBoardList(token)
-                viewModel.loadMyPostList(token)
+                viewModel.loadAllBoardList(token)
             }
         }
         
@@ -239,6 +183,28 @@ fun CommunityTabScreen(
                     }
                 }
                 1 -> {
+                    // 全部分区
+                    val swipeRefreshState = rememberSwipeRefreshState(allBoardListState.isRefreshing)
+                    SwipeRefresh(
+                        state = swipeRefreshState,
+                        onRefresh = { viewModel.refreshAllBoardList(token) }
+                    ) {
+                        BoardListContent(
+                            boards = allBoardListState.boards,
+                            isLoading = allBoardListState.isLoading,
+                            error = allBoardListState.error,
+                            onBoardClick = { board ->
+                                val intent = Intent(context, BoardDetailActivity::class.java).apply {
+                                    putExtra("board_id", board.id)
+                                    putExtra("board_name", board.name)
+                                    putExtra("token", token)
+                                }
+                                context.startActivity(intent)
+                            }
+                        )
+                    }
+                }
+                2 -> {
                     // 关注分区
                     val swipeRefreshState = rememberSwipeRefreshState(followingBoardListState.isRefreshing)
                     SwipeRefresh(
@@ -260,48 +226,137 @@ fun CommunityTabScreen(
                         )
                     }
                 }
-                2 -> {
-                    // 我的文章
-                    val swipeRefreshState = rememberSwipeRefreshState(myPostListState.isRefreshing)
-                    
-                    // 本地过滤文章列表
-                    val filteredPosts = remember(myPostListState.posts, searchQuery) {
-                        if (searchQuery.isBlank()) {
-                            myPostListState.posts
-                        } else {
-                            myPostListState.posts.filter { post ->
-                                post.title.contains(searchQuery, ignoreCase = true) ||
-                                post.content.contains(searchQuery, ignoreCase = true)
-                            }
-                        }
-                    }
-                    
-                    SwipeRefresh(
-                        state = swipeRefreshState,
-                        onRefresh = { viewModel.refreshMyPostList(token) }
-                    ) {
-                        MyPostListContent(
-                            posts = filteredPosts,
-                            isLoading = myPostListState.isLoading,
-                            error = myPostListState.error,
-                            searchQuery = searchQuery,
-                            onPostClick = { post ->
-                                // 跳转到文章详情
-                                val intent = Intent(context, PostDetailActivity::class.java).apply {
-                                    putExtra("post_id", post.id)
-                                    putExtra("post_title", post.title)
-                                    putExtra("token", token)
-                                }
-                                context.startActivity(intent)
-                            },
-                            onDeletePost = { postId ->
-                                viewModel.deletePost(token, postId)
-                            },
-                            context = context,
-                            token = token
-                        )
-                    }
+                3 -> {
+                    // 更多页面
+                    MoreTabContent(
+                        token = token,
+                        viewModel = viewModel,
+                        context = context
+                    )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * 更多页面内容
+ */
+@Composable
+fun MoreTabContent(
+    token: String,
+    viewModel: CommunityViewModel,
+    context: android.content.Context
+) {
+    var showCreateBoardDialog by remember { mutableStateOf(false) }
+    
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            // 我的文章
+            MoreOptionCard(
+                title = "我的文章",
+                description = "查看和管理我发布的文章",
+                icon = Icons.Default.Person,
+                onClick = {
+                    val intent = Intent(context, MyPostsActivity::class.java).apply {
+                        putExtra("token", token)
+                    }
+                    context.startActivity(intent)
+                }
+            )
+        }
+        
+        item {
+            // 被屏蔽的用户
+            MoreOptionCard(
+                title = "被屏蔽的用户",
+                description = "管理已屏蔽的用户列表",
+                icon = Icons.Default.Block,
+                onClick = {
+                    val intent = Intent(context, BlockedUsersActivity::class.java).apply {
+                        putExtra("token", token)
+                    }
+                    context.startActivity(intent)
+                }
+            )
+        }
+        
+        item {
+            // 新建分区
+            MoreOptionCard(
+                title = "新建分区",
+                description = "创建一个新的讨论分区",
+                icon = Icons.Default.Add,
+                onClick = {
+                    showCreateBoardDialog = true
+                }
+            )
+        }
+    }
+    
+    // 创建分区弹窗
+    if (showCreateBoardDialog) {
+        CreateBoardDialog(
+            token = token,
+            viewModel = viewModel,
+            context = context,
+            onDismiss = { showCreateBoardDialog = false }
+        )
+    }
+}
+
+/**
+ * 更多选项卡片
+ */
+@Composable
+fun MoreOptionCard(
+    title: String,
+    description: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

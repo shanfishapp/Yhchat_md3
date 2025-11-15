@@ -518,6 +518,12 @@ interface ApiService {
         @Header("token") token: String,
         @Body request: BoardListRequest
     ): Response<com.yhchat.canary.data.model.FollowingBoardListResponse>
+
+    @POST("v1/community/ba/following-ba-list")
+    suspend fun getAllBoardList(
+        @Header("token") token: String,
+        @Body request: BoardListRequest
+    ): Response<com.yhchat.canary.data.model.FollowingBoardListResponse>
     
     @POST("v1/community/posts/my-post-list")
     suspend fun getMyPostList(
@@ -622,6 +628,15 @@ interface ApiService {
     ): GroupListResponse
     
     /**
+     * 创建分区
+     */
+    @POST("v1/community/ba/create")
+    suspend fun createBoard(
+        @Header("token") token: String,
+        @Body request: CreateBoardRequest
+    ): Response<CreateBoardResponse>
+    
+    /**
      * 屏蔽/取消屏蔽用户
      */
     @POST("v1/community/set-black-list")
@@ -647,6 +662,15 @@ interface ApiService {
         @Header("token") token: String,
         @Body request: ReportPostRequest
     ): Response<ApiStatus>
+    
+    /**
+     * 搜索聊天记录
+     */
+    @POST("v1/search/chat-search")
+    suspend fun searchChatMessages(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.ChatSearchRequest
+    ): Response<com.yhchat.canary.data.model.ChatSearchResponse>
     
     /**
      * 获取在线设备列表 (Protobuf)
@@ -1613,6 +1637,29 @@ data class BlackListRequest(
     val size: Int = 20,
     @SerializedName("page")
     val page: Int = 1
+)
+
+/**
+ * 创建分区请求
+ */
+data class CreateBoardRequest(
+    @SerializedName("name")
+    val name: String, // 分区名称
+    @SerializedName("avatar")
+    val avatar: String // 分区头像url
+)
+
+/**
+ * 创建分区响应
+ */
+data class CreateBoardResponse(
+    val code: Int,
+    val data: CreateBoardData,
+    val msg: String
+)
+
+data class CreateBoardData(
+    val id: Int // 分区id
 )
 
 /**

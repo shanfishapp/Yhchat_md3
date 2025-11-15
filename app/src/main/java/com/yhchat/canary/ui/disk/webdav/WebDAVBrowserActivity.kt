@@ -46,7 +46,7 @@ import com.yhchat.canary.data.model.MountSetting
 import com.yhchat.canary.data.model.WebDAVFile
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import com.yhchat.canary.utils.RSAEncryptionUtil
-import com.yhchat.canary.utils.WebDAVClient
+import com.yhchat.canary.utils.SardineWebDAVClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -684,7 +684,7 @@ class WebDAVBrowserViewModel : ViewModel() {
                 // 不清除全局error，因为全局error只用于挂载点列表加载失败
             )
             
-            WebDAVClient.listFiles(mountSetting, path).fold(
+            SardineWebDAVClient.listFiles(mountSetting, path).fold(
                 onSuccess = { files ->
                     val updatedMountStates = _uiState.value.mountStates.toMutableMap()
                     updatedMountStates[mountIndex] = MountState(

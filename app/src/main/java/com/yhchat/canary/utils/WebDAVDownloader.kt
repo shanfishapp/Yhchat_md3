@@ -25,7 +25,7 @@ object WebDAVDownloader {
     private const val TAG = "WebDAVDownloader"
     
     /**
-     * 下载WebDAV文件到本地
+     * 使用 Sardine 下载WebDAV文件到本地（推荐使用）
      * @param context 上下文
      * @param file WebDAV文件信息
      * @param onProgress 下载进度回调 (已下载字节数, 总字节数)
@@ -33,6 +33,31 @@ object WebDAVDownloader {
      * @param onError 下载失败回调 (错误信息)
      */
     suspend fun downloadFile(
+        context: Context,
+        file: WebDAVFile,
+        onProgress: (downloaded: Long, total: Long) -> Unit = { _, _ -> },
+        onSuccess: (localPath: String) -> Unit,
+        onError: (error: String) -> Unit
+    ) {
+        // 直接使用 SardineWebDAVClient 的下载功能
+        SardineWebDAVClient.downloadFile(
+            context = context,
+            file = file,
+            onProgress = onProgress,
+            onSuccess = onSuccess,
+            onError = onError
+        )
+    }
+    
+    /**
+     * 旧版下载方法（使用原始 OkHttp 实现）
+     * @param context 上下文
+     * @param file WebDAV文件信息
+     * @param onProgress 下载进度回调 (已下载字节数, 总字节数)
+     * @param onSuccess 下载成功回调 (本地文件路径)
+     * @param onError 下载失败回调 (错误信息)
+     */
+    suspend fun downloadFileOld(
         context: Context,
         file: WebDAVFile,
         onProgress: (downloaded: Long, total: Long) -> Unit = { _, _ -> },

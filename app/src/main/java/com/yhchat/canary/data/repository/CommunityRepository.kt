@@ -556,4 +556,31 @@ class CommunityRepository @Inject constructor(
             Result.failure(e)
         }
     }
+    
+    /**
+     * 创建分区
+     */
+    suspend fun createBoard(
+        token: String,
+        name: String,
+        avatar: String
+    ): Result<CreateBoardResponse> {
+        return try {
+            val request = CreateBoardRequest(name = name, avatar = avatar)
+            val response = apiService.createBoard(token, request)
+            
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null) {
+                    Result.success(body)
+                } else {
+                    Result.failure(Exception("响应体为空"))
+                }
+            } else {
+                Result.failure(Exception("网络请求失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

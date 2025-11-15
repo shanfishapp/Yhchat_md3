@@ -1666,9 +1666,17 @@ private suspend fun getQiniuUploadToken(token: String): String? = withContext(Di
         
         if (response.isSuccessful && responseBody != null) {
             val jsonObject = JSONObject(responseBody)
-            val uploadToken = jsonObject.optString("token", null)
-            android.util.Log.d("PostDetailActivity", "🔑 获取到上传token: ${uploadToken?.take(20)}...")
-            uploadToken
+            val code = jsonObject.optInt("code", 0)
+            if (code == 1) {
+                val dataObject = jsonObject.optJSONObject("data")
+                val uploadToken = dataObject?.optString("token", null)
+                android.util.Log.d("PostDetailActivity", "🔑 获取到上传token: ${uploadToken?.take(20)}...")
+                uploadToken
+            } else {
+                val msg = jsonObject.optString("msg", "未知错误")
+                android.util.Log.e("PostDetailActivity", "🔑 API返回错误: code=$code, msg=$msg")
+                null
+            }
         } else {
             android.util.Log.e("PostDetailActivity", "🔑 获取token失败: $responseCode - $responseBody")
             null

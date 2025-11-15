@@ -258,6 +258,53 @@ object ImageUploadUtil {
     }
     
     /**
+     * 获取七牛云上传token
+     */
+    suspend fun getQiniuUploadToken(context: Context, token: String): String = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "🔑 开始获取七牛云上传token")
+            Log.d(TAG, "🔑 用户token: ${token.take(10)}...")
+            
+            val request = Request.Builder()
+                .url("https://chat-go.jwzhd.com/v1/misc/qiniu-token")
+                .addHeader("token", token)
+                .addHeader("Content-Type", "application/json")
+                .get()
+                .build()
+            
+            Log.d(TAG, "🔑 发送请求到: ${request.url}")
+            
+            val response = client.newCall(request).execute()
+            val responseCode = response.code
+            val responseBody = response.body?.string()
+            
+            Log.d(TAG, "🔑 响应码: $responseCode")
+            Log.d(TAG, "🔑 响应体: $responseBody")
+            
+            if (response.isSuccessful && responseBody != null) {
+                val jsonObject = JSONObject(responseBody)
+                val code = jsonObject.optInt("code", 0)
+                if (code == 1) {
+                    val dataObject = jsonObject.optJSONObject("data")
+                    val uploadToken = dataObject?.optString("token", null)
+                    Log.d(TAG, "🔑 获取到上传token: ${uploadToken?.take(20)}...")
+                    uploadToken ?: ""
+                } else {
+                    val msg = jsonObject.optString("msg", "未知错误")
+                    Log.e(TAG, "🔑 API返回错误: code=$code, msg=$msg")
+                    ""
+                }
+            } else {
+                Log.e(TAG, "🔑 获取token失败: $responseCode - $responseBody")
+                ""
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "🔑 获取token异常: ${e.message}", e)
+            ""
+        }
+    }
+    
+    /**
      * 计算字节数组的MD5值
      */
     private fun calculateMD5(bytes: ByteArray): String {

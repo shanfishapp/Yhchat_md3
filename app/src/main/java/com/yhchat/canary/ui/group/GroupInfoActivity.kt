@@ -82,6 +82,23 @@ class GroupInfoActivity : BaseActivity() {
                         },
                         onReportClick = {
                             // 举报功能已在GroupInfoScreen中集成
+                        },
+                        onSearchChatClick = {
+                            try {
+                                ChatSearchActivity.start(
+                                    context = this@GroupInfoActivity,
+                                    chatId = groupId,
+                                    chatType = 2, // 群聊类型
+                                    chatName = groupName
+                                )
+                            } catch (e: Exception) {
+                                android.util.Log.e("GroupInfoActivity", "Failed to open chat search", e)
+                                android.widget.Toast.makeText(
+                                    this@GroupInfoActivity,
+                                    "无法打开聊天记录搜索",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
                     )
                 }

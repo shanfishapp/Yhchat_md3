@@ -94,6 +94,9 @@ dependencies {
     // 权限处理
     implementation("com.google.accompanist:accompanist-permissions:0.32.0")
     
+    // WebDAV 客户端库（Android 兼容版，避免 Apache HttpClient 冲突）
+    implementation("com.github.thegrizzlylabs:sardine-android:0.8")
+    
     // Markwon Markdown 解析和渲染
     implementation("io.noties.markwon:core:4.6.2")
     implementation("io.noties.markwon:html:4.6.2")
