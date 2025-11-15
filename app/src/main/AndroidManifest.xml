@@ -327,7 +327,21 @@
             android:exported="false"
             android:label="WebDAV"
             android:theme="@style/Theme.YhchatCanary" />
-            
+       
+       <!-- WebDAV 设置 Activity -->
+        <activity
+            android:name=".ui.disk.webdav.WebDAVSettingsActivity"
+            android:exported="false"
+            android:label="WebDAV 设置"
+            android:theme="@style/Theme.YhchatCanary" />
+
+        <!-- WebDAV 下载列表 Activity -->
+        <activity
+            android:name=".ui.disk.webdav.WebDAVDownloadListActivity"
+            android:exported="false"
+            android:label="下载列表"
+            android:theme="@style/Theme.YhchatCanary" />
+        
         <!-- 综合搜索 Activity -->
 
         <activity

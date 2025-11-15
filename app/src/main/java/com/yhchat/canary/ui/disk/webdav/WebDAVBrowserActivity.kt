@@ -15,15 +15,21 @@ import kotlinx.coroutines.launch
 import com.yhchat.canary.utils.WebDAVDownloader
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.yhchat.canary.ui.base.BaseActivity
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -47,6 +53,7 @@ import com.yhchat.canary.data.model.WebDAVFile
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import com.yhchat.canary.utils.RSAEncryptionUtil
 import com.yhchat.canary.utils.SardineWebDAVClient
+import com.yhchat.canary.utils.WebDAVDownloadManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -109,15 +116,28 @@ fun WebDAVBrowserScreen(
     // 下载对话框状态
     var showDownloadDialog by remember { mutableStateOf(false) }
     var fileToDownload by remember { mutableStateOf<WebDAVFile?>(null) }
-    var isDownloading by remember { mutableStateOf(false) }
-    var downloadProgress by remember { mutableStateOf(0f) }
     
+    val settingsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        viewModel.loadMountSettings(groupId)
+    }
+
     LaunchedEffect(Unit) {
         viewModel.init(context)
         viewModel.loadMountSettings(groupId)
     }
     
     val uiState by viewModel.uiState.collectAsState()
+    val currentMountState = uiState.mountStates[uiState.selectedMountIndex]
+    val currentPath = currentMountState?.currentPath.orEmpty()
+
+    BackHandler {
+        val handled = viewModel.navigateUp()
+        if (!handled) {
+            onBackClick()
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -129,6 +149,17 @@ fun WebDAVBrowserScreen(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "返回"
                         )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { WebDAVDownloadListActivity.start(context) }) {
+                        Icon(imageVector = Icons.Default.Download, contentDescription = "下载列表")
+                    }
+                    IconButton(onClick = {
+                        val intent = WebDAVSettingsActivity.intent(context, groupId, groupName)
+                        settingsLauncher.launch(intent)
+                    }) {
+                        Icon(imageVector = Icons.Default.Settings, contentDescription = "WebDAV 设置")
                     }
                 }
             )
@@ -247,6 +278,14 @@ fun WebDAVBrowserScreen(
                         }
                     }
                     
+                    // 面包屑路径
+                    WebDAVBreadcrumbBar(
+                        currentPath = currentPath,
+                        onNavigate = { targetPath ->
+                            viewModel.navigateToPath(targetPath)
+                        }
+                    )
+                    
                     // 文件内容区域 - 使用 HorizontalPager
                     HorizontalPager(
                         state = pagerState,
@@ -274,11 +313,9 @@ fun WebDAVBrowserScreen(
     // 下载确认对话框
     if (showDownloadDialog && fileToDownload != null) {
         AlertDialog(
-            onDismissRequest = { 
-                if (!isDownloading) {
-                    showDownloadDialog = false
-                    fileToDownload = null
-                }
+            onDismissRequest = {
+                showDownloadDialog = false
+                fileToDownload = null
             },
             title = { Text("下载文件") },
             text = { 
@@ -295,72 +332,28 @@ fun WebDAVBrowserScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    
-                    if (isDownloading) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        LinearProgressIndicator(
-                            progress = downloadProgress,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Text(
-                            text = "下载中... ${(downloadProgress * 100).toInt()}%",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (!isDownloading) {
-                            isDownloading = true
-                            downloadProgress = 0f
-                            
-                            // 开始下载
-                            Log.d("WebDAVBrowser", "开始启动下载协程: ${fileToDownload!!.name}")
-                            coroutineScope.launch {
-                                Log.d("WebDAVBrowser", "下载协程已启动")
-                                WebDAVDownloader.downloadFile(
-                                    context = context,
-                                    file = fileToDownload!!,
-                                    onProgress = { downloaded, total ->
-                                        if (total > 0) {
-                                            downloadProgress = downloaded.toFloat() / total.toFloat()
-                                        }
-                                    },
-                                    onSuccess = { localPath ->
-                                        Log.d("WebDAVBrowser", "下载成功回调: $localPath")
-                                        isDownloading = false
-                                        showDownloadDialog = false
-                                        fileToDownload = null
-                                        Toast.makeText(context, "下载完成: $localPath", Toast.LENGTH_LONG).show()
-                                    },
-                                    onError = { error ->
-                                        Log.d("WebDAVBrowser", "下载失败回调: $error")
-                                        isDownloading = false
-                                        showDownloadDialog = false
-                                        fileToDownload = null
-                                        Toast.makeText(context, "下载失败: $error", Toast.LENGTH_LONG).show()
-                                    }
-                                )
-                            }
+                        fileToDownload?.let { file ->
+                            WebDAVDownloadManager.startDownload(context, file)
+                            Toast.makeText(context, "已加入下载列表", Toast.LENGTH_SHORT).show()
                         }
-                    },
-                    enabled = !isDownloading
+                        showDownloadDialog = false
+                        fileToDownload = null
+                    }
                 ) {
-                    Text(if (isDownloading) "下载中..." else "下载")
+                    Text("开始下载")
                 }
             },
             dismissButton = {
                 TextButton(
-                    onClick = { 
-                        if (!isDownloading) {
-                            showDownloadDialog = false
-                            fileToDownload = null
-                        }
-                    },
-                    enabled = !isDownloading
+                    onClick = {
+                        showDownloadDialog = false
+                        fileToDownload = null
+                    }
                 ) {
                     Text("取消")
                 }
@@ -555,7 +548,7 @@ class WebDAVBrowserViewModel : ViewModel() {
     
     private val _uiState = MutableStateFlow(WebDAVBrowserUiState())
     val uiState: StateFlow<WebDAVBrowserUiState> = _uiState.asStateFlow()
-    
+
     fun init(context: Context) {
         apiService = ApiClient.apiService
         tokenRepository = RepositoryFactory.getTokenRepository(context)
@@ -619,7 +612,6 @@ class WebDAVBrowserViewModel : ViewModel() {
                             android.util.Log.d("WebDAVBrowser", "挂载点 ${mountSetting.mountName} 密码解密成功")
                         } catch (e: Exception) {
                             android.util.Log.e("WebDAVBrowser", "挂载点 ${mountSetting.mountName} 密码解密失败", e)
-                            // 即使密码解密失败，也添加原始配置（密码为空）
                             decryptedMountSettings.add(mountSetting.copy(webdavPassword = ""))
                         }
                     }
@@ -722,34 +714,32 @@ class WebDAVBrowserViewModel : ViewModel() {
         }
     }
     
-    fun enterFolder(fullPath: String) {
+    fun enterFolder(relativePath: String) {
         val selectedMount = _uiState.value.mountSettings.getOrNull(_uiState.value.selectedMountIndex)
         if (selectedMount != null) {
-            // 将完整路径转换为相对路径
-            // fullPath 格式: /remote.php/dav/files/ushio_noa/yh/subfolder
-            // webdavRootPath 格式: /yh
-            // 需要提取出相对于 webdavRootPath 的部分
-            
-            val baseUrl = selectedMount.webdavUrl.trimEnd('/')
-            val rootPath = selectedMount.webdavRootPath.trimStart('/')
-            
-            // 构建基础路径模式，用于匹配
-            val basePathPattern = "/${rootPath}".replace("//", "/")
-            
-            // 从完整路径中提取相对路径
-            val relativePath = if (fullPath.contains(basePathPattern)) {
-                val afterBase = fullPath.substringAfter(basePathPattern)
-                afterBase.trimStart('/')
-            } else {
-                // 如果无法匹配，直接使用文件夹名称
-                fullPath.substringAfterLast('/')
-            }
-            
-            Log.d("WebDAVBrowser", "enterFolder: fullPath=$fullPath, basePathPattern=$basePathPattern, relativePath=$relativePath")
-            
+            Log.d("WebDAVBrowser", "enterFolder: relativePath=$relativePath")
             loadFiles(selectedMount, relativePath)
         }
     }
+
+    fun navigateToPath(targetPath: String) {
+        val selectedMount = _uiState.value.mountSettings.getOrNull(_uiState.value.selectedMountIndex)
+        if (selectedMount != null) {
+            loadFiles(selectedMount, targetPath)
+        }
+    }
+
+    fun navigateUp(): Boolean {
+        val selectedIndex = _uiState.value.selectedMountIndex
+        val mountState = _uiState.value.mountStates[selectedIndex] ?: return false
+        val currentPath = mountState.currentPath
+        if (currentPath.isBlank()) return false
+        val parentPath = currentPath.substringBeforeLast('/', "")
+        val selectedMount = _uiState.value.mountSettings.getOrNull(selectedIndex) ?: return false
+        loadFiles(selectedMount, parentPath)
+        return true
+    }
+
 }
 
 data class WebDAVBrowserUiState(
@@ -770,4 +760,47 @@ data class MountState(
     val isLoading: Boolean = false,
     val error: String? = null
 )
+
+@Composable
+private fun WebDAVBreadcrumbBar(
+    currentPath: String,
+    onNavigate: (String) -> Unit
+) {
+    val scrollState = rememberScrollState()
+    val segments = currentPath.split('/').filter { it.isNotBlank() }
+    var cumulativePath = ""
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(scrollState)
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "根目录",
+            color = if (segments.isEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            fontWeight = if (segments.isEmpty()) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.clickable { onNavigate("") }
+        )
+        segments.forEachIndexed { index, segment ->
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .size(16.dp)
+            )
+            cumulativePath = if (cumulativePath.isEmpty()) segment else "$cumulativePath/$segment"
+            val isLast = index == segments.lastIndex
+            Text(
+                text = segment,
+                color = if (isLast) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                fontWeight = if (isLast) FontWeight.Bold else FontWeight.Normal,
+                modifier = Modifier.clickable { onNavigate(cumulativePath) },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
 

@@ -16,6 +16,31 @@ data class MountSettingRequest(
     val encryptIv: String   // Base64 编码的 RSA 加密后的 IV
 )
 
+data class MountSettingCreateRequest(
+    @SerializedName("groupId")
+    val groupId: String,
+    
+    @SerializedName("mountName")
+    val mountName: String,
+    
+    @SerializedName("webdavUrl")
+    val webdavUrl: String,
+    
+    @SerializedName("webdavUserName")
+    val webdavUserName: String,
+    
+    @SerializedName("webdavPassword")
+    val webdavPassword: String,
+    
+    @SerializedName("webdavRootPath")
+    val webdavRootPath: String
+)
+
+data class MountSettingDeleteRequest(
+    @SerializedName("id")
+    val id: Long
+)
+
 /**
  * WebDAV 挂载设置响应
  */

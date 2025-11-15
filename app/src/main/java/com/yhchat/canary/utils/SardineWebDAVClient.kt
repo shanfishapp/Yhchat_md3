@@ -1,6 +1,8 @@
 package com.yhchat.canary.utils
 
 import android.content.Context
+import android.net.Uri
+import android.os.Environment
 import android.util.Log
 import com.thegrizzlylabs.sardineandroid.Sardine
 import com.thegrizzlylabs.sardineandroid.DavResource
@@ -40,6 +42,21 @@ object SardineWebDAVClient {
         }
     }
     
+    private fun resolvePath(mountSetting: MountSetting, relativePath: String): String {
+        val normalizedRoot = mountSetting.webdavRootPath.trim('/')
+        val normalizedRelative = relativePath.trim('/').takeIf { it.isNotEmpty() }?.split('/') ?: emptyList()
+        val baseUrl = mountSetting.webdavUrl.trimEnd('/')
+        val basePath = Uri.parse(baseUrl).path?.trim('/') ?: ""
+        val baseSegments = if (basePath.isEmpty()) emptyList() else basePath.split('/')
+        val baseContainsRoot = normalizedRoot.isNotEmpty() && baseSegments.lastOrNull() == normalizedRoot
+        val segments = mutableListOf<String>()
+        if (normalizedRoot.isNotEmpty() && !baseContainsRoot) {
+            segments.add(normalizedRoot)
+        }
+        segments.addAll(normalizedRelative)
+        return segments.joinToString("/")
+    }
+    
     /**
      * 测试 WebDAV 连接
      * @param mountSetting 已解密的挂载设置
@@ -77,7 +94,7 @@ object SardineWebDAVClient {
             Log.d(TAG, "列出文件: ${mountSetting.mountName} - $relativePath")
             
             val sardine = createSardineClient(mountSetting)
-            val fullPath = buildPath(mountSetting.webdavRootPath, relativePath)
+            val fullPath = resolvePath(mountSetting, relativePath)
             val url = buildUrl(mountSetting.webdavUrl, fullPath)
             
             Log.d(TAG, "请求URL: $url")
@@ -85,7 +102,7 @@ object SardineWebDAVClient {
             // 使用 Sardine 列出目录内容
             val resources: List<DavResource> = sardine.list(url)
             
-            val files = resources.mapNotNull { resource ->
+            val files = resources.drop(1).mapNotNull { resource ->
                 // 跳过当前目录项
                 if (resource.path == fullPath || resource.path == "$fullPath/") {
                     return@mapNotNull null
@@ -142,13 +159,14 @@ object SardineWebDAVClient {
             Log.d(TAG, "开始下载文件: ${file.name}")
             
             val sardine = createSardineClient(file.mountSetting)
-            val fullPath = buildPath(file.mountSetting.webdavRootPath, file.path)
+            val fullPath = resolvePath(file.mountSetting, file.path)
             val url = buildUrl(file.mountSetting.webdavUrl, fullPath)
             
             Log.d(TAG, "下载URL: $url")
             
-            // 创建本地文件
-            val downloadsDir = File(context.getExternalFilesDir(null), "downloads")
+            // 创建公共下载目录: /storage/emulated/0/Download/yhchat/
+            val downloadsRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val downloadsDir = File(downloadsRoot, "yhchat")
             if (!downloadsDir.exists()) {
                 downloadsDir.mkdirs()
             }
@@ -174,7 +192,9 @@ object SardineWebDAVClient {
                             totalBytesRead += bytesRead
                             
                             // 报告进度
-                            onProgress(totalBytesRead, file.size)
+                            withContext(Dispatchers.Main) {
+                                onProgress(totalBytesRead, file.size)
+                            }
                         }
                     }
                 }
@@ -182,7 +202,9 @@ object SardineWebDAVClient {
                 // 下载完成，重命名临时文件
                 if (tempFile.renameTo(localFile)) {
                     Log.d(TAG, "文件下载成功: ${localFile.absolutePath}")
-                    onSuccess(localFile.absolutePath)
+                    withContext(Dispatchers.Main) {
+                        onSuccess(localFile.absolutePath)
+                    }
                 } else {
                     throw IOException("无法重命名临时文件")
                 }
@@ -202,7 +224,9 @@ object SardineWebDAVClient {
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "下载文件失败: ${file.name}", e)
-            onError("下载失败: ${e.message}")
+            withContext(Dispatchers.Main) {
+                onError("下载失败: ${e.message}")
+            }
         }
     }
     
@@ -229,7 +253,7 @@ object SardineWebDAVClient {
             Log.d(TAG, "开始上传文件: ${localFile.name} -> $remotePath")
             
             val sardine = createSardineClient(mountSetting)
-            val fullPath = buildPath(mountSetting.webdavRootPath, remotePath)
+            val fullPath = resolvePath(mountSetting, remotePath)
             val url = buildUrl(mountSetting.webdavUrl, fullPath)
             
             Log.d(TAG, "上传URL: $url")
@@ -262,7 +286,7 @@ object SardineWebDAVClient {
             Log.d(TAG, "创建目录: $remotePath")
             
             val sardine = createSardineClient(mountSetting)
-            val fullPath = buildPath(mountSetting.webdavRootPath, remotePath)
+            val fullPath = resolvePath(mountSetting, remotePath)
             val url = buildUrl(mountSetting.webdavUrl, fullPath)
             
             sardine.createDirectory(url)
@@ -290,7 +314,7 @@ object SardineWebDAVClient {
             Log.d(TAG, "删除: $remotePath")
             
             val sardine = createSardineClient(mountSetting)
-            val fullPath = buildPath(mountSetting.webdavRootPath, remotePath)
+            val fullPath = resolvePath(mountSetting, remotePath)
             val url = buildUrl(mountSetting.webdavUrl, fullPath)
             
             sardine.delete(url)
@@ -320,8 +344,8 @@ object SardineWebDAVClient {
             Log.d(TAG, "移动: $sourcePath -> $targetPath")
             
             val sardine = createSardineClient(mountSetting)
-            val sourceFullPath = buildPath(mountSetting.webdavRootPath, sourcePath)
-            val targetFullPath = buildPath(mountSetting.webdavRootPath, targetPath)
+            val sourceFullPath = resolvePath(mountSetting, sourcePath)
+            val targetFullPath = resolvePath(mountSetting, targetPath)
             val sourceUrl = buildUrl(mountSetting.webdavUrl, sourceFullPath)
             val targetUrl = buildUrl(mountSetting.webdavUrl, targetFullPath)
             
@@ -352,18 +376,4 @@ object SardineWebDAVClient {
         }
     }
     
-    /**
-     * 构建路径
-     */
-    private fun buildPath(basePath: String, relativePath: String): String {
-        val cleanBasePath = basePath.trim('/')
-        val cleanRelativePath = relativePath.trim('/')
-        
-        return when {
-            cleanBasePath.isEmpty() && cleanRelativePath.isEmpty() -> ""
-            cleanBasePath.isEmpty() -> cleanRelativePath
-            cleanRelativePath.isEmpty() -> cleanBasePath
-            else -> "$cleanBasePath/$cleanRelativePath"
-        }
-    }
 }

@@ -1000,7 +1000,26 @@ interface ApiService {
         @Header("token") token: String,
         @Body request: com.yhchat.canary.data.model.MountSettingRequest
     ): Response<com.yhchat.canary.data.model.MountSettingResponse>
-    
+
+    /**
+     * 创建 WebDAV 挂载点
+     * POST /v1/mount-setting/create
+     */
+    @POST("v1/mount-setting/create")
+    suspend fun createMountSetting(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.MountSettingCreateRequest
+    ): Response<com.yhchat.canary.data.model.ApiStatus>
+
+    /**
+     * 删除 WebDAV 挂载点
+     * POST /v1/mount-setting/delete
+     */
+    @POST("v1/mount-setting/delete")
+    suspend fun deleteMountSetting(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.MountSettingDeleteRequest
+    ): Response<com.yhchat.canary.data.model.ApiStatus>
 }
 
 /**
