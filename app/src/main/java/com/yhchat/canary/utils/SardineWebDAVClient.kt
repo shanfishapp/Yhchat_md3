@@ -14,14 +14,26 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlin.coroutines.coroutineContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.io.RandomAccessFile
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.ceil
+import kotlin.math.max
+import kotlin.math.min
+import okhttp3.Credentials
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 /**
  * 基于 Sardine 库的 WebDAV 客户端工具类
@@ -30,6 +42,10 @@ import java.util.*
 object SardineWebDAVClient {
     
     private const val TAG = "SardineWebDAVClient"
+    private const val MIN_MULTI_THREAD_SIZE = 4 * 1024 * 1024L // 4MB
+    private const val DEFAULT_THREAD_COUNT = 4
+    private const val MIN_CHUNK_SIZE = 1 * 1024 * 1024L // 1MB
+    private val httpClient by lazy { OkHttpClient() }
     
     /**
      * 创建 Sardine WebDAV 客户端
@@ -171,56 +187,44 @@ object SardineWebDAVClient {
                 downloadsDir.mkdirs()
             }
             
-            val localFile = File(downloadsDir, file.name)
-            var tempFile: File? = null
-            
-            try {
-                // 创建临时文件
-                tempFile = File(downloadsDir, "${file.name}.tmp")
-                
-                // 使用 Sardine 下载文件
-                sardine.get(url).use { inputStream ->
-                    FileOutputStream(tempFile).use { outputStream ->
-                        val buffer = ByteArray(8192)
-                        var totalBytesRead = 0L
-                        var bytesRead: Int
-                        
-                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                            ensureActive() // 检查协程是否被取消
-                            
-                            outputStream.write(buffer, 0, bytesRead)
-                            totalBytesRead += bytesRead
-                            
-                            // 报告进度
-                            withContext(Dispatchers.Main) {
-                                onProgress(totalBytesRead, file.size)
-                            }
-                        }
-                    }
-                }
-                
-                // 下载完成，重命名临时文件
-                if (tempFile.renameTo(localFile)) {
-                    Log.d(TAG, "文件下载成功: ${localFile.absolutePath}")
-                    withContext(Dispatchers.Main) {
-                        onSuccess(localFile.absolutePath)
-                    }
+            val useMultiThread = file.size > MIN_MULTI_THREAD_SIZE
+            val resultPath = try {
+                if (useMultiThread) {
+                    downloadWithMultiThread(
+                        file = file,
+                        url = url,
+                        downloadsDir = downloadsDir,
+                        onProgress = onProgress
+                    )
                 } else {
-                    throw IOException("无法重命名临时文件")
+                    downloadSingleThread(
+                        sardine = sardine,
+                        url = url,
+                        downloadsDir = downloadsDir,
+                        file = file,
+                        onProgress = onProgress
+                    )
                 }
-                
-            } catch (e: CancellationException) {
-                Log.d(TAG, "下载被取消: ${file.name}")
-                tempFile?.delete()
-                throw e
             } catch (e: Exception) {
-                Log.e(TAG, "下载过程中发生错误", e)
-                tempFile?.delete()
-                throw e
+                if (useMultiThread) {
+                    Log.w(TAG, "多线程下载失败，回退到单线程", e)
+                    downloadSingleThread(
+                        sardine = sardine,
+                        url = url,
+                        downloadsDir = downloadsDir,
+                        file = file,
+                        onProgress = onProgress
+                    )
+                } else {
+                    throw e
+                }
+            }
+            
+            withContext(Dispatchers.Main) {
+                onSuccess(resultPath)
             }
             
         } catch (e: CancellationException) {
-            // 协程被取消，不报告错误
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "下载文件失败: ${file.name}", e)
@@ -229,6 +233,130 @@ object SardineWebDAVClient {
             }
         }
     }
+
+    private suspend fun downloadWithMultiThread(
+        file: WebDAVFile,
+        url: String,
+        downloadsDir: File,
+        onProgress: (Long, Long) -> Unit
+    ): String = withContext(Dispatchers.IO) {
+        val totalBytes = file.size
+        require(totalBytes > 0) { "多线程下载需要已知文件大小" }
+        val localFile = File(downloadsDir, file.name)
+        val tempFile = File(downloadsDir, "${file.name}.multi.tmp")
+        val chunkSize = max(MIN_CHUNK_SIZE, totalBytes / DEFAULT_THREAD_COUNT).coerceAtLeast(1L)
+        val chunkCount = ceil(totalBytes.toDouble() / chunkSize.toDouble()).toInt().coerceAtLeast(1)
+        val ranges = (0 until chunkCount).map { index ->
+            val start = index * chunkSize
+            val end = min(totalBytes - 1, start + chunkSize - 1)
+            start..end
+        }
+        val progress = AtomicLong(0L)
+        RandomAccessFile(tempFile, "rw").use { raf ->
+            raf.setLength(totalBytes)
+            coroutineScope {
+                val jobs = mutableListOf<Job>()
+                for (range in ranges) {
+                    jobs += launch(Dispatchers.IO) {
+                        downloadRange(
+                            url = url,
+                            mountSetting = file.mountSetting,
+                            range = range,
+                            raf = raf,
+                            progress = progress,
+                            totalBytes = totalBytes,
+                            onProgress = onProgress
+                        )
+                    }
+                }
+                jobs.forEach { it.join() }
+            }
+        }
+        if (!tempFile.renameTo(localFile)) {
+            tempFile.delete()
+            throw IOException("无法重命名多线程临时文件")
+        }
+        localFile.absolutePath
+    }
+
+    private suspend fun downloadRange(
+        url: String,
+        mountSetting: MountSetting,
+        range: LongRange,
+        raf: RandomAccessFile,
+        progress: AtomicLong,
+        totalBytes: Long,
+        onProgress: (Long, Long) -> Unit
+    ) {
+        coroutineContext.ensureActive()
+        val credential = Credentials.basic(mountSetting.webdavUserName, mountSetting.webdavPassword)
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("Range", "bytes=${range.first}-${range.last}")
+            .addHeader("Authorization", credential)
+            .build()
+        httpClient.newCall(request).execute().use { response ->
+            if (response.code != 206) {
+                throw IOException("服务器不支持多线程下载 (code=${response.code})")
+            }
+            val body = response.body ?: throw IOException("响应体为空")
+            body.byteStream().use { inputStream ->
+                val buffer = ByteArray(8192)
+                var offset = range.first
+                while (true) {
+                    coroutineContext.ensureActive()
+                    val bytesRead = inputStream.read(buffer)
+                    if (bytesRead == -1) break
+                    synchronized(raf) {
+                        raf.seek(offset)
+                        raf.write(buffer, 0, bytesRead)
+                    }
+                    offset += bytesRead
+                    val downloaded = progress.addAndGet(bytesRead.toLong())
+                    withContext(Dispatchers.Main) {
+                        onProgress(downloaded, totalBytes)
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun downloadSingleThread(
+        sardine: Sardine,
+        url: String,
+        downloadsDir: File,
+        file: WebDAVFile,
+        onProgress: (Long, Long) -> Unit
+    ): String {
+        val localFile = File(downloadsDir, file.name)
+        var tempFile: File? = null
+        try {
+            tempFile = File(downloadsDir, "${file.name}.tmp")
+            sardine.get(url).use { inputStream ->
+                FileOutputStream(tempFile).use { outputStream ->
+                    val buffer = ByteArray(8192)
+                    var totalBytesRead = 0L
+                    var bytesRead: Int
+                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                        coroutineContext.ensureActive()
+                        outputStream.write(buffer, 0, bytesRead)
+                        totalBytesRead += bytesRead
+                        withContext(Dispatchers.Main) {
+                            onProgress(totalBytesRead, file.size)
+                        }
+                    }
+                }
+            }
+            if (!tempFile.renameTo(localFile)) {
+                throw IOException("无法重命名临时文件")
+            }
+            return localFile.absolutePath
+        } catch (e: Exception) {
+            tempFile?.delete()
+            throw e
+        }
+    }
+
     
     /**
      * 上传文件
