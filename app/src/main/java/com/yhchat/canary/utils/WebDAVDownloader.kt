@@ -181,6 +181,7 @@ object WebDAVDownloader {
         val encodedPath = filePath.split("/").joinToString("/") { segment ->
             if (segment.isNotEmpty()) {
                 URLEncoder.encode(segment, StandardCharsets.UTF_8.toString())
+                    .replace("+", "%20")
             } else {
                 segment
             }

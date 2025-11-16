@@ -22,7 +22,7 @@ fun BottomNavigationBar(
 ) {
     NavigationBar(
         modifier = modifier
-            .padding(horizontal = 2.dp) // 通过外部padding减少间距
+            .padding(horizontal = 0.dp) // 减小水平间距
     ) {
         visibleItems.forEach { item ->
             NavigationBarItem(

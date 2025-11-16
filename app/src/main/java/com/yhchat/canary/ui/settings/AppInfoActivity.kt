@@ -48,7 +48,7 @@ import dagger.hilt.android.AndroidEntryPoint
 class AppInfoActivity : BaseActivity() {
     
     companion object {
-        const val APP_VERSION = "Canary 20 Preview"
+        const val APP_VERSION = "Canary 20.1 Preview"
         const val APP_NAME = "Yhchat Canary"
 
         const val DEVELOPER_NAME_1 = "Kauid323"
