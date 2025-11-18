@@ -333,6 +333,16 @@ private fun DisplaySettingsCard(
             
             // WebP压缩质量设置
             WebPQualitySettingItem(context = context)
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // HTML消息显示原文开关
+            HtmlRawTextSettingItem(context = context)
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Markdown消息显示原文开关
+            MarkdownRawTextSettingItem(context = context)
         }
     }
 }
@@ -1407,6 +1417,144 @@ private fun WebPQualitySettingItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+    }
+}
+
+/**
+ * HTML消息显示原文设置项
+ */
+@Composable
+private fun HtmlRawTextSettingItem(
+    context: Context,
+    modifier: Modifier = Modifier
+) {
+    val prefs = remember { 
+        context.getSharedPreferences("message_settings", Context.MODE_PRIVATE) 
+    }
+    
+    var showHtmlRawText by remember { 
+        mutableStateOf(prefs.getBoolean("show_html_raw_text", false)) 
+    }
+    
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Code,
+                contentDescription = "HTML原文显示",
+                modifier = Modifier.size(24.dp),
+                tint = if (showHtmlRawText) 
+                    MaterialTheme.colorScheme.primary 
+                else 
+                    MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "HTML消息显示原文",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (showHtmlRawText) "显示HTML源代码而不是渲染后的网页" else "正常渲染HTML消息",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            Switch(
+                checked = showHtmlRawText,
+                onCheckedChange = { checked ->
+                    showHtmlRawText = checked
+                    prefs.edit().putBoolean("show_html_raw_text", checked).apply()
+                }
+            )
+        }
+    }
+}
+
+/**
+ * Markdown消息显示原文设置项
+ */
+@Composable
+private fun MarkdownRawTextSettingItem(
+    context: Context,
+    modifier: Modifier = Modifier
+) {
+    val prefs = remember { 
+        context.getSharedPreferences("message_settings", Context.MODE_PRIVATE) 
+    }
+    
+    var showMarkdownRawText by remember { 
+        mutableStateOf(prefs.getBoolean("show_markdown_raw_text", false)) 
+    }
+    
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.TextFields,
+                contentDescription = "Markdown原文显示",
+                modifier = Modifier.size(24.dp),
+                tint = if (showMarkdownRawText) 
+                    MaterialTheme.colorScheme.primary 
+                else 
+                    MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "Markdown消息显示原文",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (showMarkdownRawText) "显示Markdown源代码而不是渲染后的格式" else "正常渲染Markdown消息",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            Switch(
+                checked = showMarkdownRawText,
+                onCheckedChange = { checked ->
+                    showMarkdownRawText = checked
+                    prefs.edit().putBoolean("show_markdown_raw_text", checked).apply()
+                }
+            )
         }
     }
 }

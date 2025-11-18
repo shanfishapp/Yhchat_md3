@@ -39,6 +39,14 @@ interface ApiService {
         @Header("token") token: String,
         @Body request: okhttp3.RequestBody
     ): Response<ResponseBody>
+    
+    /**
+     * 获取用户统计数据
+     */
+    @POST("v1/user/invite/invite-progress")
+    suspend fun getUserStats(
+        @Header("token") token: String
+    ): Response<UserStatsResponse>
 
     
     @POST("v1/user/captcha")
@@ -125,6 +133,15 @@ interface ApiService {
     ): Response<okhttp3.ResponseBody>
     
     /**
+     * 按消息ID列出消息（包含消息id指定的消息）- 使用protobuf
+     */
+    @POST("v1/msg/list-message-by-mid-seq")
+    suspend fun listMessageByMidSeq(
+        @Header("token") token: String,
+        @Body request: okhttp3.RequestBody
+    ): Response<okhttp3.ResponseBody>
+    
+    /**
      * 发送消息 - 使用protobuf
      */
     @POST("v1/msg/send-message")
@@ -180,6 +197,31 @@ interface ApiService {
         @Header("token") token: String,
         @Body request: com.yhchat.canary.data.model.BotIdRequest
     ): Response<com.yhchat.canary.data.model.ResetBotTokenResponse>
+    
+    /**
+     * 获取机器人商店Banner
+     */
+    @POST("v1/bot/banner")
+    suspend fun getBotBanner(
+        @Header("token") token: String
+    ): Response<com.yhchat.canary.data.model.BotBannerResponse>
+    
+    /**
+     * 获取机器人商店列表
+     */
+    @POST("v1/bot/new-list")
+    suspend fun getBotNewList(
+        @Header("token") token: String
+    ): Response<com.yhchat.canary.data.model.BotNewListResponse>
+    
+    /**
+     * 获取机器人详情
+     */
+    @POST("v1/bot/bot-detail")
+    suspend fun getBotDetail(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.BotDetailRequest
+    ): Response<com.yhchat.canary.data.model.BotDetailResponse>
 
     /**
      * 获取机器人事件订阅设置

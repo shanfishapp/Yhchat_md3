@@ -1053,6 +1053,104 @@ data class RecommendBot(
 )
 
 /**
+ * 机器人商店Banner响应 (/v1/bot/banner)
+ */
+data class BotBannerResponse(
+    @SerializedName("code") val code: Int,
+    @SerializedName("data") val data: BotBannerData?,
+    @SerializedName("msg") val msg: String?
+)
+
+data class BotBannerData(
+    @SerializedName("banners") val banners: List<BotBanner>
+)
+
+data class BotBanner(
+    @SerializedName("id") val id: Int,
+    @SerializedName("title") val title: String,
+    @SerializedName("introduction") val introduction: String?,
+    @SerializedName("targetId") val targetId: String?,
+    @SerializedName("targetUrl") val targetUrl: String?,
+    @SerializedName("imageUrl") val imageUrl: String,
+    @SerializedName("sort") val sort: Int,
+    @SerializedName("delFlag") val delFlag: Int,
+    @SerializedName("createTime") val createTime: Long,
+    @SerializedName("remark") val remark: String?,
+    @SerializedName("createBy") val createBy: Int,
+    @SerializedName("typ") val typ: Int
+)
+
+/**
+ * 机器人新列表响应 (/v1/bot/new-list)
+ */
+data class BotNewListResponse(
+    @SerializedName("code") val code: Int,
+    @SerializedName("data") val data: BotNewListData?,
+    @SerializedName("msg") val msg: String?
+)
+
+data class BotNewListData(
+    @SerializedName("bots") val bots: List<BotNewItem>
+)
+
+data class BotNewItem(
+    @SerializedName("chatId") val chatId: String,
+    @SerializedName("chatType") val chatType: String,
+    @SerializedName("headcount") val headcount: String,
+    @SerializedName("nickname") val nickname: String,
+    @SerializedName("introduction") val introduction: String?,
+    @SerializedName("instructions") val instructions: String?,
+    @SerializedName("avatarUrl") val avatarUrl: String?
+)
+
+/**
+ * 机器人详情响应 (/v1/bot/bot-detail)
+ */
+data class BotDetailResponse(
+    @SerializedName("code") val code: Int,
+    @SerializedName("data") val data: BotDetailData?,
+    @SerializedName("msg") val msg: String?
+)
+
+data class BotDetailData(
+    @SerializedName("bot") val bot: BotDetail,
+    @SerializedName("groups") val groups: List<BotDetailGroup>?
+)
+
+data class BotDetail(
+    @SerializedName("id") val id: Int,
+    @SerializedName("botId") val botId: String,
+    @SerializedName("nickname") val nickname: String,
+    @SerializedName("nicknameId") val nicknameId: Int,
+    @SerializedName("avatarId") val avatarId: Int,
+    @SerializedName("avatarUrl") val avatarUrl: String,
+    @SerializedName("type") val type: Int,
+    @SerializedName("introduction") val introduction: String?,
+    @SerializedName("createBy") val createBy: String,
+    @SerializedName("createTime") val createTime: Long,
+    @SerializedName("headcount") val headcount: Int,
+    @SerializedName("private") val private: Int,
+    @SerializedName("isStop") val isStop: Int,
+    @SerializedName("settingJson") val settingJson: String?,
+    @SerializedName("del_flag") val delFlag: Int,
+    @SerializedName("alwaysAgree") val alwaysAgree: Int,
+    @SerializedName("banId") val banId: Int,
+    @SerializedName("uri") val uri: String?
+)
+
+data class BotDetailGroup(
+    @SerializedName("groupId") val groupId: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("introduction") val introduction: String?,
+    @SerializedName("avatarUrl") val avatarUrl: String?,
+    @SerializedName("headcount") val headcount: Int
+)
+
+data class BotDetailRequest(
+    @SerializedName("id") val id: String
+)
+
+/**
  * 用户主页信息响应
  */
 data class UserHomepageResponse(

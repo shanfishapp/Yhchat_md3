@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.layout.*
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -39,8 +40,12 @@ import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,6 +63,7 @@ import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.lazy.LazyItemScope
 import com.yhchat.canary.ui.bot.BotInfoActivity
@@ -158,7 +164,6 @@ fun ChatScreen(
     
     // 机器人看板展开状态
     var showBotBoard by remember { mutableStateOf(false) }
-    
     
     // 初始化聊天
     LaunchedEffect(chatId, chatType, userId) {
@@ -549,17 +554,29 @@ fun ChatScreen(
                         // 获取发送者的权限等级（仅群聊）
                         val memberPermission = uiState.groupMembers[message.sender.chatId]?.permissionLevel
                         
-                        MessageItem(
+                        AnimatedMessageItem(
                             message = message,
                             isMyMessage = viewModel.isMyMessage(message),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .animateItem(
-                                    fadeInSpec = null, // 移除渐变动画，提升性能
-                                    fadeOutSpec = null, // 移除渐变动画，提升性能
-                                    placementSpec = tween(
-                                        durationMillis = 150, // 缩短动画时间
-                                        easing = FastOutSlowInEasing // 使用高性能缓动函数
+                                    fadeInSpec = tween(
+                                        durationMillis = 300,
+                                        easing = FastOutSlowInEasing
+                                    ),
+                                    fadeOutSpec = tween(
+                                        durationMillis = 200,
+                                        easing = FastOutSlowInEasing
+                                    ),
+                                    placementSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMedium
+                                    )
+                                )
+                                .animateContentSize(
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMedium
                                     )
                                 ),
                             onImageClick = { imageUrl ->
@@ -730,15 +747,16 @@ fun ChatScreen(
                 onTextChange = { inputText = it },
                 onSendMessage = {
                     if (inputText.isNotBlank()) {
+                        val messageText = inputText.trim()
                         if (selectedInstruction != null) {
-                            android.util.Log.d("ChatScreen", "📤 发送指令消息: /${selectedInstruction?.name}, commandId=${selectedInstruction?.id}, text=${inputText.trim()}")
+                            android.util.Log.d("ChatScreen", "📤 发送指令消息: /${selectedInstruction?.name}, commandId=${selectedInstruction?.id}, text=$messageText")
                         } else {
-                            android.util.Log.d("ChatScreen", "📤 发送普通消息: ${inputText.trim()}")
+                            android.util.Log.d("ChatScreen", "📤 发送普通消息: $messageText")
                         }
                         
                         // 根据选择的消息类型发送消息，带上引用信息和指令ID
                         viewModel.sendMessage(
-                            text = inputText.trim(),
+                            text = messageText,
                             contentType = selectedMessageType,
                             quoteMsgId = quotedMessageId,
                             quoteMsgText = quotedMessageText,
@@ -1531,41 +1549,67 @@ private fun MessageContentView(
                                 MaterialTheme.colorScheme.onSurface
     }
     val context = LocalContext.current
+    
+    // 获取消息显示设置
+    val messagePrefs = remember { 
+        context.getSharedPreferences("message_settings", Context.MODE_PRIVATE) 
+    }
+    val showHtmlRawText = remember { 
+        messagePrefs.getBoolean("show_html_raw_text", false) 
+    }
+    val showMarkdownRawText = remember { 
+        messagePrefs.getBoolean("show_markdown_raw_text", false) 
+    }
 
     Column(modifier = modifier) {
         when (contentType) {
             8 -> {
                 // HTML消息
                 content.text?.let { htmlContent ->
-                    // 使用Box包裹，添加占位符以减少初始渲染压力
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 120.dp, max = 440.dp)
-                    ) {
-                    HtmlWebView(
-                        htmlContent = htmlContent,
-                        onImageClick = onImageClick,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .combinedClickable(
-                                onClick = { },
-                                onLongClick = onLongClick
-                            )
-                            .pointerInput(Unit) {
-                                awaitPointerEventScope {
-                                    while (true) {
-                                        val event = awaitPointerEvent()
-                                        event.changes.forEach { pointerInputChange ->
-                                            // 兼容旧Compose：手动判断down
-                                            if (!pointerInputChange.previousPressed && pointerInputChange.pressed) {
-                                                pointerInputChange.consume()
+                    if (showHtmlRawText) {
+                        // 显示HTML原文
+                        Text(
+                            text = htmlContent,
+                            color = textColor,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .combinedClickable(
+                                    onClick = { },
+                                    onLongClick = onLongClick
+                                )
+                        )
+                    } else {
+                        // 使用Box包裹，添加占位符以减少初始渲染压力
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 120.dp, max = 440.dp)
+                        ) {
+                        HtmlWebView(
+                            htmlContent = htmlContent,
+                            onImageClick = onImageClick,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .combinedClickable(
+                                    onClick = { },
+                                    onLongClick = onLongClick
+                                )
+                                .pointerInput(Unit) {
+                                    awaitPointerEventScope {
+                                        while (true) {
+                                            val event = awaitPointerEvent()
+                                            event.changes.forEach { pointerInputChange ->
+                                                // 兼容旧Compose：手动判断down
+                                                if (!pointerInputChange.previousPressed && pointerInputChange.pressed) {
+                                                    pointerInputChange.consume()
+                                                }
                                             }
                                         }
                                     }
                                 }
-                            }
-                    )
+                        )
+                        }
                     }
                 }
 
@@ -1673,22 +1717,38 @@ private fun MessageContentView(
             3 -> {
                 // Markdown消息
                 content.text?.let { markdownText ->
-                    MarkdownText(
-                        markdown = markdownText,
-                        textColor = if (isMyMessage) {
-                            MaterialTheme.colorScheme.onPrimary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                        backgroundColor = Color.Transparent, // 使用透明背景，继承消息气泡背景
-                        onImageClick = onImageClick,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .combinedClickable(
-                                onClick = { },
-                                onLongClick = onLongClick
-                            )
-                    )
+                    if (showMarkdownRawText) {
+                        // 显示Markdown原文
+                        Text(
+                            text = markdownText,
+                            color = textColor,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .combinedClickable(
+                                    onClick = { },
+                                    onLongClick = onLongClick
+                                )
+                        )
+                    } else {
+                        // 正常渲染Markdown
+                        MarkdownText(
+                            markdown = markdownText,
+                            textColor = if (isMyMessage) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            backgroundColor = Color.Transparent, // 使用透明背景，继承消息气泡背景
+                            onImageClick = onImageClick,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .combinedClickable(
+                                    onClick = { },
+                                    onLongClick = onLongClick
+                                )
+                        )
+                    }
                 }
             }
             6 -> {
@@ -2712,4 +2772,64 @@ fun MessageEditDialog(
             }
         }
     )
+}
+
+/**
+ * 新消息弹出动画包装器
+ * 为新插入的消息添加简单的从下往上弹出动画
+ */
+@Composable
+private fun AnimatedMessageItem(
+    message: ChatMessage,
+    isMyMessage: Boolean,
+    modifier: Modifier = Modifier,
+    onImageClick: (String) -> Unit = {},
+    onAvatarClick: (String, String, Int) -> Unit = { _, _, _ -> },
+    onAddExpression: (String) -> Unit = {},
+    onQuote: (String, String) -> Unit = { _, _ -> },
+    onRecall: (String) -> Unit = {},
+    onEdit: (ChatMessage) -> Unit = {},
+    memberPermission: Int? = null
+) {
+    // 检查消息是否是新消息（发送时间在最近2秒内）
+    val isNewMessage = remember(message.msgId) {
+        val currentTime = System.currentTimeMillis()
+        val messageTime = message.sendTime
+        currentTime - messageTime < 2000 // 2秒内的消息认为是新消息
+    }
+    
+    // 动画状态
+    var isVisible by remember(message.msgId) { mutableStateOf(!isNewMessage) }
+    
+    // 启动动画
+    LaunchedEffect(message.msgId) {
+        if (isNewMessage) {
+            isVisible = true
+        }
+    }
+    
+    AnimatedVisibility(
+        visible = isVisible,
+        enter = slideInVertically(
+            initialOffsetY = { fullHeight -> fullHeight / 2 }, // 从底部一半位置开始
+            animationSpec = tween(
+                durationMillis = 250,
+                easing = FastOutSlowInEasing
+            )
+        ),
+        modifier = modifier
+    ) {
+        MessageItem(
+            message = message,
+            isMyMessage = isMyMessage,
+            modifier = Modifier.fillMaxWidth(),
+            onImageClick = onImageClick,
+            onAvatarClick = onAvatarClick,
+            onAddExpression = onAddExpression,
+            onQuote = onQuote,
+            onRecall = onRecall,
+            onEdit = onEdit,
+            memberPermission = memberPermission
+        )
+    }
 }

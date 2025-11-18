@@ -28,7 +28,8 @@ data class ChatSearchState(
     val hasMoreResults: Boolean = true,
     val currentPage: Int = 0,
     val selectedMessage: ChatMessage? = null,
-    val isLoadingMessageDetail: Boolean = false
+    val isLoadingMessageDetail: Boolean = false,
+    val lastTimestamp: Long = 9999999999999L // 记录最后一条消息的时间戳
 )
 
 @HiltViewModel
@@ -57,7 +58,8 @@ class ChatSearchViewModel @Inject constructor(
             _state.value = _state.value.copy(
                 searchResults = emptyList(),
                 currentPage = 0,
-                hasMoreResults = true
+                hasMoreResults = true,
+                lastTimestamp = 9999999999999L
             )
             return
         }
@@ -72,7 +74,8 @@ class ChatSearchViewModel @Inject constructor(
                     isLoading = true, 
                     error = null,
                     currentPage = 0,
-                    hasMoreResults = true
+                    hasMoreResults = true,
+                    lastTimestamp = 9999999999999L
                 )
             }
             
@@ -91,16 +94,17 @@ class ChatSearchViewModel @Inject constructor(
                     return@launch
                 }
                 
-                val currentPage = if (isLoadMore) _state.value.currentPage + 1 else 0
                 val pageSize = 30
-                val totalSize = pageSize * (currentPage + 1)
-                Log.d(TAG, "searchMessages: requesting page=$currentPage, pageSize=$pageSize, totalSize=$totalSize")
+                // 使用时间戳进行分页，而不是累积数量
+                val timestamp = if (isLoadMore) _state.value.lastTimestamp else 9999999999999L
+                Log.d(TAG, "searchMessages: requesting with timestamp=$timestamp, pageSize=$pageSize, isLoadMore=$isLoadMore")
                 
                 val request = ChatSearchRequest(
                     word = query,
                     chatId = chatId,
                     chatType = chatType,
-                    size = totalSize // 累积请求数量
+                    size = pageSize,
+                    time = timestamp
                 )
                 
                 val response = apiService.searchChatMessages(token, request)
@@ -126,25 +130,11 @@ class ChatSearchViewModel @Inject constructor(
                             return@launch
                         }
                         
-                        // 并发获取每个消息的完整内容
-                        Log.d(TAG, "searchMessages: fetching full message content for ${searchResults.size} messages")
+                        // 直接将搜索结果转换为ChatMessage对象（用于列表显示）
+                        Log.d(TAG, "searchMessages: converting ${searchResults.size} search results to ChatMessage objects")
                         val fullMessages = searchResults.map { searchMessage ->
-                            async {
-                                try {
-                                    Log.v(TAG, "searchMessages: fetching message ${searchMessage.id}")
-                                    val message = messageRepository.getMessageById(searchMessage.id)
-                                    if (message != null) {
-                                        Log.v(TAG, "searchMessages: got message ${searchMessage.id}, type=${message.contentType}")
-                                    } else {
-                                        Log.w(TAG, "searchMessages: message ${searchMessage.id} not found in repository")
-                                    }
-                                    message
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "searchMessages: failed to get message ${searchMessage.id}", e)
-                                    null
-                                }
-                            }
-                        }.awaitAll().filterNotNull()
+                            convertSearchMessageToChatMessage(searchMessage)
+                        }
                         
                         Log.d(TAG, "searchMessages: successfully fetched ${fullMessages.size} full messages")
                         
@@ -159,17 +149,34 @@ class ChatSearchViewModel @Inject constructor(
                             fullMessages
                         }
                         
-                        val hasMore = searchResults.size >= pageSize
                         val finalResults = currentResults + newResults
                         
-                        Log.d(TAG, "searchMessages: final results count=${finalResults.size}, hasMore=$hasMore, currentPage=$currentPage")
+                        // 判断是否还有更多结果
+                        // 只有在加载更多时返回空结果或去重后没有新消息时才认为没有更多
+                        val hasMore = if (isLoadMore && (searchResults.isEmpty() || newResults.isEmpty())) {
+                            Log.d(TAG, "searchMessages: load more returned empty or no new results, no more results")
+                            false
+                        } else {
+                            // 第一次搜索或有新结果时，假设还有更多（让用户滑到底部时再判断）
+                            true
+                        }
+                        
+                        // 计算新的最老时间戳（用于下次加载更多）
+                        // 从当前所有结果中找最老的消息时间戳
+                        val newLastTimestamp = if (finalResults.isNotEmpty()) {
+                            finalResults.minOfOrNull { it.sendTime } ?: 9999999999999L
+                        } else {
+                            9999999999999L
+                        }
+                        
+                        Log.d(TAG, "searchMessages: final=${finalResults.size}, new=${newResults.size}, hasMore=$hasMore, timestamp=$newLastTimestamp")
                         
                         _state.value = _state.value.copy(
                             isLoading = false,
                             isLoadingMore = false,
                             searchResults = finalResults,
-                            currentPage = currentPage,
                             hasMoreResults = hasMore,
+                            lastTimestamp = newLastTimestamp,
                             error = null
                         )
                     } else {
@@ -205,12 +212,15 @@ class ChatSearchViewModel @Inject constructor(
             Log.d(TAG, "loadMoreResults: skipping - already loading or no more results")
             return
         }
-        Log.d(TAG, "loadMoreResults: triggering search for more results")
-        searchMessages(chatId, chatType, query, isLoadMore = true)
+        // 使用当前保存的搜索词，而不是传入的参数
+        val currentQuery = _state.value.searchQuery.takeIf { it.isNotBlank() } ?: query
+        Log.d(TAG, "loadMoreResults: triggering search for more results with query='$currentQuery', lastTimestamp=${_state.value.lastTimestamp}")
+        searchMessages(chatId, chatType, currentQuery, isLoadMore = true)
     }
     
     fun showMessageDetail(message: ChatMessage) {
-        Log.d(TAG, "showMessageDetail: showing detail for message ${message.msgId}")
+        Log.d(TAG, "showMessageDetail: showing message ${message.msgId}")
+        // 直接显示搜索结果中的消息，不需要重新获取
         _state.value = _state.value.copy(selectedMessage = message)
     }
     
@@ -238,9 +248,9 @@ class ChatSearchViewModel @Inject constructor(
                     return@launch
                 }
                 
-                // 使用MessageRepository获取消息详情
-                Log.d(TAG, "getMessageDetail: calling messageRepository.getMessageById($messageId)")
-                val message = messageRepository.getMessageById(messageId)
+                // 使用API获取完整的消息详情
+                Log.d(TAG, "getMessageDetail: calling messageRepository.getMessageByIdFromApi($messageId)")
+                val message = messageRepository.getMessageByIdFromApi(messageId, chatId, chatType)
                 if (message != null) {
                     Log.d(TAG, "getMessageDetail: successfully got message detail, type=${message.contentType}")
                     _state.value = _state.value.copy(
@@ -248,7 +258,7 @@ class ChatSearchViewModel @Inject constructor(
                         selectedMessage = message
                     )
                 } else {
-                    Log.w(TAG, "getMessageDetail: message not found in repository")
+                    Log.w(TAG, "getMessageDetail: message not found via API")
                     _state.value = _state.value.copy(
                         isLoadingMessageDetail = false,
                         error = "无法获取消息详情"
@@ -267,5 +277,40 @@ class ChatSearchViewModel @Inject constructor(
     fun clearError() {
         Log.d(TAG, "clearError: clearing error state")
         _state.value = _state.value.copy(error = null)
+    }
+    
+    /**
+     * 将ChatSearchMessage转换为ChatMessage
+     */
+    private fun convertSearchMessageToChatMessage(searchMessage: ChatSearchMessage): ChatMessage {
+        val sender = com.yhchat.canary.data.model.MessageSender(
+            chatId = searchMessage.chatId,
+            chatType = searchMessage.chatType,
+            name = searchMessage.name,
+            avatarUrl = searchMessage.avatarUrl ?: "",
+            tagOld = emptyList(),
+            tag = emptyList()
+        )
+        
+        val content = com.yhchat.canary.data.model.MessageContent(
+            text = searchMessage.content.takeIf { it.isNotBlank() }
+        )
+        
+        return ChatMessage(
+            msgId = searchMessage.id,
+            sender = sender,
+            direction = "left", // 搜索结果默认为左侧显示
+            contentType = searchMessage.type.toIntOrNull() ?: 1,
+            content = content,
+            sendTime = searchMessage.time,
+            cmd = null,
+            msgDeleteTime = null,
+            quoteMsgId = null,
+            msgSeq = searchMessage.sequence,
+            editTime = null,
+            chatId = searchMessage.chatId,
+            chatType = searchMessage.chatType,
+            recvId = null
+        )
     }
 }

@@ -300,6 +300,13 @@
             android:exported="false"
             android:label="金币明细"
             android:theme="@style/Theme.YhchatCanary" />
+            
+        <!-- 用户统计 Activity -->
+        <activity
+            android:name=".ui.stats.UserStatsActivity"
+            android:exported="false"
+            android:label="云湖用户统计"
+            android:theme="@style/Theme.YhchatCanary" />
 
         <activity
             android:name=".ui.coin.ProductDetailActivity"
@@ -373,6 +380,19 @@
             android:exported="false"
             android:label="发现群聊"
             android:theme="@style/Theme.YhchatCanary" />
+            
+        <activity
+            android:name=".ui.discover.BotListActivity"
+            android:exported="false"
+            android:label="机器人商店"
+            android:theme="@style/Theme.YhchatCanary" />
+            
+        <activity
+            android:name=".ui.discover.BotDetailActivity"
+            android:exported="false"
+            android:label="机器人详情"
+            android:theme="@style/Theme.YhchatCanary" />
+            
         <!-- 语音播放服务 -->
         <service
             android:name=".service.AudioPlayerService"

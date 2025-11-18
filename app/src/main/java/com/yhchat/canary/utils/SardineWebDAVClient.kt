@@ -494,7 +494,9 @@ object SardineWebDAVClient {
     private fun buildUrl(baseUrl: String, path: String): String {
         val cleanBaseUrl = baseUrl.trimEnd('/')
         val cleanPath = path.trim('/').split('/').joinToString("/") { part ->
+            // URL编码路径段，并将 + 替换为 %20（URL路径中空格应该用 %20，而不是 +）
             URLEncoder.encode(part, StandardCharsets.UTF_8.toString())
+                .replace("+", "%20")
         }
         
         return if (cleanPath.isEmpty()) {

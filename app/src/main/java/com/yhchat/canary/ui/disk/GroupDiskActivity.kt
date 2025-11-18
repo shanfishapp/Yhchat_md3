@@ -11,6 +11,7 @@ import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -116,6 +117,29 @@ fun GroupDiskScreen(
     // 监听当前文件夹变化，重新加载
     LaunchedEffect(uiState.currentFolderId) {
         viewModel.loadFiles(groupId, uiState.currentFolderId)
+    }
+    
+    // 处理安卓返回键
+    BackHandler {
+        if (uiState.currentFolderId != 0L) {
+            // 如果不在根目录，返回上一级目录
+            if (uiState.breadcrumbs.isNotEmpty()) {
+                // 返回到面包屑中的上一级目录
+                val parentBreadcrumb = uiState.breadcrumbs.dropLast(1).lastOrNull()
+                if (parentBreadcrumb != null) {
+                    viewModel.navigateToFolder(parentBreadcrumb.id)
+                } else {
+                    // 返回根目录
+                    viewModel.navigateToFolder(0)
+                }
+            } else {
+                // 返回根目录
+                viewModel.navigateToFolder(0)
+            }
+        } else {
+            // 在根目录时，退出Activity
+            onBackClick()
+        }
     }
     
     // 文件选择器

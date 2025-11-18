@@ -99,7 +99,7 @@ fun DiscoverScreen(
         isLoadingBots = true
         discoverRepo.getRecommendBots().fold(
             onSuccess = { botList ->
-                bots = botList.take(5) // 只显示前5个
+                bots = botList.take(23) // 显示前23个
                 
                 isLoadingBots = false
             },
@@ -131,7 +131,7 @@ fun DiscoverScreen(
                     icon = Icons.Default.SmartToy,
                     isLoading = isLoadingBots,
                     onMoreClick = {
-                        // TODO: 跳转到机器人列表页面
+                        BotListActivity.start(context)
                     }
                 ) {
                     if (bots.isNotEmpty()) {

@@ -59,11 +59,10 @@ fun ChatSearchScreen(
     
     // 防抖搜索
     LaunchedEffect(searchQuery) {
+        viewModel.updateSearchQuery(searchQuery) // 立即更新搜索词状态
         if (searchQuery.isNotBlank()) {
             delay(500) // 500ms防抖
             viewModel.searchMessages(chatId, chatType, searchQuery)
-        } else {
-            viewModel.updateSearchQuery("")
         }
     }
     
@@ -104,7 +103,6 @@ fun ChatSearchScreen(
                 value = searchQuery,
                 onValueChange = { 
                     searchQuery = it
-                    viewModel.updateSearchQuery(it)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -121,7 +119,6 @@ fun ChatSearchScreen(
                         IconButton(
                             onClick = { 
                                 searchQuery = ""
-                                viewModel.updateSearchQuery("")
                             }
                         ) {
                             Icon(
@@ -274,7 +271,9 @@ fun ChatSearchScreen(
                                         CircularProgressIndicator(modifier = Modifier.size(24.dp))
                                     }
                                 } else {
-                                    LaunchedEffect(Unit) {
+                                    // 使用lastTimestamp作为key，当时间戳更新时触发加载更多
+                                    // 这样可以避免重复触发，也能在有新时间戳时继续加载
+                                    LaunchedEffect(state.lastTimestamp) {
                                         viewModel.loadMoreResults(chatId, chatType, searchQuery)
                                     }
                                 }

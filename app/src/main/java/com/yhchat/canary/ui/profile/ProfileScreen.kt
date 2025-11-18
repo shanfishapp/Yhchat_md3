@@ -184,6 +184,7 @@ fun ProfileScreen(
                         imagePickerLauncher = imagePickerLauncher,
                         changeAvatarState = changeAvatarState,
                         betaState = betaState,
+                        changeInviteCodeState = changeInviteCodeState,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -242,6 +243,7 @@ private fun UserProfileContent(
     imagePickerLauncher: androidx.activity.result.ActivityResultLauncher<String>,
     changeAvatarState: ChangeAvatarState,
     betaState: BetaState,
+    changeInviteCodeState: ChangeInviteCodeState,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -479,7 +481,7 @@ private fun UserProfileContent(
                     var showCoinMenu by remember { mutableStateOf(false) }
                     
                     ProfileInfoItemClickable(
-                        icon = Icons.Default.AccountCircle,
+                        icon = Icons.Default.Star, // 使用更合适的金币图标
                         label = "金币",
                         value = "%.2f".format(userProfile.coin),
                         onClick = {
@@ -507,13 +509,26 @@ private fun UserProfileContent(
 
                 // 邀请码
                 if (!TextUtils.isEmpty(userProfile.invitationCode)) {
-                    ProfileInfoItemWithButton(
+                    var showInviteCodeMenu by remember { mutableStateOf(false) }
+                    
+                    ProfileInfoItemClickable(
                         icon = Icons.Default.Person,
                         label = "邀请码",
                         value = userProfile.invitationCode!!,
-                        buttonText = "修改邀请码",
-                        onButtonClick = onShowChangeInviteCodeDialog
+                        onClick = {
+                            showInviteCodeMenu = true
+                        }
                     )
+                    
+                    if (showInviteCodeMenu) {
+                        InviteCodeMenuBottomSheet(
+                            currentInviteCode = userProfile.invitationCode!!,
+                            changeInviteCodeState = changeInviteCodeState,
+                            viewModel = viewModel,
+                            onDismiss = { showInviteCodeMenu = false },
+                            onShowChangeInviteCodeDialog = onShowChangeInviteCodeDialog
+                        )
+                    }
                 }
             }
         }
@@ -643,7 +658,7 @@ private fun ProfileInfoItemClickable(
                 imageVector = icon,
                 contentDescription = label,
                 modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
@@ -1162,4 +1177,90 @@ private fun ProfileInfoItemWithToggle(
         modifier = Modifier.padding(start = 32.dp),
         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     )
+}
+
+/**
+ * 邀请码菜单底部弹窗
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InviteCodeMenuBottomSheet(
+    currentInviteCode: String,
+    changeInviteCodeState: ChangeInviteCodeState,
+    viewModel: ProfileViewModel?,
+    onDismiss: () -> Unit,
+    onShowChangeInviteCodeDialog: () -> Unit
+) {
+    val context = LocalContext.current
+    val sheetState = rememberModalBottomSheetState()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp)
+        ) {
+            Text(
+                text = "邀请码功能",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+            )
+            
+            // 修改邀请码
+            InviteCodeMenuItem(
+                icon = Icons.Default.Edit,
+                label = "修改邀请码",
+                onClick = {
+                    onShowChangeInviteCodeDialog()
+                    onDismiss()
+                }
+            )
+            
+            // 查看云湖总用户
+            InviteCodeMenuItem(
+                icon = Icons.Default.Person,
+                label = "查看云湖总用户",
+                onClick = {
+                    val intent = android.content.Intent(context, com.yhchat.canary.ui.stats.UserStatsActivity::class.java)
+                    context.startActivity(intent)
+                    onDismiss()
+                }
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun InviteCodeMenuItem(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
 }

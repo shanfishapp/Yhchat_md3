@@ -22,6 +22,11 @@ class MessageRepository @Inject constructor(
     
     /**
      * 获取消息列表
+     * 
+     * 使用 list-message 接口：
+     * - 列出的是指定消息ID **之前** 的消息
+     * - 不包含请求的msgId指定的消息
+     * - proto结构与 list-message-by-mid-seq 共用
      */
     suspend fun getMessages(
         chatId: String,
@@ -815,6 +820,74 @@ class MessageRepository @Inject constructor(
             cacheRepository.getMessageById(msgId)
         } catch (e: Exception) {
             Log.e(tag, "Error getting message by id: $msgId", e)
+            null
+        }
+    }
+    
+    /**
+     * 通过消息ID从API获取消息详情
+     * 
+     * 使用 list-message-by-mid-seq 接口：
+     * - 获取到的消息 **包含** 请求的消息ID的消息内容
+     * - 实际获取到的消息数量是 请求消息数量+1
+     * - proto结构与 list-message 共用
+     * - 参考Python示例：直接取返回列表的最后一条消息
+     */
+    suspend fun getMessageByIdFromApi(messageId: String, chatId: String, chatType: Int): ChatMessage? {
+        return try {
+            val tokenFlow = tokenRepository.getToken()
+            val token = tokenFlow.first()?.token
+            if (token.isNullOrEmpty()) {
+                Log.e(tag, "Token is null or empty")
+                return null
+            }
+
+            // 构建protobuf请求
+            val request = list_message_by_mid_seq_send.newBuilder()
+                .setChatId(chatId)
+                .setChatType(chatType.toLong())
+                .setMsgId(messageId)
+                .setMsgCount(1)
+                .setMsgSeq(-1)
+                .setUnknown(0)
+                .build()
+            
+            val requestBody = request.toByteArray().toRequestBody("application/x-protobuf".toMediaType())
+
+            Log.d(tag, "Getting message by id from API: $messageId in chat: $chatId")
+            
+            val response = apiService.listMessageByMidSeq(token, requestBody)
+            
+            if (response.isSuccessful) {
+                response.body()?.let { responseBody ->
+                    val bytes = responseBody.bytes()
+                    val messageResponse = list_message_by_mid_seq.parseFrom(bytes)
+                    
+                    Log.d(tag, "API response status code: ${messageResponse.status.code}, msg count: ${messageResponse.msgList.size}, total: ${messageResponse.total}")
+                    
+                    if (messageResponse.status.code == 1) {
+                        if (messageResponse.msgList.isEmpty()) {
+                            Log.w(tag, "Message list is empty for messageId: $messageId")
+                            return@let null
+                        }
+                        
+                        // 根据API文档和Python示例，直接取最后一条消息（包含请求的消息ID的消息）
+                        val protoMsg = messageResponse.msgList.last()
+                        val targetMessage = convertProtoToMessage(protoMsg, chatId, chatType)
+                        
+                        Log.d(tag, "Successfully got message from API: requested=$messageId, returned=${targetMessage.msgId}, contentType=${targetMessage.contentType}")
+                        targetMessage
+                    } else {
+                        Log.e(tag, "API error: ${messageResponse.status.msg}")
+                        null
+                    }
+                }
+            } else {
+                Log.e(tag, "HTTP error: ${response.code()}")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error getting message by id from API: $messageId", e)
             null
         }
     }
