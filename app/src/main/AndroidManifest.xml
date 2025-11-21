@@ -374,6 +374,24 @@
             android:exported="false"
             android:label="编辑机器人"
             android:theme="@style/Theme.YhchatCanary" />
+            
+        <activity
+            android:name=".ui.bot.InstructionManagementActivity"
+            android:exported="false"
+            android:label="指令管理"
+            android:theme="@style/Theme.YhchatCanary" />
+            
+        <activity
+            android:name=".ui.bot.InstructionEditActivity"
+            android:exported="false"
+            android:label="编辑指令"
+            android:theme="@style/Theme.YhchatCanary" />
+            
+        <activity
+            android:name=".ui.bot.InstructionPreviewActivity"
+            android:exported="false"
+            android:label="指令预览"
+            android:theme="@style/Theme.YhchatCanary" />
 
         <activity
             android:name=".ui.discover.DiscoverGroupsActivity"
@@ -392,6 +410,7 @@
             android:exported="false"
             android:label="机器人详情"
             android:theme="@style/Theme.YhchatCanary" />
+
             
         <!-- 语音播放服务 -->
         <service

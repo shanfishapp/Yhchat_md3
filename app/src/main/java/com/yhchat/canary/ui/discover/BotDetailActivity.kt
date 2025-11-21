@@ -310,6 +310,15 @@ fun BotDetailScreen(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    
+                                    // 创建者
+                                    Text(
+                                        text = "创建者: ${bot!!.createBy}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    
                                     // 简介
                                     bot!!.introduction?.takeIf { it.isNotEmpty() }?.let { intro ->
                                         Spacer(modifier = Modifier.height(16.dp))
@@ -351,11 +360,11 @@ fun BotDetailScreen(
                             }
                         }
                         
-                        // 相关群聊标题
+                        // 绑定该机器人的群聊标题
                         if (groups.isNotEmpty()) {
                             item {
                                 Text(
-                                    text = "相关群聊",
+                                    text = "绑定该机器人的群聊",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -433,25 +442,16 @@ fun GroupListItem(
                     overflow = TextOverflow.Ellipsis
                 )
                 
-                Spacer(modifier = Modifier.height(4.dp))
-                
                 if (!group.introduction.isNullOrEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = group.introduction,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
                 }
-                
-                Text(
-                    text = "${group.headcount}人",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
             }
             
             Spacer(modifier = Modifier.width(8.dp))

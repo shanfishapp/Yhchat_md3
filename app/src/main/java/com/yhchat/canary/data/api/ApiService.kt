@@ -222,6 +222,33 @@ interface ApiService {
         @Header("token") token: String,
         @Body request: com.yhchat.canary.data.model.BotDetailRequest
     ): Response<com.yhchat.canary.data.model.BotDetailResponse>
+    
+    /**
+     * 获取机器人指令列表
+     */
+    @POST("v1/instruction/web-list")
+    suspend fun getBotInstructionList(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.BotInstructionRequest
+    ): Response<com.yhchat.canary.data.model.BotInstructionListResponse>
+    
+    /**
+     * 创建机器人指令
+     */
+    @POST("v1/instruction/create")
+    suspend fun createBotInstruction(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.CreateInstructionRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
+    
+    /**
+     * 编辑机器人指令
+     */
+    @POST("v1/instruction/edit")
+    suspend fun editBotInstruction(
+        @Header("token") token: String,
+        @Body request: com.yhchat.canary.data.model.EditInstructionRequest
+    ): Response<com.yhchat.canary.data.model.BaseResponse>
 
     /**
      * 获取机器人事件订阅设置

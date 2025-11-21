@@ -8,8 +8,11 @@ import androidx.activity.compose.setContent
 import com.yhchat.canary.ui.base.BaseActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,6 +25,9 @@ import com.yhchat.canary.data.api.ApiClient
 import com.yhchat.canary.data.di.RepositoryFactory
 import com.yhchat.canary.data.model.BotEventEditRequest
 import com.yhchat.canary.data.model.BotIdRequest
+import com.yhchat.canary.data.model.BotInstruction
+import com.yhchat.canary.data.model.BotInstructionRequest
+import com.yhchat.canary.ui.bot.InstructionManagementActivity
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
 import kotlinx.coroutines.launch
 import android.widget.Toast
@@ -85,6 +91,8 @@ private fun BotSettingsScreen(
     var isResettingLink by remember { mutableStateOf(false) }
     var isSavingWebhook by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var instructions by remember { mutableStateOf<List<BotInstruction>>(emptyList()) }
+    var isLoadingInstructions by remember { mutableStateOf(true) }
 
     // 事件订阅开关
     var messageReceiveNormal by remember { mutableStateOf(false) }
@@ -162,6 +170,18 @@ private fun BotSettingsScreen(
             isLoading = false
             error = e.message
         }
+        
+        // 加载机器人指令列表
+        runCatching {
+            api.getBotInstructionList(userToken, BotInstructionRequest(botId))
+        }.onSuccess { resp ->
+            if (resp.body()?.code == 1) {
+                instructions = resp.body()?.data?.list ?: emptyList()
+            }
+            isLoadingInstructions = false
+        }.onFailure {
+            isLoadingInstructions = false
+        }
     }
 
     Scaffold(
@@ -176,268 +196,373 @@ private fun BotSettingsScreen(
             )
         }
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            if (error != null) {
-                Text(text = error ?: "", color = MaterialTheme.colorScheme.error)
-            }
-
-            // Token 区域
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
+                if (error != null) {
+                    Text(text = error ?: "", color = MaterialTheme.colorScheme.error)
+                }
+
+                // Token 区域
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
-                    Text(
-                        text = "机器人 Token",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
                     ) {
-                        OutlinedTextField(
-                            value = token,
-                            onValueChange = { token = it },
-                            modifier = Modifier.weight(1f),
-                            placeholder = { Text("请输入机器人 Token") },
-                            singleLine = true,
-                            enabled = !isLoading
+                        Text(
+                            text = "机器人 Token",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
                         
-                        Spacer(modifier = Modifier.width(8.dp))
-                        
-                        OutlinedButton(
-                            onClick = {
-                                scope.launch {
-                                    val userToken = tokenRepo.getTokenSync() ?: return@launch
-                                    isLoading = true
-                                    error = null
-                                    runCatching { api.resetBotToken(userToken, BotIdRequest(botId)) }
-                                        .onSuccess { resp ->
-                                            isLoading = false
-                                            if (resp.body()?.code == 1) {
-                                                token = resp.body()?.data?.token ?: token
-                                            } else {
-                                                error = resp.body()?.msg ?: "重置失败"
-                                            }
-                                        }
-                                        .onFailure { e ->
-                                            isLoading = false
-                                            error = e.message
-                                        }
-                                }
-                            },
-                            enabled = !isLoading
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(imageVector = Icons.Default.Refresh, contentDescription = null)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("重置")
+                            OutlinedTextField(
+                                value = token,
+                                onValueChange = { token = it },
+                                modifier = Modifier.weight(1f),
+                                placeholder = { Text("请输入机器人 Token") },
+                                singleLine = true,
+                                enabled = !isLoading
+                            )
+                            
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            OutlinedButton(
+                                onClick = {
+                                    scope.launch {
+                                        val userToken = tokenRepo.getTokenSync() ?: return@launch
+                                        isLoading = true
+                                        error = null
+                                        runCatching { api.resetBotToken(userToken, BotIdRequest(botId)) }
+                                            .onSuccess { resp ->
+                                                isLoading = false
+                                                if (resp.body()?.code == 1) {
+                                                    token = resp.body()?.data?.token ?: token
+                                                } else {
+                                                    error = resp.body()?.msg ?: "重置失败"
+                                                }
+                                            }
+                                            .onFailure { e ->
+                                                isLoading = false
+                                                error = e.message
+                                            }
+                                    }
+                                },
+                                enabled = !isLoading
+                            ) {
+                                Icon(imageVector = Icons.Default.Refresh, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("重置")
+                            }
                         }
                     }
                 }
-            }
-            
-            // Webhook 订阅地址区域
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
+                
+                // Webhook 订阅地址区域
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
-                    Text(
-                        text = "Webhook 订阅地址",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    
-                    Text(
-                        text = "机器人接收消息事件的回调地址",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
                     ) {
-                        OutlinedTextField(
-                            value = webhookUrl,
-                            onValueChange = { webhookUrl = it },
-                            modifier = Modifier.weight(1f),
-                            placeholder = { Text("http(s)://ip(域名)...") },
-                            singleLine = true,
-                            enabled = !isSavingWebhook && !isLoading
+                        Text(
+                            text = "Webhook 订阅地址",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
                         
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "机器人接收消息事件的回调地址",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = webhookUrl,
+                                onValueChange = { webhookUrl = it },
+                                modifier = Modifier.weight(1f),
+                                placeholder = { Text("http(s)://ip(域名)...") },
+                                singleLine = true,
+                                enabled = !isSavingWebhook && !isLoading
+                            )
+                            
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        val userToken = tokenRepo.getTokenSync() ?: return@launch
+                                        isSavingWebhook = true
+                                        error = null
+                                        runCatching { 
+                                            api.editBotSubscribedLink(
+                                                userToken, 
+                                                com.yhchat.canary.data.api.EditBotSubscribedLinkRequest(
+                                                    botId = botId,
+                                                    link = webhookUrl
+                                                )
+                                            )
+                                        }.onSuccess { resp ->
+                                            isSavingWebhook = false
+                                            if (resp.body()?.code == 1) {
+                                                Toast.makeText(context, "Webhook地址保存成功", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                error = resp.body()?.message ?: "保存失败"
+                                            }
+                                        }.onFailure { e ->
+                                            isSavingWebhook = false
+                                            error = e.message
+                                        }
+                                    }
+                                },
+                                enabled = !isSavingWebhook && !isLoading
+                            ) {
+                                if (isSavingWebhook) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("保存中...")
+                                } else {
+                                    Text("保存")
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // 恢复订阅链接按钮
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "订阅链接管理",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        Text(
+                            text = "如果机器人订阅链接失效，可以使用此功能恢复",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
                         
                         Button(
                             onClick = {
                                 scope.launch {
                                     val userToken = tokenRepo.getTokenSync() ?: return@launch
-                                    isSavingWebhook = true
+                                    isResettingLink = true
                                     error = null
-                                    runCatching { 
-                                        api.editBotSubscribedLink(
-                                            userToken, 
-                                            com.yhchat.canary.data.api.EditBotSubscribedLinkRequest(
-                                                botId = botId,
-                                                link = webhookUrl
-                                            )
+                                    runCatching {
+                                        webApi.resetBotLink(
+                                            token = userToken,
+                                            request = mapOf("botId" to botId)
                                         )
                                     }.onSuccess { resp ->
-                                        isSavingWebhook = false
+                                        isResettingLink = false
                                         if (resp.body()?.code == 1) {
-                                            Toast.makeText(context, "Webhook地址保存成功", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "订阅链接已恢复", Toast.LENGTH_SHORT).show()
                                         } else {
-                                            error = resp.body()?.message ?: "保存失败"
+                                            val errorMsg = resp.body()?.message ?: "恢复失败"
+                                            error = errorMsg
+                                            Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
                                         }
                                     }.onFailure { e ->
-                                        isSavingWebhook = false
+                                        isResettingLink = false
                                         error = e.message
+                                        Toast.makeText(context, "恢复失败: ${e.message}", Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             },
-                            enabled = !isSavingWebhook && !isLoading
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isResettingLink && !isLoading
                         ) {
-                            if (isSavingWebhook) {
+                            if (isResettingLink) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(16.dp),
                                     strokeWidth = 2.dp,
                                     color = MaterialTheme.colorScheme.onPrimary
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("保存中...")
+                                Text("恢复中...")
                             } else {
-                                Text("保存")
+                                Text("恢复订阅链接")
                             }
                         }
                     }
                 }
-            }
-            
-            // 恢复订阅链接按钮
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
+
+                // 订阅设置
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
-                    Text(
-                        text = "订阅链接管理",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    
-                    Text(
-                        text = "如果机器人订阅链接失效，可以使用此功能恢复",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                val userToken = tokenRepo.getTokenSync() ?: return@launch
-                                isResettingLink = true
-                                error = null
-                                runCatching {
-                                    webApi.resetBotLink(
-                                        token = userToken,
-                                        request = mapOf("botId" to botId)
-                                    )
-                                }.onSuccess { resp ->
-                                    isResettingLink = false
-                                    if (resp.body()?.code == 1) {
-                                        Toast.makeText(context, "订阅链接已恢复", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        val errorMsg = resp.body()?.message ?: "恢复失败"
-                                        error = errorMsg
-                                        Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(text = "事件订阅", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+
+                        SubscriptionSwitch("普通消息事件", messageReceiveNormal) { checked ->
+                            messageReceiveNormal = checked
+                            scope.launch { submitEventEdit("messageReceiveNormal", checked) }
+                        }
+                        SubscriptionSwitch("指令消息事件", messageReceiveInstruction) { checked ->
+                            messageReceiveInstruction = checked
+                            scope.launch { submitEventEdit("messageReceiveInstruction", checked) }
+                        }
+                        SubscriptionSwitch("关注机器人事件", botFollowed) { checked ->
+                            botFollowed = checked
+                            scope.launch { submitEventEdit("botFollowed", checked) }
+                        }
+                        SubscriptionSwitch("取关机器人事件", botUnfollowed) { checked ->
+                            botUnfollowed = checked
+                            scope.launch { submitEventEdit("botUnfollowed", checked) }
+                        }
+                        SubscriptionSwitch("加入群事件", groupJoin) { checked ->
+                            groupJoin = checked
+                            scope.launch { submitEventEdit("groupJoin", checked) }
+                        }
+                        SubscriptionSwitch("退出群事件", groupLeave) { checked ->
+                            groupLeave = checked
+                            scope.launch { submitEventEdit("groupLeave", checked) }
+                        }
+                        SubscriptionSwitch("机器人设置消息事件", botSetting) { checked ->
+                            botSetting = checked
+                            scope.launch { submitEventEdit("botSetting", checked) }
+                        }
+                    }
+                }
+                
+                // 机器人指令列表
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "机器人指令",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            
+                            IconButton(
+                                onClick = {
+                                    InstructionManagementActivity.start(context, botId, botName)
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = "管理指令"
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        if (isLoadingInstructions) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(60.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            }
+                        } else if (instructions.isEmpty()) {
+                            Text(
+                                text = "暂无指令，点击右上角管理",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                instructions.take(3).forEach { instruction ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = instruction.name,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            if (!instruction.desc.isNullOrEmpty()) {
+                                                Text(
+                                                    text = instruction.desc,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                        
+                                        Text(
+                                            text = when (instruction.instructionType) {
+                                                1 -> "普通"
+                                                2 -> "直发"
+                                                5 -> "自定义"
+                                                else -> "其他"
+                                            },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
                                     }
-                                }.onFailure { e ->
-                                    isResettingLink = false
-                                    error = e.message
-                                    Toast.makeText(context, "恢复失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    
+                                    if (instruction != instructions.take(3).last()) {
+                                        Divider()
+                                    }
+                                }
+                                
+                                if (instructions.size > 3) {
+                                    Text(
+                                        text = "还有 ${instructions.size - 3} 个指令...",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
                                 }
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !isResettingLink && !isLoading
-                    ) {
-                        if (isResettingLink) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("恢复中...")
-                        } else {
-                            Text("恢复订阅链接")
                         }
-                    }
-                }
-            }
-
-            // 订阅设置
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(text = "事件订阅", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-
-                    SubscriptionSwitch("普通消息事件", messageReceiveNormal) { checked ->
-                        messageReceiveNormal = checked
-                        scope.launch { submitEventEdit("messageReceiveNormal", checked) }
-                    }
-                    SubscriptionSwitch("指令消息事件", messageReceiveInstruction) { checked ->
-                        messageReceiveInstruction = checked
-                        scope.launch { submitEventEdit("messageReceiveInstruction", checked) }
-                    }
-                    SubscriptionSwitch("关注机器人事件", botFollowed) { checked ->
-                        botFollowed = checked
-                        scope.launch { submitEventEdit("botFollowed", checked) }
-                    }
-                    SubscriptionSwitch("取关机器人事件", botUnfollowed) { checked ->
-                        botUnfollowed = checked
-                        scope.launch { submitEventEdit("botUnfollowed", checked) }
-                    }
-                    SubscriptionSwitch("加入群事件", groupJoin) { checked ->
-                        groupJoin = checked
-                        scope.launch { submitEventEdit("groupJoin", checked) }
-                    }
-                    SubscriptionSwitch("退出群事件", groupLeave) { checked ->
-                        groupLeave = checked
-                        scope.launch { submitEventEdit("groupLeave", checked) }
-                    }
-                    SubscriptionSwitch("机器人设置消息事件", botSetting) { checked ->
-                        botSetting = checked
-                        scope.launch { submitEventEdit("botSetting", checked) }
                     }
                 }
             }

@@ -1151,8 +1151,58 @@ data class BotDetailRequest(
 )
 
 /**
- * 用户主页信息响应
+ * 机器人指令列表响应 (/v1/instruction/web-list)
  */
+data class BotInstructionListResponse(
+    @SerializedName("code") val code: Int,
+    @SerializedName("data") val data: BotInstructionListData?,
+    @SerializedName("msg") val msg: String?
+)
+
+data class BotInstructionListData(
+    @SerializedName("list") val list: List<BotInstruction>
+)
+
+data class BotInstruction(
+    @SerializedName("id") val id: Int,
+    @SerializedName("botId") val botId: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("desc") val desc: String?,
+    @SerializedName("instructionType") val instructionType: Int, // 1-普通指令，2-直发指令，5-自定义输入指令
+    @SerializedName("hintText") val hintText: String?,
+    @SerializedName("defaultText") val defaultText: String?,
+    @SerializedName("customJson") val customJson: String?,
+    @SerializedName("createTime") val createTime: Long,
+    @SerializedName("sort") val sort: Int,
+    @SerializedName("hidden") val hidden: Int
+) : java.io.Serializable
+
+data class BotInstructionRequest(
+    @SerializedName("botId") val botId: String
+)
+
+data class CreateInstructionRequest(
+    @SerializedName("name") val name: String,
+    @SerializedName("desc") val desc: String,
+    @SerializedName("hintText") val hintText: String?,
+    @SerializedName("defaultText") val defaultText: String?,
+    @SerializedName("type") val type: Int,
+    @SerializedName("botId") val botId: String,
+    @SerializedName("customJson") val customJson: String? = null
+)
+
+data class EditInstructionRequest(
+    @SerializedName("id") val id: Int,
+    @SerializedName("botId") val botId: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("desc") val desc: String?,
+    @SerializedName("hintText") val hintText: String?,
+    @SerializedName("defaultText") val defaultText: String?,
+    @SerializedName("type") val type: Int,
+    @SerializedName("customJson") val customJson: String? = null,
+    @SerializedName("delFlag") val delFlag: Int? = null
+)
+
 data class UserHomepageResponse(
     @SerializedName("code")
     val code: Int,
