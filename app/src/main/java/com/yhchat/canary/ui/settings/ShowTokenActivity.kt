@@ -120,19 +120,21 @@ fun ShowTokenScreen(
                 }
             }
             
-            // 复制按钮
-            Button(
-                onClick = {
-                    clipboardManager.setText(AnnotatedString(token))
-                    val localContext = androidx.compose.ui.platform.LocalContext.current
-                    Toast.makeText(
-                        localContext,
-                        "Token已复制到剪贴板",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                },
-                modifier = Modifier.fillMaxWidth()
+            // 复制按钮
+            Button(
+                onClick = {
+                    clipboardManager.setText(AnnotatedString(token))
+                    val localContext = androidx.compose.ui.platform.LocalContext.current
+                    Toast.makeText(
+                        localContext,
+                        "Token已复制到剪贴板",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                },
+                modifier = Modifier.fillMaxWidth()
             ) {
+                Text("复制Token")
+            }
             
             // 警告说明
             Text(
