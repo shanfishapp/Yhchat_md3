@@ -61,8 +61,9 @@ fun ChatInputBar(
     onMessageTypeChange: ((Int) -> Unit)? = null,
     quotedMessageText: String? = null, // 引用的消息文本
     onClearQuote: (() -> Unit)? = null, // 清除引用
-    onExpressionClick: ((com.yhchat.canary.data.model.Expression) -> Unit)? = null,  // 表情点击回调
-    onStickerClick: ((com.yhchat.canary.data.model.StickerItem) -> Unit)? = null,  // 表情包贴纸点击回调
+    onExpressionClick: ((com.yhchat.canary.data.model.Expression) -> Unit)? = null,  // 表情点击回调
+    onStickerClick: ((com.yhchat.canary.data.model.StickerItem) -> Unit)? = null,  // 表情包贴纸点击回调
+    onLocalExpressionClick: ((String) -> Unit)? = null, // 本地表情点击回调，传递格式化的表情名称
     onInstructionClick: ((com.yhchat.canary.data.model.Instruction) -> Unit)? = null,  // 指令点击回调
     groupId: String? = null,  // 群聊ID，用于加载指令
     selectedInstruction: com.yhchat.canary.data.model.Instruction? = null, // 选中的指令
@@ -301,19 +302,23 @@ fun ChatInputBar(
             }
         }  // 关闭主输入栏容器Column
         
-        // 表情选择器
-        if (showExpressionPicker && onExpressionClick != null) {
-            ExpressionPicker(
-                onExpressionClick = { expression ->
-                    onExpressionClick?.invoke(expression)
-                    showExpressionPicker = false
-                },
-                onStickerClick = { stickerItem ->
-                    onStickerClick?.invoke(stickerItem)
-                    showExpressionPicker = false
-                },
-                onDismiss = { showExpressionPicker = false }
-            )
+        // 表情选择器
+        if (showExpressionPicker && (onExpressionClick != null || onLocalExpressionClick != null)) {
+            ExpressionPicker(
+                onExpressionClick = { expression ->
+                    onExpressionClick?.invoke(expression)
+                    showExpressionPicker = false
+                },
+                onStickerClick = { stickerItem ->
+                    onStickerClick?.invoke(stickerItem)
+                    showExpressionPicker = false
+                },
+                onLocalExpressionClick = { expressionText ->
+                    onLocalExpressionClick?.invoke(expressionText)
+                    showExpressionPicker = false
+                },
+                onDismiss = { showExpressionPicker = false }
+            )
         }
         
         // 指令选择器（在Surface外面）

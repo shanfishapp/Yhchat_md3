@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.lazy.LazyItemScope
 import com.yhchat.canary.ui.bot.BotInfoActivity
 import com.yhchat.canary.ui.components.MarkdownText
+import com.yhchat.canary.ui.components.EmojiText
 import com.yhchat.canary.ui.components.HtmlWebView
 import com.yhchat.canary.ui.components.ChatInputBar
 import com.yhchat.canary.ui.components.ImageUtils
@@ -711,32 +712,38 @@ fun ChatScreen(
             context.getSharedPreferences("chat_settings", android.content.Context.MODE_PRIVATE)
                 .getBoolean("show_menu_buttons", true) 
         }
-        if (chatType == 2 && uiState.menuButtons.isNotEmpty() && showMenuButtons) {
-            com.yhchat.canary.ui.components.MenuButtonBar(
-                menuButtons = uiState.menuButtons,
-                onButtonClick = { button ->
-                    val buttonValue = button.content
-                    
-                    // 检查按钮值是否是可处理的链接
-                    when {
-                        com.yhchat.canary.utils.UnifiedLinkHandler.isHandleableLink(buttonValue) -> {
-                            // 使用 UnifiedLinkHandler 处理 yunhu://, yhfx 分享链接, yhchat.com 文章链接
-                            com.yhchat.canary.utils.UnifiedLinkHandler.handleLink(context, buttonValue)
-                        }
-                        (buttonValue as String).startsWith("http://") || (buttonValue as String).startsWith("https://") -> {
-                            // 其他 HTTP/HTTPS 链接，使用系统浏览器打开
-                            try {
-                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(buttonValue))
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                android.widget.Toast.makeText(context, "无法打开链接", android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                        else -> {
-                            // 不是链接，发送按钮请求
-                            viewModel.clickMenuButton(button)
-                        }
-                    }
+        if (chatType == 2 && showMenuButtons && uiState.groupMembers.isNotEmpty()) {
+            MenuButtons(
+                onAddFriend = {
+                    // 添加好友按钮点击事件
+                    com.yhchat.canary.ui.contacts.AddFriendActivity.start(
+                        context = context,
+                        groupId = chatId,
+                        groupName = chatName
+                    )
+                },
+                onGroupNotice = {
+                    // 群公告按钮点击事件
+                    com.yhchat.canary.ui.group.GroupNoticeActivity.start(
+                        context = context,
+                        groupId = chatId
+                    )
+                },
+                onGroupFile = {
+                    // 群文件按钮点击事件
+                    com.yhchat.canary.ui.disk.GroupDiskActivity.start(
+                        context = context,
+                        groupId = chatId,
+                        groupName = chatName
+                    )
+                },
+                onGroupMember = {
+                    // 群成员按钮点击事件
+                    com.yhchat.canary.ui.group.GroupMembersActivity.start(
+                        context = context,
+                        groupId = chatId,
+                        groupName = chatName
+                    )
                 }
             )
         }
@@ -823,6 +830,10 @@ fun ChatScreen(
                     quotedMessageId = null
                     quotedMessageText = null
                 },
+                onLocalExpressionClick = { expressionText ->
+                    // 将表情格式文本插入到输入框
+                    inputText += expressionText
+                },
                 onInstructionClick = { instruction ->
                     android.util.Log.d("ChatScreen", "🎯 用户点击指令: /${instruction.name} (id=${instruction.id}, type=${instruction.type})")
                     
@@ -888,43 +899,33 @@ fun ChatScreen(
     if (showImageViewer && !currentImageUrl.isNullOrEmpty()) {
         ImageViewer(
             imageUrl = currentImageUrl!!,
-            onDismiss = {
-                showImageViewer = false
-                currentImageUrl = null
-            }
+            onDismiss = { showImageViewer = false }
         )
     }
     
-    // 消息编辑对话框
+    // 编辑消息对话框
     if (showEditDialog && messageToEdit != null) {
-        MessageEditDialog(
+        EditMessageDialog(
             message = messageToEdit!!,
-            onDismiss = {
+            onConfirm = { newText ->
+                // 更新消息
+                viewModel.editMessage(messageToEdit!!.msgId, newText)
                 showEditDialog = false
                 messageToEdit = null
             },
-            onConfirm = { content, contentType ->
-                viewModel.editMessage(
-                    chatId = chatId,
-                    chatType = chatType,
-                    msgId = messageToEdit!!.msgId,
-                    content = content,
-                    contentType = contentType
-                )
+            onDismiss = {
                 showEditDialog = false
                 messageToEdit = null
             }
         )
     }
-    
 }
 
 /**
- * 消息项
+ * 消息项组件
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MessageItem(
+fun LazyItemScope.AnimatedMessageItem(
     message: ChatMessage,
     isMyMessage: Boolean,
     modifier: Modifier = Modifier,
@@ -932,966 +933,499 @@ private fun MessageItem(
     onAvatarClick: (String, String, Int) -> Unit = { _, _, _ -> },
     onAddExpression: (String) -> Unit = {},
     onQuote: (String, String) -> Unit = { _, _ -> },
-    onRecall: (String) -> Unit = {},  // 撤回消息
-    onEdit: (ChatMessage) -> Unit = {},  // 编辑消息
+    onRecall: (String) -> Unit = {},
+    onEdit: (ChatMessage) -> Unit = {},
     memberPermission: Int? = null  // 群成员权限等级
 ) {
     val context = LocalContext.current
-    val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-    var showContextMenu by remember { mutableStateOf(false) }
-    
-    // 检查是否为撤回消息
-    if (message.msgDeleteTime != null) {
-        // 撤回消息显示
-        RecallMessageItem(
-            message = message,
-            modifier = modifier
-        )
-        return
-    }
-    
-    // 检查是否为tip消息（类型9）
-    if (message.contentType == 9) {
-        // Tip消息显示
-        TipMessageItem(
-            message = message,
-            modifier = modifier
-        )
-        return
-    }
-    
-    // 使用 key 记住展开状态
-    var tagsExpanded by remember(message.msgId) { mutableStateOf(false) }
-    
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .combinedClickable(
-                onClick = {}, // 单击不做任何事
-                onDoubleClick = {
-                    // 双击复制消息文本
-                    val textToCopy = message.content.text ?: ""
-                    if (textToCopy.isNotEmpty()) {
-                        val clip = android.content.ClipData.newPlainText("message", textToCopy)
-                        clipboardManager.setPrimaryClip(clip)
-                        Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                onLongClick = {
-                    // 长按显示菜单
-                    showContextMenu = true
-                }
-            ),
-        horizontalArrangement = if (isMyMessage) Arrangement.End else Arrangement.Start
-    ) {
-        if (!isMyMessage) {
-            // 发送者头像（左侧）
-            AsyncImage(
-                model = ImageUtils.createAvatarImageRequest(
-                    context = LocalContext.current,
-                    url = message.sender.avatarUrl
-                ),
-                contentDescription = message.sender.name,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .clickable {
-                        onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType)
-                    },
-                contentScale = ContentScale.Crop
-            )
-            
-            Spacer(modifier = Modifier.width(8.dp))
-        }
-        
-        Column(
-            modifier = Modifier
-                .weight(1f, fill = false)
-                .widthIn(max = 280.dp),
-            horizontalAlignment = if (isMyMessage) Alignment.End else Alignment.Start
-        ) {
-            // 发送者姓名和标签
-            SenderNameAndTags(
-                message = message,
-                isMyMessage = isMyMessage,
-                tagsExpanded = tagsExpanded,
-                onToggleExpand = { tagsExpanded = !tagsExpanded },
-                memberPermission = memberPermission
-            )
-            
-            // 指令消息标识（只有当cmd不为null且name不为空时才显示）
-            if (message.cmd != null && message.cmd.name.isNotEmpty()) {
-                Text(
-                    text = "/${message.cmd.name}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                )
-            }
-
-            // 消息气泡
-            Surface(
-                modifier = Modifier
-                    .wrapContentWidth()
-                    .clip(
-                    RoundedCornerShape(
-                        topStart = if (isMyMessage) 16.dp else 4.dp,
-                        topEnd = if (isMyMessage) 4.dp else 16.dp,
-                        bottomStart = 16.dp,
-                        bottomEnd = 16.dp
-                    )
-                ),
-                color = if (isMyMessage) {
-                        MaterialTheme.colorScheme.primary 
-                } else {
-                        MaterialTheme.colorScheme.surface
-                },
-                tonalElevation = if (isMyMessage) {
-                    0.dp  // 自己的消息使用纯色
-                } else {
-                    2.dp  // 对方的消息使用浅色高程
-                }
-            ) {
-                MessageContentView(
-                    message = message,
-                    content = message.content,
-                    contentType = message.contentType,
-                    isMyMessage = isMyMessage,
-                    modifier = Modifier.padding(12.dp),
-                    onImageClick = onImageClick,
-                    onLongClick = { showContextMenu = true }
-                )
-            }
-
-            // 时间戳和编辑状态
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-            ) {
-            Text(
-                text = formatTimestamp(message.sendTime),
-                style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                
-                // 如果消息被编辑过，显示"已编辑"标记
-                if (message.editTime != null && message.editTime > 0) {
-                    var showEditHistory by remember { mutableStateOf(false) }
-                    
-                    Row(
-                        modifier = Modifier.clickable { showEditHistory = true },
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "已编辑",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "查看编辑历史",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(12.dp)
-                        )
-                    }
-                    
-                    // 编辑历史弹窗
-                    if (showEditHistory) {
-                        EditHistoryDialog(
-                            msgId = message.msgId,
-                            onDismiss = { showEditHistory = false }
-                        )
-                    }
-                }
-            }
-        }
-
-        if (isMyMessage) {
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // 自己的头像（右侧）
-            AsyncImage(
-                model = ImageUtils.createAvatarImageRequest(
-                    context = LocalContext.current,
-                    url = message.sender.avatarUrl
-                ),
-                contentDescription = "我",
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .clickable {
-                        onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType)
-                    },
-                contentScale = ContentScale.Crop
-            )
-        }
-    }
-    
-    // 长按菜单
-    if (showContextMenu) {
-        MessageContextMenu(
-            message = message,
-            onDismiss = { showContextMenu = false },
-            onCopyAll = {
-                val textToCopy = message.content.text ?: ""
-                if (textToCopy.isNotEmpty()) {
-                    val clip = android.content.ClipData.newPlainText("message", textToCopy)
-                    clipboardManager.setPrimaryClip(clip)
-                    Toast.makeText(context, "已复制全部", Toast.LENGTH_SHORT).show()
-                }
-                showContextMenu = false
-            },
-            onQuote = {
-                // 设置引用消息，格式：发送者名称 : 内容
-                val senderName = message.sender.name
-                val content = message.content.text ?: ""
-                val quotedText = "$senderName : $content"
-                onQuote(message.msgId, quotedText)
-                showContextMenu = false
-            },
-            onRecall = {
-                // 撤回消息
-                onRecall(message.msgId)
-                showContextMenu = false
-            },
-            onEdit = if (message.contentType in listOf(1, 3, 8) && isMyMessage) {
-                {
-                    // 编辑消息
-                    onEdit(message)
-                    showContextMenu = false
-                }
-            } else null,
-            onAddExpression = if (message.contentType == 7) {
-                {
-                    // 添加表情到个人收藏
-                    val expressionId = message.content.expressionId
-                    if (!expressionId.isNullOrEmpty()) {
-                        onAddExpression(expressionId)
-                        Toast.makeText(context, "已添加表情", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, "无法获取表情ID", Toast.LENGTH_SHORT).show()
-                    }
-                    showContextMenu = false
-                }
-            } else null
-        )
-    }
-}
-
-/**
- * 消息上下文菜单
- */
-@Composable
-private fun MessageContextMenu(
-    message: ChatMessage,
-    onDismiss: () -> Unit,
-    onCopyAll: () -> Unit,
-    onQuote: () -> Unit,
-    onRecall: () -> Unit,
-    onEdit: (() -> Unit)? = null,
-    onAddExpression: (() -> Unit)? = null
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "消息操作",
-                style = MaterialTheme.typography.titleMedium
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                // 复制全部
-                TextButton(
-                    onClick = onCopyAll,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Start,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = "复制全部",
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("复制全部")
-                    }
-                }
-                
-                // 引用
-                TextButton(
-                    onClick = onQuote,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Start,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FormatQuote,
-                            contentDescription = "引用",
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("引用")
-                    }
-                }
-                
-                // 编辑消息（仅对文本、Markdown、HTML消息显示）
-                if (onEdit != null && message.contentType in listOf(1, 3, 8)) {
-                    TextButton(
-                        onClick = onEdit,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Start,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = "编辑",
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("编辑")
-                        }
-                    }
-                }
-                
-                // 添加表情（仅对消息类型7显示）
-                if (onAddExpression != null && message.contentType == 7) {
-                    TextButton(
-                        onClick = onAddExpression,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Start,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AddCircle,
-                                contentDescription = "添加表情",
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("添加表情")
-                        }
-                    }
-                }
-                
-                // 撤回
-                TextButton(
-                    onClick = onRecall,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Start,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "撤回",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            "撤回",
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消")
-            }
-        }
-    )
-}
-
-/**
- * 发送者姓名和标签组件
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun SenderNameAndTags(
-    message: ChatMessage,
-    isMyMessage: Boolean,
-    tagsExpanded: Boolean,
-    onToggleExpand: () -> Unit,
-    memberPermission: Int? = null  // 群成员权限等级：100=群主，2=管理员
-) {
-    val tags = message.sender.tag ?: emptyList()
-    val hasMultipleTags = tags.size > 1
-    
-    Column(
-        modifier = Modifier
-            .wrapContentWidth()
-            .padding(horizontal = 4.dp, vertical = 2.dp),
-        horizontalAlignment = if (isMyMessage) Alignment.End else Alignment.Start
-    ) {
-        // 第一行：名称、机器人标签、前两个tag
-        Row(
-            modifier = Modifier.wrapContentWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = if (isMyMessage) 
-                Arrangement.spacedBy(6.dp, Alignment.End) 
-            else 
-                Arrangement.spacedBy(6.dp, Alignment.Start)
-        ) {
-            Text(
-                text = message.sender.name,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Medium
-            )
-
-            // 机器人标签
-            if (message.sender.chatType == 3) {
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Text(
-                        text = "机器人",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-            }
-            
-            // 群主/管理员标签
-            when (memberPermission) {
-                100 -> {
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = Color(0xFFFF9800)  // 橙色表示群主
-                    ) {
-                        Text(
-                            text = "群主",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-                2 -> {
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = Color(0xFF2196F3)  // 蓝色表示管理员
-                    ) {
-                        Text(
-                            text = "管理员",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-            }
-            
-            // 显示前两个标签
-            tags.take(1).forEach { tag ->
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = parseTagColor(tag.color)
-                ) {
-                    Text(
-                        text = tag.text,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-            }
-            
-            // 如果有更多标签，显示展开/收起按钮
-            if (hasMultipleTags) {
-                IconButton(
-                    onClick = onToggleExpand,
-                    modifier = Modifier.size(20.dp)
-                ) {
-                    Icon(
-                        imageVector = if (tagsExpanded) 
-                            Icons.Default.KeyboardArrowUp 
-                        else 
-                            Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (tagsExpanded) "收起标签" else "展开标签",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-        }
-        
-        // 展开时显示剩余标签（支持换行）
-        if (tagsExpanded && tags.size > 1) {
-            Spacer(modifier = Modifier.height(4.dp))
-            FlowRow(
-                modifier = Modifier.wrapContentWidth(),
-                horizontalArrangement = if (isMyMessage)
-                    Arrangement.spacedBy(6.dp, Alignment.End)
-                else
-                    Arrangement.spacedBy(6.dp, Alignment.Start),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                tags.drop(1).forEach { tag ->
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = parseTagColor(tag.color)
-                    ) {
-                        Text(
-                            text = tag.text,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * 撤回消息项
- */
-@Composable
-private fun RecallMessageItem(
-    message: ChatMessage,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center
-    ) {
-        Surface(
-            modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
-                .widthIn(max = 280.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            tonalElevation = 1.dp
-        ) {
-            Text(
-                text = "${message.sender.name} 在 ${formatRecallTime(message.msgDeleteTime!!)} 撤回了一条消息",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-        }
-    }
-}
-
-/**
- * Tip消息项（类型9）
- */
-@Composable
-private fun TipMessageItem(
-    message: ChatMessage,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center
-    ) {
-        Surface(
-            modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
-                .widthIn(max = 280.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            tonalElevation = 1.dp
-        ) {
-            Text(
-                text = message.content.text ?: "系统提示",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-        }
-    }
-}
-
-/**
- * 消息内容视图
- */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun MessageContentView(
-    message: ChatMessage,
-    content: MessageContent,
-    contentType: Int,
-    isMyMessage: Boolean,
-    modifier: Modifier = Modifier,
-    onImageClick: (String) -> Unit = {},
-    onLongClick: () -> Unit = {}
-) {
+    val content = message.content
     val textColor = if (isMyMessage) {
-                                MaterialTheme.colorScheme.onPrimary 
+        MaterialTheme.colorScheme.onPrimary
     } else {
-                                MaterialTheme.colorScheme.onSurface
+        MaterialTheme.colorScheme.onSurface
     }
-    val context = LocalContext.current
+    val backgroundColor = if (isMyMessage) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+    val alignment = if (isMyMessage) {
+        Alignment.End
+    } else {
+        Alignment.Start
+    }
     
-    // 获取消息显示设置
-    val messagePrefs = remember { 
-        context.getSharedPreferences("message_settings", Context.MODE_PRIVATE) 
-    }
-    val showHtmlRawText = remember { 
-        messagePrefs.getBoolean("show_html_raw_text", false) 
-    }
-    val showMarkdownRawText = remember { 
-        messagePrefs.getBoolean("show_markdown_raw_text", false) 
-    }
-
-    Column(modifier = modifier) {
-        when (contentType) {
-            8 -> {
-                // HTML消息
-                content.text?.let { htmlContent ->
-                    if (showHtmlRawText) {
-                        // 显示HTML原文
-                        Text(
-                            text = htmlContent,
-                            color = textColor,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .combinedClickable(
-                                    onClick = { },
-                                    onLongClick = onLongClick
-                                )
-                        )
-                    } else {
-                        // 使用Box包裹，添加占位符以减少初始渲染压力
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 120.dp, max = 440.dp)
-                        ) {
-                        HtmlWebView(
-                            htmlContent = htmlContent,
-                            onImageClick = onImageClick,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .combinedClickable(
-                                    onClick = { },
-                                    onLongClick = onLongClick
-                                )
-                                .pointerInput(Unit) {
-                                    awaitPointerEventScope {
-                                        while (true) {
-                                            val event = awaitPointerEvent()
-                                            event.changes.forEach { pointerInputChange ->
-                                                // 兼容旧Compose：手动判断down
-                                                if (!pointerInputChange.previousPressed && pointerInputChange.pressed) {
-                                                    pointerInputChange.consume()
-                                                }
+    // 长按菜单状态
+    var showContextMenu by remember { mutableStateOf(false) }
+    var contextMenuPosition by remember { mutableStateOf(Offset.Zero) }
+    
+    // 确定消息内容类型
+    val contentType = content.contentType ?: 1  // 默认为文本消息
+    
+    // 为长按事件创建一个引用
+    val messageText = content.text ?: ""
+    val messageUrl = content.imageUrl ?: content.stickerUrl ?: content.fileUrl ?: content.videoUrl ?: content.audioUrl ?: ""
+    
+    Box(
+        modifier = modifier
+            .combinedClickable(
+                onClick = { 
+                    // 单击事件：根据内容类型执行不同的操作
+                    when (contentType) {
+                        2 -> {
+                            // Markdown消息：什么都不做，内容已在界面上渲染
+                        }
+                        8 -> {
+                            // HTML消息：什么都不做，内容已在界面上渲染
+                        }
+                        else -> {
+                            // 其他类型消息：如果有URL则点击打开，否则无操作
+                            if (messageUrl.isNotEmpty()) {
+                                when {
+                                    messageUrl.endsWith(".mp3") || messageUrl.endsWith(".wav") || messageUrl.endsWith(".m4a") -> {
+                                        // 音频文件：播放音频
+                                        AudioPlayerService.start(context, messageUrl, message.sender.name)
+                                    }
+                                    messageUrl.endsWith(".mp4") || messageUrl.endsWith(".mov") || messageUrl.endsWith(".avi") -> {
+                                        // 视频文件：下载并播放视频
+                                        FileDownloadService.downloadAndOpenFile(
+                                            context = context,
+                                            fileUrl = messageUrl,
+                                            fileName = "video_${System.currentTimeMillis()}.mp4",
+                                            mimeType = "video/mp4"
+                                        )
+                                    }
+                                    messageUrl.endsWith(".pdf") || messageUrl.endsWith(".doc") || messageUrl.endsWith(".docx") || 
+                                    messageUrl.endsWith(".xls") || messageUrl.endsWith(".xlsx") || messageUrl.endsWith(".ppt") || 
+                                    messageUrl.endsWith(".pptx") -> {
+                                        // 文档文件：下载并打开文档
+                                        FileDownloadService.downloadAndOpenFile(
+                                            context = context,
+                                            fileUrl = messageUrl,
+                                            fileName = "file_${System.currentTimeMillis()}_${messageUrl.substringAfterLast("/")}",
+                                            mimeType = when {
+                                                messageUrl.endsWith(".pdf") -> "application/pdf"
+                                                messageUrl.endsWith(".doc") || messageUrl.endsWith(".docx") -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                                messageUrl.endsWith(".xls") || messageUrl.endsWith(".xlsx") -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                                messageUrl.endsWith(".ppt") || messageUrl.endsWith(".pptx") -> "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                                                else -> "application/octet-stream"
                                             }
-                                        }
+                                        )
+                                    }
+                                    else -> {
+                                        // 图片文件：打开图片预览
+                                        onImageClick(messageUrl)
                                     }
                                 }
-                        )
+                            }
                         }
                     }
-                }
-
-            }
-            2 -> {
-                // 图片消息
-                content.imageUrl?.let { imageUrl ->
-                        AsyncImage(
-                        model = ImageUtils.createImageRequest(
-                            context = LocalContext.current,
-                            url = imageUrl
-                        ),
-                            contentDescription = "图片",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .combinedClickable(
-                                onClick = { onImageClick(imageUrl) },
-                                onLongClick = onLongClick
-                            ),
-                            contentScale = ContentScale.Crop
-                        )
+                },
+                onLongClick = { 
+                    // 获取点击位置
+                    val density = LocalDensity.current
+                    onGloballyPositioned { coordinates ->
+                        contextMenuPosition = coordinates.positionInRoot()
                     }
-                content.text?.let { text ->
-                    if (text.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
+                    showContextMenu = true
+                }
+            )
+    ) {
+        // 消息容器
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = if (isMyMessage) Arrangement.End else Arrangement.Start
+        ) {
+            // 头像（非我的消息才显示）
+            if (!isMyMessage) {
+                message.sender.avatarUrl?.let { avatarUrl ->
+                    AsyncImage(
+                        model = ImageUtils.createAvatarImageRequest(
+                            context = context,
+                            url = avatarUrl
+                        ),
+                        contentDescription = "头像",
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .clickable { 
+                                // 点击头像：进入用户详情
+                                onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType)
+                            },
+                        contentScale = ContentScale.Crop
+                    )
+                } ?: run {
+                    // 如果没有头像URL，使用默认头像
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary)
+                            .clickable { 
+                                // 点击头像：进入用户详情
+                                onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
-                            text = text,
-                            color = textColor,
+                            text = message.sender.name.take(1).uppercase(),
+                            color = MaterialTheme.colorScheme.onPrimary,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 }
+                
+                Spacer(modifier = Modifier.width(8.dp))
             }
-            4 -> {
-                // 文件消息
-                content.fileName?.let { fileName ->
-                    Surface(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .combinedClickable(
-                                onClick = {
-                                    content.fileUrl?.let { fileUrl ->
-                                        handleFileDownload(
-                                            context = context,
-                                            fileUrl = fileUrl,
-                                            fileName = fileName,
-                                            fileSize = content.fileSize ?: 0L
-                                        )
-                                    }
-                                },
-                                onLongClick = onLongClick
-                            ),
-                        color = textColor.copy(alpha = 0.1f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Send, // 用作文件图标的临时替代
-                                contentDescription = "文件",
-                                tint = textColor,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = fileName,
-                                    color = textColor,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
+            
+            // 消息内容气泡
+            Surface(
+                modifier = Modifier
+                    .padding(vertical = 2.dp)
+                    .defaultMinSize(minWidth = 40.dp),
+                shape = RoundedCornerShape(
+                    topStart = if (isMyMessage) 16.dp else 4.dp,
+                    topEnd = 16.dp,
+                    bottomStart = if (isMyMessage) 4.dp else 16.dp,
+                    bottomEnd = 16.dp
+                ),
+                color = backgroundColor
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .widthIn(max = 280.dp)  // 限制最大宽度
+                ) {
+                    // 发送者名称（只在非我的消息且非群主/管理员时显示）
+                    if (!isMyMessage && memberPermission != null && memberPermission > 0) {
+                        Text(
+                            text = message.sender.name,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (memberPermission == 2) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            fontWeight = if (memberPermission == 2) FontWeight.Bold else FontWeight.Normal
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                    
+                    // 根据内容类型显示不同内容
+                    when (contentType) {
+                        2 -> {
+                            // Markdown消息内容
+                            if (message.content.text != null) {
+                                MarkdownText(
+                                    markdown = message.content.text!!,
+                                    textColor = textColor,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
-                                content.fileSize?.let { size ->
-                                    Text(
-                                        text = formatFileSize(size),
-                                        color = textColor.copy(alpha = 0.7f),
-                                        style = MaterialTheme.typography.labelSmall
+                            }
+                        }
+                        3 -> {
+                            // Markdown消息内容
+                            if (message.content.text != null) {
+                                MarkdownText(
+                                    markdown = message.content.text!!,
+                                    textColor = textColor,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                        8 -> {
+                            // HTML消息内容
+                            if (message.content.text != null) {
+                                // 为HTML内容创建一个容器
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(200.dp)  // 固定高度，可根据需要调整
+                                ) {
+                                    HtmlWebView(
+                                        htmlContent = message.content.text!!,,
+                                        modifier = Modifier.fillMaxSize()
                                     )
                                 }
                             }
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = "下载",
-                                tint = textColor.copy(alpha = 0.7f),
-                                modifier = Modifier.size(16.dp)
-                            )
+                        }
+                        4 -> {
+                            // 文件消息
+                            message.content.fileName?.let { fileName ->
+                                val fileSize = message.content.fileSize
+                                val fileSizeText = if (fileSize != null) {
+                                    " (${formatFileSize(fileSize)})"
+                                } else {
+                                    ""
+                                }
+                                
+                                Column {
+                                    Icon(
+                                        imageVector = Icons.Default.AttachFile,
+                                        contentDescription = "文件",
+                                        tint = textColor
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = fileName + fileSizeText,
+                                        color = textColor,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                        6 -> {
+                            // 文章消息
+                            message.content.postTitle?.let { title ->
+                                Column {
+                                    Text(
+                                        text = title,
+                                        color = textColor,
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    message.content.text?.let { summary ->
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = summary,
+                                            color = textColor.copy(alpha = 0.8f),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            maxLines = 3,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "查看全文 →",
+                                        color = if (isMyMessage) {
+                                            MaterialTheme.colorScheme.primaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.primary
+                                        },
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
+                            }
+                        }
+                        7 -> {
+                            // 表情消息 (包括表情包和个人收藏表情)
+                            val stickerPackId = content.stickerPackId
+                            val expressionId = content.expressionId
+                            
+                            // 判断是个人表情还是表情包
+                            val isPersonalExpression = expressionId != null && expressionId != "0"
+                            val isStickerPack = stickerPackId != null && stickerPackId != 0L
+                            
+                            content.imageUrl?.let { imageUrl ->
+                                AsyncImage(
+                                    model = ImageUtils.createStickerImageRequest(
+                                        context = context,
+                                        url = imageUrl
+                                    ),
+                                    contentDescription = when {
+                                        isPersonalExpression -> "个人收藏表情"
+                                        isStickerPack -> "表情包"
+                                        else -> "表情"
+                                    },
+                                    modifier = Modifier
+                                        .size(120.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .combinedClickable(
+                                            onClick = {
+                                                if (isPersonalExpression) {
+                                                    // 个人表情：打开图片预览
+                                                    onImageClick(imageUrl)
+                                                } else if (isStickerPack) {
+                                                    // 表情包：跳转到表情包详情
+                                                    com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
+                                                        context = context,
+                                                        stickerPackId = stickerPackId?.toString() ?: ""
+                                                    )
+                                                } else {
+                                                    // 默认：图片预览
+                                                    onImageClick(imageUrl)
+                                                }
+                                            },
+                                            onLongClick = { 
+                                                // 获取点击位置
+                                                val density = LocalDensity.current
+                                                onGloballyPositioned { coordinates ->
+                                                    contextMenuPosition = coordinates.positionInRoot()
+                                                }
+                                                showContextMenu = true
+                                            }
+                                        ),
+                                    contentScale = ContentScale.Fit
+                                )
+                            } ?: run {
+                                // 如果没有 imageUrl，尝试使用 stickerUrl 拼接完整URL
+                                content.stickerUrl?.let { stickerUrl ->
+                                    val fullUrl = if (stickerUrl.startsWith("http")) {
+                                        stickerUrl
+                                    } else {
+                                        "https://chat-img.jwznb.com/$stickerUrl"
+                                    }
+                                    
+                                    AsyncImage(
+                                        model = ImageUtils.createStickerImageRequest(
+                                            context = context,
+                                            url = fullUrl
+                                        ),
+                                        contentDescription = "表情",
+                                        modifier = Modifier
+                                            .size(120.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .combinedClickable(
+                                                onClick = {
+                                                    if (isPersonalExpression) {
+                                                    onImageClick(fullUrl)
+                                                    } else if (isStickerPack) {
+                                                        com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
+                                                            context = context,
+                                                            stickerPackId = stickerPackId?.toString() ?: ""
+                                                        )
+                                                    } else {
+                                                        onImageClick(fullUrl)
+                                                    }
+                                                },
+                                                onLongClick = { 
+                                                    // 获取点击位置
+                                                    val density = LocalDensity.current
+                                                    onGloballyPositioned { coordinates ->
+                                                        contextMenuPosition = coordinates.positionInRoot()
+                                                    }
+                                                    showContextMenu = true
+                                                }
+                                            ),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                }
+                            }
+                        }
+                        10 -> {
+                            // 视频消息 (contentType 10)
+                            content.videoUrl?.let { videoUrl ->
+                                VideoMessageView(
+                                    videoUrl = videoUrl,
+                                    textColor = textColor,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                        5 -> {
+                            // 表单消息（带按钮）
+                            content.text?.let { text ->
+                                Text(
+                                    text = text,
+                                    color = textColor,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                        else -> {
+                            // 其他类型消息，显示文本内容
+                            content.text?.let { text ->
+                                // 检查是否包含表情格式或链接
+                                if (text.contains("[.")) {
+                                    // 包含表情格式的文本，使用EmojiText组件
+                                    EmojiText(
+                                        text = text,
+                                        color = textColor,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.combinedClickable(
+                                            onClick = { },
+                                            onLongClick = { 
+                                                // 获取点击位置
+                                                val density = LocalDensity.current
+                                                onGloballyPositioned { coordinates ->
+                                                    contextMenuPosition = coordinates.positionInRoot()
+                                                }
+                                                showContextMenu = true
+                                            }
+                                        )
+                                    )
+                                } else if (LinkDetector.containsLink(text)) {
+                                    // 包含链接的文本
+                                    LinkText(
+                                        text = text,
+                                        style = MaterialTheme.typography.bodyMedium.copy(color = textColor),
+                                        linkColor = if (isMyMessage) {
+                                            MaterialTheme.colorScheme.primaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.primary
+                                        },
+                                        modifier = Modifier.combinedClickable(
+                                            onClick = { },
+                                            onLongClick = { 
+                                                // 获取点击位置
+                                                val density = LocalDensity.current
+                                                onGloballyPositioned { coordinates ->
+                                                    contextMenuPosition = coordinates.positionInRoot()
+                                                }
+                                                showContextMenu = true
+                                            }
+                                        )
+                                    )
+                                } else {
+                                    // 普通文本（支持表情格式渲染）
+                                    EmojiText(
+                                        text = text,
+                                        color = textColor,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.combinedClickable(
+                                            onClick = { },
+                                            onLongClick = { 
+                                                // 获取点击位置
+                                                val density = LocalDensity.current
+                                                onGloballyPositioned { coordinates ->
+                                                    contextMenuPosition = coordinates.positionInRoot()
+                                                }
+                                                showContextMenu = true
+                                            }
+                                        )
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
-            11 -> {
-                // 语音消息
-                content.audioUrl?.let { audioUrl ->
-                    AudioMessageView(
-                        audioUrl = audioUrl,
-                        duration = content.audioTime ?: 0,
-                        textColor = textColor,
-                        senderName = "语音消息"
-                    )
-                }
-            }
-            3 -> {
-                // Markdown消息
-                content.text?.let { markdownText ->
-                    if (showMarkdownRawText) {
-                        // 显示Markdown原文
-                        Text(
-                            text = markdownText,
-                            color = textColor,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .combinedClickable(
-                                    onClick = { },
-                                    onLongClick = onLongClick
-                                )
-                        )
-                    } else {
-                        // 正常渲染Markdown
-                        MarkdownText(
-                            markdown = markdownText,
-                            textColor = if (isMyMessage) {
-                                MaterialTheme.colorScheme.onPrimary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                            backgroundColor = Color.Transparent, // 使用透明背景，继承消息气泡背景
-                            onImageClick = onImageClick,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .combinedClickable(
-                                    onClick = { },
-                                    onLongClick = onLongClick
-                                )
-                        )
-                    }
-                }
-            }
-            6 -> {
-                // 文章消息
-                PostMessageView(
-                    postId = content.postId,
-                    postTitle = content.postTitle,
-                    postContent = content.postContent,
-                    postContentType = content.postContentType,
-                    textColor = textColor,
-                    isMyMessage = isMyMessage
-                )
-            }
-            7 -> {
-                // 表情消息 (包括表情包和个人收藏表情)
-                val context = LocalContext.current
-                val stickerPackId = content.stickerPackId
-                val expressionId = content.expressionId
-                
-                // 判断是个人表情还是表情包
-                val isPersonalExpression = expressionId != null && expressionId != "0"
-                val isStickerPack = stickerPackId != null && stickerPackId != 0L
-                
-                content.imageUrl?.let { imageUrl ->
+            
+            // 我的消息的头像
+            if (isMyMessage) {
+                Spacer(modifier = Modifier.width(8.dp))
+                message.sender.avatarUrl?.let { avatarUrl ->
                     AsyncImage(
-                        model = ImageUtils.createStickerImageRequest(
+                        model = ImageUtils.createAvatarImageRequest(
                             context = context,
-                            url = imageUrl
+                            url = avatarUrl
                         ),
-                        contentDescription = when {
-                            isPersonalExpression -> "个人收藏表情"
-                            isStickerPack -> "表情包"
-                            else -> "表情"
-                        },
+                        contentDescription = "头像",
                         modifier = Modifier
-                            .size(120.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .combinedClickable(
-                                onClick = {
-                                    if (isPersonalExpression) {
-                                        // 个人表情：打开图片预览
-                                    onImageClick(imageUrl)
-                                    } else if (isStickerPack) {
-                                        // 表情包：跳转到表情包详情
-                                        com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
-                                            context = context,
-                                            stickerPackId = stickerPackId?.toString() ?: ""
-                                        )
-                                    } else {
-                                        // 默认：图片预览
-                                        onImageClick(imageUrl)
-                                    }
-                                },
-                                onLongClick = onLongClick
-                            ),
-                        contentScale = ContentScale.Fit
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .clickable { 
+                                // 点击头像：进入用户详情
+                                onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType)
+                            },
+                        contentScale = ContentScale.Crop
                     )
                 } ?: run {
-                    // 如果没有 imageUrl，尝试使用 stickerUrl 拼接完整URL
-                    content.stickerUrl?.let { stickerUrl ->
-                        val fullUrl = if (stickerUrl.startsWith("http")) {
-                            stickerUrl
-                        } else {
-                            "https://chat-img.jwznb.com/$stickerUrl"
-                        }
-                        
-                        AsyncImage(
-                            model = ImageUtils.createStickerImageRequest(
-                                context = context,
-                                url = fullUrl
-                            ),
-                            contentDescription = "表情",
-                            modifier = Modifier
-                                .size(120.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .combinedClickable(
-                                    onClick = {
-                                        if (isPersonalExpression) {
-                                        onImageClick(fullUrl)
-                                        } else if (isStickerPack) {
-                                            com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
-                                                context = context,
-                                                stickerPackId = stickerPackId?.toString() ?: ""
-                                            )
-                                        } else {
-                                            onImageClick(fullUrl)
-                                        }
-                                    },
-                                    onLongClick = onLongClick
-                                ),
-                            contentScale = ContentScale.Fit
-                        )
-                    }
-                }
-            }
-            10 -> {
-                // 视频消息 (contentType 10)
-                content.videoUrl?.let { videoUrl ->
-                    VideoMessageView(
-                        videoUrl = videoUrl,
-                        textColor = textColor,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-            5 -> {
-                // 表单消息（带按钮）
-                content.text?.let { text ->
-                    Text(
-                        text = text,
-                        color = textColor,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-            else -> {
-                // 其他类型消息，显示文本内容
-                content.text?.let { text ->
-                    if (LinkDetector.containsLink(text)) {
-                        // 包含链接的文本
-                        LinkText(
-                            text = text,
-                            style = MaterialTheme.typography.bodyMedium.copy(color = textColor),
-                            linkColor = if (isMyMessage) {
-                                MaterialTheme.colorScheme.primaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.primary
+                    // 如果没有头像URL，使用默认头像
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary)
+                            .clickable { 
+                                // 点击头像：进入用户详情
+                                onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType)
                             },
-                            modifier = Modifier.combinedClickable(
-                                onClick = { },
-                                onLongClick = onLongClick
-                            )
-                        )
-                    } else {
-                        // 普通文本
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
-                            text = text,
-                            color = textColor,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.combinedClickable(
-                                onClick = { },
-                                onLongClick = onLongClick
-                            )
+                            text = message.sender.name.take(1).uppercase(),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 }
@@ -1943,825 +1477,332 @@ private fun MessageContentView(
         // 按钮（用于表单消息等）
         content.buttons?.let { buttonsJson ->
             if (buttonsJson.isNotBlank() && buttonsJson != "null") {
-                MessageButtons(
-                    buttonsJson = buttonsJson,
-                    message = message,
-                    textColor = textColor,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-    }
-}
-
-/**
- * 文章消息视图
- */
-@Composable
-private fun PostMessageView(
-    postId: String?,
-    postTitle: String?,
-    postContent: String?,
-    postContentType: String?,
-    textColor: Color,
-    isMyMessage: Boolean
-) {
-    val context = LocalContext.current
-    
-    if (postId.isNullOrEmpty()) {
-        Text(
-            text = "文章消息",
-            color = textColor,
-            style = MaterialTheme.typography.bodyMedium
-        )
-        return
-    }
-    
-    // 文章卡片
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {
-                // 点击跳转到文章详情
-                val intent = Intent(context, PostDetailActivity::class.java).apply {
-                    putExtra("post_id", postId.toIntOrNull() ?: 0)
-                    putExtra("post_title", postTitle ?: "文章详情")
-                }
-                context.startActivity(intent)
-            }
-            .border(
-                width = 1.dp,
-                color = if (isMyMessage) {
-                    MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f)
-                } else {
-                    MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                },
-                shape = RoundedCornerShape(8.dp)
-            ),
-        color = Color.Transparent
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp)
-        ) {
-            // 文章图标和标题
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = "📄",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(end = 8.dp)
-                )
-                Text(
-                    text = postTitle ?: "文章",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = textColor,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            
-            // 文章内容预览
-            if (!postContent.isNullOrEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                when (postContentType) {
-                    "2" -> {
-                        // Markdown内容预览
-                        Text(
-                            text = postContent.take(100) + if (postContent.length > 100) "..." else "",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = textColor.copy(alpha = 0.8f),
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    else -> {
-                        // 普通文本内容预览
-                        Text(
-                            text = postContent.take(100) + if (postContent.length > 100) "..." else "",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = textColor.copy(alpha = 0.8f),
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-            
-            // 查看详情提示
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "点击查看文章详情 →",
-                style = MaterialTheme.typography.labelSmall,
-                color = if (isMyMessage) {
-                    MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
-                } else {
-                    MaterialTheme.colorScheme.primary
-                },
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
-}
-
-/**
- * 编辑历史弹窗
- */
-@Composable
-private fun EditHistoryDialog(
-    msgId: String,
-    onDismiss: () -> Unit
-) {
-    val viewModel: ChatViewModel = viewModel()
-    var editRecords by remember { mutableStateOf<List<com.yhchat.canary.data.model.MessageEditRecord>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    
-    LaunchedEffect(msgId) {
-        isLoading = true
-        val result = viewModel.getMessageEditHistory(msgId)
-        result.fold(
-            onSuccess = { records ->
-                editRecords = records
-                isLoading = false
-            },
-            onFailure = { error ->
-                errorMessage = error.message
-                isLoading = false
-            }
-        )
-    }
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "编辑历史",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 400.dp)
-            ) {
-                when {
-                    isLoading -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                try {
+                    val buttonsArray = JSONArray(buttonsJson)
+                    if (buttonsArray.length() > 0) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            CircularProgressIndicator()
-                        }
-                    }
-                    errorMessage != null -> {
-                        Text(
-                            text = errorMessage ?: "加载失败",
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    }
-                    editRecords.isEmpty() -> {
-                        Text(
-                            text = "暂无编辑历史",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    }
-                    else -> {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(editRecords) { record ->
-                                EditRecordItem(record)
+                            for (i in 0 until buttonsArray.length()) {
+                                val buttonObj = buttonsArray.getJSONObject(i)
+                                val buttonText = buttonObj.optString("text", "")
+                                val buttonValue = buttonObj.optString("value", "")
+                                val buttonType = buttonObj.optString("type", "text") // 默认为text类型
+                                
+                                Button(
+                                    onClick = {
+                                        when (buttonType) {
+                                            "url" -> {
+                                                // URL类型按钮：打开链接
+                                                val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(buttonValue))
+                                                try {
+                                                    context.startActivity(intent)
+                                                } catch (e: Exception) {
+                                                    Toast.makeText(context, "无法打开链接", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                            "copy" -> {
+                                                // 复制类型按钮：复制文本到剪贴板
+                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                                val clip = android.content.ClipData.newPlainText("button_value", buttonValue)
+                                                clipboard.setPrimaryClip(clip)
+                                                Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+                                            }
+                                            else -> {
+                                                // 文本类型按钮：执行相应操作
+                                                Toast.makeText(context, "已点击：$buttonText", Toast.LENGTH_SHORT).show()
+                                                // 这里可以添加其他按钮类型的处理逻辑
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.height(36.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                ) {
+                                    Text(
+                                        text = buttonText,
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
                             }
                         }
                     }
+                } catch (e: Exception) {
+                    android.util.Log.e("ChatScreen", "解析按钮JSON失败", e)
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("关闭")
-            }
         }
-    )
-}
-
-/**
- * 编辑记录项
- */
-@Composable
-private fun EditRecordItem(record: com.yhchat.canary.data.model.MessageEditRecord) {
-    val parsedText = remember(record) {
-        runCatching {
-            val json = org.json.JSONObject(record.contentOld)
-            json.optString("text").takeIf { it.isNotEmpty() }
-        }.getOrNull()
-    }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // 编辑时间
-            Text(
-                text = "编辑于 ${formatTimestamp(record.msgTime)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary
-            )
-            
-            // 旧内容
-            val displayText = parsedText ?: record.contentOld
-            if (displayText.isNotEmpty()) {
-                Text(
-                    text = displayText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        }
-    }
-}
-
-/**
- * 格式化时间戳
- */
-private fun formatTimestamp(timestamp: Long): String {
-    val date = Date(timestamp)
-    val now = Date()
-    val calendar = Calendar.getInstance()
-    
-    val todayCalendar = Calendar.getInstance().apply {
-        time = now
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
     }
     
-    return when {
-        date.after(todayCalendar.time) -> {
-            // 今天 - 只显示时间
-            SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)
-        }
-        date.after(Date(todayCalendar.timeInMillis - 86400000)) -> {
-            // 昨天
-            "昨天 " + SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)
-        }
-        else -> {
-            // 更早 - 显示日期
-            SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(date)
-        }
-    }
-}
-
-/**
- * 格式化撤回时间（只显示时:分）
- */
-private fun formatRecallTime(timestamp: Long): String {
-    val date = Date(timestamp)
-    return SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)
-}
-
-/**
- * 格式化文件大小
- */
-private fun formatFileSize(bytes: Long): String {
-    return when {
-        bytes < 1024 -> "${bytes}B"
-        bytes < 1024 * 1024 -> "${bytes / 1024}KB"
-        bytes < 1024 * 1024 * 1024 -> "${bytes / (1024 * 1024)}MB"
-        else -> "${bytes / (1024 * 1024 * 1024)}GB"
-    }
-}
-
-/**
- * 格式化音频时长
- */
-private fun formatAudioDuration(seconds: Long): String {
-    val minutes = seconds / 60
-    val remainingSeconds = seconds % 60
-    return "${minutes}:${remainingSeconds.toString().padStart(2, '0')}"
-}
-
-private fun handleFileDownload(
-    context: Context,
-    fileUrl: String,
-    fileName: String,
-    fileSize: Long
-) {
-    if (!PermissionUtils.hasAllDownloadPermissions(context)) {
-        if (context is Activity) {
-            PermissionUtils.requestAllDownloadPermissions(context)
-            Toast.makeText(context, "请先授予下载所需权限", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(context, "当前上下文无法申请权限", Toast.LENGTH_SHORT).show()
-        }
-        return
-    }
-
-    Toast.makeText(context, "开始下载：$fileName", Toast.LENGTH_SHORT).show()
-    FileDownloadService.startDownload(
-        context = context,
-        fileUrl = fileUrl,
-        fileName = fileName,
-        fileSize = fileSize
-    )
-}
-
-/**
- * 视频消息视图
- */
-@Composable
-private fun VideoMessageView(
-    videoUrl: String,
-    textColor: Color,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    var downloadState by remember { mutableStateOf<DownloadState>(DownloadState.NotStarted) }
-    
-    Surface(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .clickable {
-                if (downloadState == DownloadState.NotStarted) {
-                    downloadState = DownloadState.Downloading
-                    // 提取文件名
-                    val fileName = videoUrl.substringAfterLast("/").ifEmpty { "video_${System.currentTimeMillis()}.mp4" }
-                    
-                    // 启动下载，下载完成后自动打开
-                    FileDownloadService.startDownload(
-                        context = context,
-                        fileUrl = videoUrl,
-                        fileName = fileName,
-                        fileSize = 0L,
-                        autoOpen = true
-                    )
-                    
-                    Toast.makeText(context, "开始下载视频：$fileName", Toast.LENGTH_SHORT).show()
-                }
+    // 长按菜单
+    if (showContextMenu) {
+        MessageContextMenu(
+            message = message,
+            isMyMessage = isMyMessage,
+            position = contextMenuPosition,
+            onCopy = { textToCopy ->
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val clip = android.content.ClipData.newPlainText("message", textToCopy)
+                clipboard.setPrimaryClip(clip)
+                Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
             },
-        color = textColor.copy(alpha = 0.1f)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // 视频图标
-            Box(
-                modifier = Modifier
-                    .size(60.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(textColor.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = "视频",
-                    tint = textColor,
-                    modifier = Modifier.size(36.dp)
-                )
-            }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            // 视频信息
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "视频消息",
-                    color = textColor,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = when (downloadState) {
-                        DownloadState.NotStarted -> "点击下载，使用外部播放器播放"
-                        DownloadState.Downloading -> "正在下载..."
-                        DownloadState.Completed -> "已下载"
-                    },
-                    color = textColor.copy(alpha = 0.7f),
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-            
-            // 下载图标
-            Icon(
-                imageVector = when (downloadState) {
-                    DownloadState.NotStarted -> Icons.Default.PlayArrow
-                    DownloadState.Downloading -> Icons.Default.Add // 用作loading的临时替代
-                    DownloadState.Completed -> Icons.Default.Check
-                },
-                contentDescription = when (downloadState) {
-                    DownloadState.NotStarted -> "下载"
-                    DownloadState.Downloading -> "下载中"
-                    DownloadState.Completed -> "完成"
-                },
-                tint = textColor.copy(alpha = 0.7f),
-                modifier = Modifier.size(24.dp)
-            )
-        }
-    }
-}
-
-/**
- * 下载状态
- */
-private enum class DownloadState {
-    NotStarted,
-    Downloading,
-    Completed
-}
-
-/**
- * 语音消息视图
- */
-@Composable
-private fun AudioMessageView(
-    audioUrl: String,
-    duration: Long,
-    textColor: Color,
-    senderName: String,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    var isCurrentlyPlaying by remember { mutableStateOf(false) }
-    
-    // 检查当前是否正在播放这个音频
-    LaunchedEffect(audioUrl) {
-        // 这里可以添加检查当前播放状态的逻辑
-        // 暂时简化处理
-    }
-    
-    Surface(
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .clickable {
-                // 点击播放语音
-                AudioPlayerService.startPlayAudio(
-                    context = context,
-                    audioUrl = audioUrl,
-                    title = "$senderName 的语音"
-                )
-                isCurrentlyPlaying = !isCurrentlyPlaying
+            onQuote = onQuote,
+            onRecall = { 
+                onRecall(message.msgId)
+                showContextMenu = false
             },
-        color = textColor.copy(alpha = 0.1f)
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // 播放/暂停图标
-            Icon(
-                imageVector = if (isCurrentlyPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = if (isCurrentlyPlaying) "暂停" else "播放",
-                tint = textColor,
-                modifier = Modifier.size(24.dp)
-            )
-            
-            Spacer(modifier = Modifier.width(8.dp))
-            
-            // 音频波形效果 (简化版本)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                repeat(5) { index ->
-                    val height = if (isCurrentlyPlaying) {
-                        // 简单的动画效果
-                        (8 + (index * 2)).dp
-                    } else {
-                        6.dp
-                    }
-                    
-                    Box(
-                        modifier = Modifier
-                            .width(3.dp)
-                            .height(height)
-                            .background(
-                                textColor.copy(alpha = 0.6f),
-                                RoundedCornerShape(1.dp)
-                            )
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.width(8.dp))
-            
-            // 时长显示
-            Text(
-                text = formatAudioDuration(duration),
-                color = textColor,
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
+            onEdit = {
+                onEdit(message)
+                showContextMenu = false
+            },
+            onAddExpression = { url ->
+                onAddExpression(url)
+                showContextMenu = false
+            },
+            onDismiss = { showContextMenu = false }
+        )
     }
 }
 
 /**
- * 消息按钮组件
+ * 消息长按菜单
  */
 @Composable
-private fun MessageButtons(
-    buttonsJson: String,
+fun MessageContextMenu(
     message: ChatMessage,
-    textColor: Color,
-    modifier: Modifier = Modifier
+    isMyMessage: Boolean,
+    position: Offset,
+    onCopy: (String) -> Unit,
+    onQuote: (String, String) -> Unit,
+    onRecall: () -> Unit,
+    onEdit: () -> Unit,
+    onAddExpression: (String) -> Unit,
+    onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val viewModel: ChatViewModel = viewModel()
+    val density = LocalDensity.current
+    val currentMessage = message
     
-    // 在Composable外部解析JSON
-    val buttonData = remember(buttonsJson) {
-        try {
-            val buttonRows = JSONArray(buttonsJson)
-            val rows = mutableListOf<List<ButtonData>>()
-            
-            for (i in 0 until buttonRows.length()) {
-                val buttonRow = buttonRows.getJSONArray(i)
-                val buttons = mutableListOf<ButtonData>()
-                
-                for (j in 0 until buttonRow.length()) {
-                    val button = buttonRow.getJSONObject(j)
-                    buttons.add(
-                        ButtonData(
-                            text = button.optString("text", "按钮"),
-                            actionType = button.optInt("actionType", 0),
-                            url = button.optString("url", ""),
-                            value = button.optString("value", "")
-                        )
-                    )
-                }
-                rows.add(buttons)
-            }
-            rows
-        } catch (e: Exception) {
-            android.util.Log.e("MessageButtons", "Failed to parse buttons JSON", e)
-            emptyList()
-        }
+    // 获取屏幕尺寸
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp * density.density
+    val screenHeight = configuration.screenHeightDp.dp * density.density
+    
+    // 计算菜单位置，确保不超出屏幕边界
+    val menuWidth = 160.dp
+    val menuHeight = 48.dp * when {
+        isMyMessage -> 4  // 编辑、撤回、引用、复制
+        else -> 3  // 引用、复制、添加表情（如果包含图片）
     }
     
-    if (buttonData.isNotEmpty()) {
-        Column(modifier = modifier) {
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // 遍历每一行按钮
-            buttonData.forEach { buttonRow ->
+    val x = if (position.x + 160.dp.toPx() > screenWidth) {
+        screenWidth - 160.dp.toPx() - 8.dp.toPx()  // 靠右但不超出屏幕
+    } else {
+        position.x
+    }
+    
+    val y = if (position.y + menuHeight.toPx() > screenHeight) {
+        position.y - menuHeight.toPx()  // 向上显示菜单
+    } else {
+        position.y
+    }
+    
+    Box(
+        modifier = Modifier
+            .offset { IntOffset(x.toInt(), y.toInt()) }
+            .clickable { }  // 防止点击穿透
+    ) {
+        Card(
+            modifier = Modifier.width(menuWidth),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Column {
+                // 复制
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // 遍历每一行的按钮
-                    buttonRow.forEach { btnData ->
-                        Button(
-                            onClick = {
-                                handleButtonClick(
-                                    context = context,
-                                    viewModel = viewModel,
-                                    message = message,
-                                    actionType = btnData.actionType,
-                                    url = btnData.url,
-                                    value = btnData.value,
-                                    buttonText = btnData.text
-                                )
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = textColor.copy(alpha = 0.15f),
-                                contentColor = textColor
-                            ),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(
-                                text = btnData.text,
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                        .clickable {
+                            val textToCopy = currentMessage.content.text ?: ""
+                            if (textToCopy.isNotEmpty()) {
+                                onCopy(textToCopy)
+                                onDismiss()
+                            }
                         }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * 按钮数据类
- */
-private data class ButtonData(
-    val text: String,
-    val actionType: Int,
-    val url: String,
-    val value: String
-)
-
-/**
- * 处理按钮点击事件
- */
-private fun handleButtonClick(
-    context: Context,
-    viewModel: ChatViewModel,
-    message: ChatMessage,
-    actionType: Int,
-    url: String,
-    value: String,
-    buttonText: String
-) {
-    when (actionType) {
-        1 -> {
-            // 打开URL
-            if (url.isNotBlank()) {
-                try {
-                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                    context.startActivity(intent)
-                } catch (e: Exception) {
-                    Toast.makeText(context, "无法打开链接", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-        2 -> {
-            // 复制文本
-            if (value.isNotBlank()) {
-                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                val clip = android.content.ClipData.newPlainText("button_value", value)
-                clipboard.setPrimaryClip(clip)
-                Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
-            }
-        }
-        3 -> {
-            // 按钮事件上报（button_report）
-            val chatId = message.chatId ?: ""
-            val chatType = message.chatType ?: 1
-            
-            viewModel.reportButtonClick(
-                chatId = chatId,
-                chatType = chatType,
-                msgId = message.msgId,
-                buttonValue = value
-            )
-            
-            val chatTypeText = when (chatType) {
-                1 -> "私聊"
-                2 -> "群聊"
-                3 -> "机器人"
-                else -> "未知"
-            }
-            android.util.Log.d("ButtonClick", "点击按钮: 类型=$chatTypeText, chatId=$chatId, 按钮值=$value")
-            Toast.makeText(context, "已点击：$buttonText", Toast.LENGTH_SHORT).show()
-        }
-        else -> {
-            Toast.makeText(context, "未知按钮类型", Toast.LENGTH_SHORT).show()
-        }
-    }
-}
-
-/**
- * 解析标签颜色字符串为 Color 对象
- * 支持格式：#RRGGBB 或 #AARRGGBB
- */
-private fun parseTagColor(colorString: String): Color {
-    return try {
-        val cleanColor = colorString.trim()
-        if (cleanColor.startsWith("#")) {
-            val hex = cleanColor.substring(1)
-            when (hex.length) {
-                6 -> {
-                    // #RRGGBB
-                    val rgb = hex.toLong(16)
-                    Color(
-                        red = ((rgb shr 16) and 0xFF) / 255f,
-                        green = ((rgb shr 8) and 0xFF) / 255f,
-                        blue = (rgb and 0xFF) / 255f
-                    )
-                }
-                8 -> {
-                    // #AARRGGBB
-                    val argb = hex.toLong(16)
-                    Color(
-                        red = ((argb shr 16) and 0xFF) / 255f,
-                        green = ((argb shr 8) and 0xFF) / 255f,
-                        blue = (argb and 0xFF) / 255f,
-                        alpha = ((argb shr 24) and 0xFF) / 255f
-                    )
-                }
-                else -> Color.Gray
-            }
-        } else {
-            Color.Gray
-        }
-    } catch (e: Exception) {
-        Color.Gray
-    }
-}
-
-/**
- * 消息编辑对话框
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun MessageEditDialog(
-    message: ChatMessage,
-    onDismiss: () -> Unit,
-    onConfirm: (String, Int) -> Unit  // content, contentType
-) {
-    var editedContent by remember { mutableStateOf(message.content.text ?: "") }
-    var selectedContentType by remember { mutableStateOf(message.contentType) }
-    var expanded by remember { mutableStateOf(false) }
-    
-    val contentTypeOptions = listOf(
-        1 to "文本",
-        3 to "Markdown", 
-        8 to "HTML"
-    )
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "编辑消息",
-                style = MaterialTheme.typography.titleMedium
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // 消息类型选择器
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded }
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedTextField(
-                        value = contentTypeOptions.find { it.first == selectedContentType }?.second ?: "文本",
-                        onValueChange = { },
-                        readOnly = true,
-                        label = { Text("消息类型") },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                        },
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "复制",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                
+                // 引用
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val textToQuote = currentMessage.content.text ?: ""
+                            if (textToQuote.isNotEmpty()) {
+                                onQuote(currentMessage.msgId, textToQuote)
+                                onDismiss()
+                            }
+                        }
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FormatQuote,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "引用",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                
+                // 添加到表情（如果是图片消息）
+                if (currentMessage.content.imageUrl != null || 
+                    currentMessage.content.stickerUrl != null) {
+                    val imageUrl = currentMessage.content.imageUrl ?: currentMessage.content.stickerUrl
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .menuAnchor()
-                    )
-                    
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
-                    ) {
-                        contentTypeOptions.forEach { (type, name) ->
-                            DropdownMenuItem(
-                                text = { Text(name) },
-                                onClick = {
-                                    selectedContentType = type
-                                    expanded = false
+                            .clickable {
+                                if (!imageUrl.isNullOrEmpty()) {
+                                    onAddExpression(imageUrl)
+                                    onDismiss()
                                 }
-                            )
-                        }
+                            }
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AddCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "添加表情",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                     }
                 }
                 
-                // 消息内容输入框
-                OutlinedTextField(
-                    value = editedContent,
-                    onValueChange = { editedContent = it },
-                    label = { Text("消息内容") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp),
-                    maxLines = 5,
-                    singleLine = false
-                )
+                // 编辑（仅自己的消息）
+                if (isMyMessage && currentMessage.content.contentType == 1 && 
+                    currentMessage.content.text != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onEdit()
+                                onDismiss()
+                            }
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "编辑",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+                
+                // 撤回（仅自己的消息，且在2分钟内）
+                if (isMyMessage) {
+                    val sendTime = currentMessage.sendTime
+                    val currentTime = System.currentTimeMillis()
+                    val timeDiff = currentTime - sendTime
+                    val canRecall = timeDiff <= 2 * 60 * 1000  // 2分钟内可以撤回
+                    
+                    if (canRecall) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onRecall()
+                                    onDismiss()
+                                }
+                                .padding(16.dp)
+                                .background(if (canRecall) Color.Red else Color.Gray),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "撤回",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
             }
+        }
+        
+        // 点击菜单外部区域关闭菜单
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable { onDismiss() }
+        )
+    }
+}
+
+/**
+ * 编辑消息对话框
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditMessageDialog(
+    message: ChatMessage,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var editedText by remember { mutableStateOf(message.content.text ?: "") }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("编辑消息") },
+        text = {
+            TextField(
+                value = editedText,
+                onValueChange = { editedText = it },
+                label = { Text("消息内容") },
+                modifier = Modifier.fillMaxWidth()
+            )
         },
         confirmButton = {
             TextButton(
-                onClick = {
-                    if (editedContent.isNotBlank()) {
-                        onConfirm(editedContent.trim(), selectedContentType)
+                onClick = { 
+                    if (editedText.isNotBlank()) {
+                        onConfirm(editedText)
                     }
-                },
-                enabled = editedContent.isNotBlank()
+                }
             ) {
                 Text("确定")
             }
@@ -2775,61 +1816,247 @@ fun MessageEditDialog(
 }
 
 /**
- * 新消息弹出动画包装器
- * 为新插入的消息添加简单的从下往上弹出动画
+ * 格式化文件大小
+ */
+fun formatFileSize(sizeInBytes: Long): String {
+    val sizeInKB = sizeInBytes / 1024.0
+    return when {
+        sizeInKB < 1024 -> "%.1f KB".format(sizeInKB)
+        else -> "%.1f MB".format(sizeInKB / 1024.0)
+    }
+}
+
+/**
+ * 视频消息视图
  */
 @Composable
-private fun AnimatedMessageItem(
-    message: ChatMessage,
-    isMyMessage: Boolean,
-    modifier: Modifier = Modifier,
-    onImageClick: (String) -> Unit = {},
-    onAvatarClick: (String, String, Int) -> Unit = { _, _, _ -> },
-    onAddExpression: (String) -> Unit = {},
-    onQuote: (String, String) -> Unit = { _, _ -> },
-    onRecall: (String) -> Unit = {},
-    onEdit: (ChatMessage) -> Unit = {},
-    memberPermission: Int? = null
+fun VideoMessageView(
+    videoUrl: String,
+    textColor: Color,
+    modifier: Modifier = Modifier
 ) {
-    // 检查消息是否是新消息（发送时间在最近2秒内）
-    val isNewMessage = remember(message.msgId) {
-        val currentTime = System.currentTimeMillis()
-        val messageTime = message.sendTime
-        currentTime - messageTime < 2000 // 2秒内的消息认为是新消息
-    }
+    val context = LocalContext.current
     
-    // 动画状态
-    var isVisible by remember(message.msgId) { mutableStateOf(!isNewMessage) }
-    
-    // 启动动画
-    LaunchedEffect(message.msgId) {
-        if (isNewMessage) {
-            isVisible = true
-        }
-    }
-    
-    AnimatedVisibility(
-        visible = isVisible,
-        enter = slideInVertically(
-            initialOffsetY = { fullHeight -> fullHeight / 2 }, // 从底部一半位置开始
-            animationSpec = tween(
-                durationMillis = 250,
-                easing = FastOutSlowInEasing
-            )
-        ),
+    Column(
         modifier = modifier
     ) {
-        MessageItem(
-            message = message,
-            isMyMessage = isMyMessage,
-            modifier = Modifier.fillMaxWidth(),
-            onImageClick = onImageClick,
-            onAvatarClick = onAvatarClick,
-            onAddExpression = onAddExpression,
-            onQuote = onQuote,
-            onRecall = onRecall,
-            onEdit = onEdit,
-            memberPermission = memberPermission
+        Icon(
+            imageVector = Icons.Default.PlayArrow,
+            contentDescription = "视频",
+            tint = textColor
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "视频消息",
+            color = textColor,
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "点击播放",
+            color = if (textColor == MaterialTheme.colorScheme.onPrimary) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.primary
+            },
+            style = MaterialTheme.typography.labelMedium
+        )
+    }
+}
+
+/**
+ * 机器人看板内容
+ */
+@Composable
+fun BotBoardContent(
+    boardData: com.yhchat.canary.data.model.BotBoardData,
+    onImageClick: (String) -> Unit
+) {
+    val context = LocalContext.current
+    
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        // 看板标题
+        if (boardData.title.isNotBlank()) {
+            Text(
+                text = boardData.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        
+        // 看板内容（使用Markdown渲染）
+        if (boardData.content.isNotBlank()) {
+            MarkdownText(
+                markdown = boardData.content,
+                textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        
+        // 看板图片
+        boardData.imageUrl?.let { imageUrl ->
+            Spacer(modifier = Modifier.height(8.dp))
+            AsyncImage(
+                model = ImageUtils.createImageRequest(
+                    context = context,
+                    url = imageUrl
+                ),
+                contentDescription = "看板图片",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onImageClick(imageUrl) },
+                contentScale = ContentScale.Crop
+            )
+        }
+        
+        // 如果有链接，添加链接文本
+        boardData.linkUrl?.let { linkUrl ->
+            Spacer(modifier = Modifier.height(8.dp))
+            LinkText(
+                text = linkUrl,
+                linkColor = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+/**
+ * 群聊中的机器人看板部分
+ */
+@Composable
+fun GroupBotBoardsSection(
+    groupBots: List<com.yhchat.canary.data.model.GroupBot>,
+    groupBotBoards: Map<String, com.yhchat.canary.data.model.BotBoard>,
+    onImageClick: (String) -> Unit
+) {
+    groupBots.forEach { bot ->
+        val board = groupBotBoards[bot.botId]
+        if (board != null && board.boardCount > 0) {
+            val boardData = board.getBoardList().firstOrNull()
+            if (boardData != null && boardData.content.isNotBlank()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "机器人看板",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "${bot.name} 看板",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // 看板内容
+                        BotBoardContent(
+                            boardData = boardData,
+                            onImageClick = onImageClick
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 菜单按钮栏
+ */
+@Composable
+fun MenuButtons(
+    onAddFriend: () -> Unit,
+    onGroupNotice: () -> Unit,
+    onGroupFile: () -> Unit,
+    onGroupMember: () -> Unit
+) {
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        item {
+            MenuButton(
+                icon = Icons.Default.Add,
+                label = "添加",
+                onClick = onAddFriend
+            )
+        }
+        item {
+            MenuButton(
+                icon = Icons.Default.FormatQuote,
+                label = "公告",
+                onClick = onGroupNotice
+            )
+        }
+        item {
+            MenuButton(
+                icon = Icons.Default.AttachFile,
+                label = "文件",
+                onClick = onGroupFile
+            )
+        }
+        item {
+            MenuButton(
+                icon = Icons.Default.MoreVert,
+                label = "成员",
+                onClick = onGroupMember
+            )
+        }
+    }
+}
+
+/**
+ * 菜单按钮
+ */
+@Composable
+fun MenuButton(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clickable { onClick() }
+            .padding(8.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            modifier = Modifier.size(24.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
