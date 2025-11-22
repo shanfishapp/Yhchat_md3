@@ -585,7 +585,7 @@ fun ChatScreen(
                                 currentImageUrl = imageUrl
                                 showImageViewer = true
                             },
-                            onAvatarClick = { chatId, name, chatType ->
+                            onAvatarClick = { chatId, name, chatType , currentUserPermission ->
                                 // 处理头像点击事件
                                 if (chatType == 3) { // 机器人
                                     val intent = Intent(context, BotInfoActivity::class.java).apply {
@@ -890,7 +890,7 @@ fun LazyItemScope.AnimatedMessageItem(
     isMyMessage: Boolean,
     modifier: Modifier = Modifier,
     onImageClick: (String) -> Unit = {},
-    onAvatarClick: (String, String, Int) -> Unit = { _, _, _ -> },
+    onAvatarClick: (String, String, Int, Int) -> Unit = { _, _, _ -> },
     onAddExpression: (String) -> Unit = {},
     onQuote: (String, String) -> Unit = { _, _ -> },
     onRecall: (String) -> Unit = {},
@@ -920,7 +920,7 @@ fun LazyItemScope.AnimatedMessageItem(
     var contextMenuPosition by remember { mutableStateOf(Offset.Zero) }
     
     // 确定消息内容类型
-    val contentType = content.contentType ?: 1  // 默认为文本消息
+    val contentType = message.content.contentType ?: 1
     
     // 为长按事件创建一个引用
     val messageText = content.text ?: ""
@@ -948,28 +948,24 @@ fun LazyItemScope.AnimatedMessageItem(
                                     }
                                     messageUrl.endsWith(".mp4") || messageUrl.endsWith(".mov") || messageUrl.endsWith(".avi") -> {
                                         // 视频文件：下载并播放视频
-                                        FileDownloadService.downloadAndOpenFile(
-                                            context = context,
-                                            fileUrl = messageUrl,
-                                            fileName = "video_${System.currentTimeMillis()}.mp4",
-                                            mimeType = "video/mp4"
-                                        )
+                                        FileDownloadService.startDownload(  
+                                            context = context,  
+                                            fileUrl = messageUrl,  
+                                            fileName = "video_${System.currentTimeMillis()}.mp4",  
+                                            fileSize = 0L,  // 如果不知道大小可以传 0  
+                                            autoOpen = true  
+                                        )  
                                     }
                                     messageUrl.endsWith(".pdf") || messageUrl.endsWith(".doc") || messageUrl.endsWith(".docx") || 
                                     messageUrl.endsWith(".xls") || messageUrl.endsWith(".xlsx") || messageUrl.endsWith(".ppt") || 
                                     messageUrl.endsWith(".pptx") -> {
                                         // 文档文件：下载并打开文档
-                                        FileDownloadService.downloadAndOpenFile(
-                                            context = context,
-                                            fileUrl = messageUrl,
-                                            fileName = "file_${System.currentTimeMillis()}_${messageUrl.substringAfterLast("/")}",
-                                            mimeType = when {
-                                                messageUrl.endsWith(".pdf") -> "application/pdf"
-                                                messageUrl.endsWith(".doc") || messageUrl.endsWith(".docx") -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                                                messageUrl.endsWith(".xls") || messageUrl.endsWith(".xlsx") -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                                                messageUrl.endsWith(".ppt") || messageUrl.endsWith(".pptx") -> "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                                                else -> "application/octet-stream"
-                                            }
+                                        FileDownloadService.startDownload(  
+                                            context = context,  
+                                            fileUrl = messageUrl,  
+                                            fileName = "file_${System.currentTimeMillis()}_${messageUrl.substringAfterLast("/")}",  
+                                            fileSize = 0L,  
+                                            autoOpen = true  
                                         )
                                     }
                                     else -> {
@@ -1005,7 +1001,7 @@ fun LazyItemScope.AnimatedMessageItem(
                             .clip(CircleShape)
                             .clickable { 
                                 // 点击头像：进入用户详情
-                                onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType)
+                                onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType, currentUserPermission)
                             },
                         contentScale = ContentScale.Crop
                     )
@@ -1018,7 +1014,7 @@ fun LazyItemScope.AnimatedMessageItem(
                             .background(MaterialTheme.colorScheme.primary)
                             .clickable { 
                                 // 点击头像：进入用户详情
-                                onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType)
+                                onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType, currentUserPermission)
                             },
                         contentAlignment = Alignment.Center
                     ) {
@@ -1360,7 +1356,7 @@ fun LazyItemScope.AnimatedMessageItem(
                             .clip(CircleShape)
                             .clickable { 
                                 // 点击头像：进入用户详情
-                                onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType)
+                                onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType, currentUserPermission)
                             },
                         contentScale = ContentScale.Crop
                     )
@@ -1373,7 +1369,7 @@ fun LazyItemScope.AnimatedMessageItem(
                             .background(MaterialTheme.colorScheme.primary)
                             .clickable { 
                                 // 点击头像：进入用户详情
-                                onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType)
+                                onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType, currentUserPermission)
                             },
                         contentAlignment = Alignment.Center
                     ) {
