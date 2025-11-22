@@ -4,6 +4,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -82,6 +85,7 @@ fun GroupBotBoardsSection(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(groupBots) { bot ->
+            var isExpanded by remember { mutableStateOf(true) }
             val botBoardData = groupBotBoards[bot.botId]
             if (botBoardData != null) {
                 val boardContent = botBoardData
@@ -95,24 +99,43 @@ fun GroupBotBoardsSection(
                         )
                     ) {
                         Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp)
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            // 机器人名称
-                            Text(
-                                text = bot.name ?: "未知机器人",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(bottom = 4.dp)
-                            )
+                            // 机器人名称和展开/折叠按钮
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { isExpanded = !isExpanded }
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = bot.name ?: "未知机器人",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Icon(
+                                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = if (isExpanded) "收起" else "展开",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                             
-                            // 看板内容
-                            BotBoardContent(
-                                boardContent = boardContent,
-                                onImageClick = onImageClick
-                            )
+                            // 看板内容（根据展开状态显示）
+                            if (isExpanded) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
+                                ) {
+                                    BotBoardContent(
+                                        boardContent = boardContent,
+                                        onImageClick = onImageClick
+                                    )
+                                }
+                            }
                         }
                     }
                 }

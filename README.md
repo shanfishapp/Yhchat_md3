@@ -1,5 +1,5 @@
 # Yhchat_MD3
-用Cursor IDE制作的云湖第三方客户端，由AI强力驱动。
+用Cursor IDE + IFlow 制作的云湖第三方客户端，由AI强力驱动。
 
 # 声明
 此项目（Yhchat_MD3）是个人为了兴趣而开发, 仅用于学习和测试，请于下载后24小时内删除。 所用API皆从官方网站收集, 不提供任何破解内容。
@@ -35,3 +35,11 @@
 # 特别感谢
 ### [yhchatAPI](https://github.com/yh-Tpdev/yhchatAPI)
 
+# 特别说明
+本项目基于 [Kauid323/Yhchat_md3](https://github.com/Kauid323/Yhchat_md3) 进行二次开发，由衷感谢原作者以及所有贡献者的工作。  
+本分支由 ShanFishApp 维护和增强。  
+原作品版权归 Kauid323 所有。  
+本修改版本版权归 ShanFishApp 所有。  
+
+
+本程序根据 GNU Affero General Public License v3.0 或更高版本授权。
