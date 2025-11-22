@@ -35,6 +35,7 @@ fun SettingsScreen(
     navigationRepository: NavigationRepository? = null,
     tokenRepository: TokenRepository? = null,
     onLogout: () -> Unit = {},
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -65,6 +66,16 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
+            },
+            navigationIcon = {
+                if (onBack != null) {
+                    IconButton(onClick = { onBack() }) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "返回"
+                        )
+                    }
+                }
             }
         )
         

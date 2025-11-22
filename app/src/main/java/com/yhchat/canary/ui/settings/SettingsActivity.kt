@@ -87,6 +87,9 @@ class SettingsActivity : BaseActivity() {
                         onLogout = {
                             performLogout(this@SettingsActivity)
                         },
+                        onBack = {
+                            finish()
+                        },
                         modifier = Modifier.fillMaxSize()
                     )
                 }
