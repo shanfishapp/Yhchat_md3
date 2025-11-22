@@ -104,95 +104,98 @@ fun SettingsScreen(
                 )
             }
             
-            // 账户设置
-            item {
-                SettingsCard(
-                    title = "账户设置",
-                    items = listOf(
-                        SettingsItem(
-                            icon = Icons.Default.Devices,
-                            title = "在线设备",
-                            subtitle = "查看当前登录的设备",
-                            onClick = {
-                                tokenRepository?.let { tokenRepo ->
-                                    OnlineDevicesActivity.start(context, tokenRepo)
-                                }
-                            }
-                        ),
-                        SettingsItem(
-                            icon = Icons.Default.Lock,
-                            title = "修改密码",
-                            subtitle = "更改账户登录密码",
-                            onClick = {
-                                // 启动修改密码Activity，传递用户邮箱
-                                val intent = ChangePasswordActivity.createIntent(context, userEmail)
-                                context.startActivity(intent)
-                            }
-                        )
-                    )
-                )
-            }
-            
-            // 内容设置
-            item {
-                SettingsCard(
-                    title = "内容设置",
-                    items = listOf(
-                        SettingsItem(
-                            icon = Icons.Default.Web,
-                            title = "HTML设置",
-                            subtitle = "网页内容显示设置",
-                            onClick = {
-                                HtmlSettingsActivity.start(context)
-                            }
-                        )
-                    )
-                )
-            }
-            
-            // 显示设置
-            item {
-                DisplaySettingsCard(context = context)
-            }
-            
-            // 个性化设置
-            item {
-                PersonalizationSettingsCard(context = context)
-            }
-            
-            // 关于应用
-            item {
-                SettingsCard(
-                    title = "关于",
-                    items = listOf(
-                        SettingsItem(
-                            icon = Icons.Default.Info,
-                            title = "应用详情",
-                            subtitle = "查看应用版本和开发者信息",
-                            onClick = {
-                                AppInfoActivity.start(context)
-                            }
-                        )
-                    )
-                )
-            }
-            
-            // 账户设置
-            item {
-                SettingsCard(
-                    title = "账户管理",
-                    items = listOf(
-                        SettingsItem(
-                            icon = Icons.Default.ExitToApp,
-                            title = "退出登录",
-                            subtitle = "安全退出当前账户",
-                            onClick = {
-                                showLogoutDialog = true
-                            },
-                            isDestructive = true
-                        )
-                    )
-                )
+            // 账户设置
+            item {
+                SettingsCard(
+                    title = "账户设置",
+                    items = listOf(
+                        SettingsItem(
+                            icon = Icons.Default.Devices,
+                            title = "在线设备",
+                            subtitle = "查看当前登录的设备",
+                            onClick = {
+                                tokenRepository?.let { tokenRepo ->
+                                    OnlineDevicesActivity.start(context, tokenRepo)
+                                }
+                            }
+                        ),
+                        SettingsItem(
+                            icon = Icons.Default.Lock,
+                            title = "修改密码",
+                            subtitle = "更改账户登录密码",
+                            onClick = {
+                                // 启动修改密码Activity，传递用户邮箱
+                                val intent = ChangePasswordActivity.createIntent(context, userEmail)
+                                context.startActivity(intent)
+                            }
+                        ),
+                        SettingsItem(
+                            icon = Icons.Default.Key,
+                            title = "显示Token",
+                            subtitle = "查看当前登录的Token",
+                            onClick = {
+                                tokenRepository?.let { tokenRepo ->
+                                    tokenRepo.getToken()?.let { token ->
+                                        ShowTokenActivity.start(context, token)
+                                    }
+                                }
+                            }
+                        ),
+                        SettingsItem(
+                            icon = Icons.Default.ExitToApp,
+                            title = "退出登录",
+                            subtitle = "安全退出当前账户",
+                            onClick = {
+                                showLogoutDialog = true
+                            },
+                            isDestructive = true
+                        )
+                    )
+                )
+            }
+            
+            // 内容设置
+            item {
+                SettingsCard(
+                    title = "内容设置",
+                    items = listOf(
+                        SettingsItem(
+                            icon = Icons.Default.Web,
+                            title = "HTML设置",
+                            subtitle = "网页内容显示设置",
+                            onClick = {
+                                HtmlSettingsActivity.start(context)
+                            }
+                        )
+                    )
+                )
+            }
+            
+            // 显示设置
+            item {
+                DisplaySettingsCard(context = context)
+            }
+            
+            // 个性化设置
+            item {
+                PersonalizationSettingsCard(context = context)
+            }
+            
+            // 关于应用
+            item {
+                SettingsCard(
+                    title = "关于",
+                    items = listOf(
+                        SettingsItem(
+                            icon = Icons.Default.Info,
+                            title = "应用详情",
+                            subtitle = "查看应用版本和开发者信息",
+                            onClick = {
+                                AppInfoActivity.start(context)
+                            }
+                        )
+                    )
+                )
             }
         }
         

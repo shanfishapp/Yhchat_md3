@@ -12,8 +12,9 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
@@ -33,6 +34,7 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import kotlinx.coroutines.delay
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -43,9 +45,10 @@ class QRCodeScannerActivity : BaseActivity() {
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            startCamera()
+            // 权限已授予，会在 Compose 中自动启动相机
         } else {
             Toast.makeText(this, "需要相机权限才能扫描二维码", Toast.LENGTH_SHORT).show()
+            finish()
         }
     }
 
@@ -72,27 +75,38 @@ class QRCodeScannerActivity : BaseActivity() {
         onScanResult: (String) -> Unit
     ) {
         val context = LocalContext.current
+        val previewView = remember { 
+            PreviewView(context).apply {
+                scaleType = PreviewView.ScaleType.FILL_CENTER
+            }
+        }
         var hasCameraPermission by remember {
             mutableStateOf(ContextCompat.checkSelfPermission(
                 context, Manifest.permission.CAMERA
             ) == PackageManager.PERMISSION_GRANTED)
         }
         
-        LaunchedEffect(Unit) {
+        LaunchedEffect(hasCameraPermission) {
             if (!hasCameraPermission) {
                 requestPermissionLauncher.launch(Manifest.permission.CAMERA)
-            } else {
-                startCamera()
             }
         }
         
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
-            ScannerPreview(
-                modifier = Modifier.fillMaxSize(),
-                onScanResult = onScanResult
+            // 相机预览
+            AndroidView(
+                factory = { previewView },
+                modifier = Modifier.fillMaxSize()
             )
+            
+            // 当有权限时启动相机
+            if (hasCameraPermission) {
+                LaunchedEffect(Unit) {
+                    startCamera(previewView, onScanResult)
+                }
+            }
             
             // 顶部标题栏
             TopAppBar(
@@ -106,9 +120,9 @@ class QRCodeScannerActivity : BaseActivity() {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.3f),
-                    titleContentColor = androidx.compose.ui.graphics.Color.White,
-                    navigationIconContentColor = androidx.compose.ui.graphics.Color.White
+                    containerColor = Color.Black.copy(alpha = 0.3f),
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White
                 ),
                 modifier = Modifier.align(Alignment.TopCenter)
             )
@@ -118,42 +132,110 @@ class QRCodeScannerActivity : BaseActivity() {
                 modifier = Modifier
                     .align(Alignment.Center)
                     .size(250.dp)
+                    .clip(MaterialTheme.shapes.medium)
                     .border(
                         width = 2.dp,
-                        color = androidx.compose.ui.graphics.Color(0xFF4CAF50),
-                        shape = androidx.compose.material3.MaterialTheme.shapes.medium
+                        color = Color(0xFF4CAF50),
+                        shape = MaterialTheme.shapes.medium
                     )
+            )
+            
+            // 扫描动画线
+            var animationPosition by remember { mutableStateOf(0f) }
+            
+            LaunchedEffect(Unit) {
+                while (true) {
+                    animationPosition = 0f
+                    repeat(100) {
+                        animationPosition += 0.01f
+                        delay(16)
+                    }
+                }
+            }
+            
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(250.dp)
+                    .clip(MaterialTheme.shapes.medium)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .offset(y = (animationPosition - 0.5f) * 250.dp)
+                        .background(Color(0xFF4CAF50))
+                )
+            }
+            
+            // 四个角
+            // 左上角
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(x = 125.dp, y = 125.dp)
+                    .size(20.dp, 2.dp)
+                    .background(Color(0xFF4CAF50))
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(x = 125.dp, y = 125.dp)
+                    .size(2.dp, 20.dp)
+                    .background(Color(0xFF4CAF50))
+            )
+            
+            // 右上角
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-125).dp, y = 125.dp)
+                    .size(20.dp, 2.dp)
+                    .background(Color(0xFF4CAF50))
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-125).dp, y = 125.dp)
+                    .size(2.dp, 20.dp)
+                    .background(Color(0xFF4CAF50))
+            )
+            
+            // 左下角
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .offset(x = 125.dp, y = (-125).dp)
+                    .size(20.dp, 2.dp)
+                    .background(Color(0xFF4CAF50))
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .offset(x = 125.dp, y = (-125).dp)
+                    .size(2.dp, 20.dp)
+                    .background(Color(0xFF4CAF50))
+            )
+            
+            // 右下角
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(x = (-125).dp, y = (-125).dp)
+                    .size(20.dp, 2.dp)
+                    .background(Color(0xFF4CAF50))
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(x = (-125).dp, y = (-125).dp)
+                    .size(2.dp, 20.dp)
+                    .background(Color(0xFF4CAF50))
             )
         }
     }
-    
-    @Composable
-    private fun ScannerPreview(
-        modifier: Modifier = Modifier,
-        onScanResult: (String) -> Unit
-    ) {
-        val context = LocalContext.current as QRCodeScannerActivity
-        val previewView = remember {
-            PreviewView(context).apply {
-                scaleType = PreviewView.ScaleType.FILL_CENTER
-            }
-        }
-        
-        AndroidView(
-            factory = { previewView },
-            modifier = modifier
-        )
-        
-        LaunchedEffect(Unit) {
-            if (ContextCompat.checkSelfPermission(
-                    context, Manifest.permission.CAMERA
-                ) == PackageManager.PERMISSION_GRANTED
-            ) {
-                context.startCamera(previewView, onScanResult)
-            }
-        }
-    }
-    
+
+    // 其他方法保持不变...
     private fun startCamera(previewView: PreviewView, onScanResult: (String) -> Unit) {
         val options = BarcodeScannerOptions.Builder()
             .setBarcodeFormats(Barcode.FORMAT_QR_CODE)

@@ -272,8 +272,7 @@ fun ChangePasswordScreen(
                 value = email,
                 onValueChange = { email = it },
                 label = { Text("邮箱") },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = false // 默认邮箱不可编辑
+                modifier = Modifier.fillMaxWidth()
             )
             
             // 图片验证码

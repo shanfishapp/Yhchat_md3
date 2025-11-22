@@ -249,12 +249,18 @@
             android:exported="false"
             android:label="在线设备"
             android:theme="@style/Theme.YhchatCanary" />
-        <activity
-            android:name=".ui.settings.ChangePasswordActivity"
-            android:exported="false"
-            android:label="更改密码"
-            android:theme="@style/Theme.YhchatCanary" />
-            
+        <activity
+            android:name=".ui.settings.ChangePasswordActivity"
+            android:exported="false"
+            android:label="更改密码"
+            android:theme="@style/Theme.YhchatCanary" />
+            
+        <activity
+            android:name=".ui.settings.ShowTokenActivity"
+            android:exported="false"
+            android:label="用户Token"
+            android:theme="@style/Theme.YhchatCanary" />
+            
         <!-- 机器人信息 Activity -->
         <activity
             android:name=".ui.bot.BotInfoActivity"
