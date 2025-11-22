@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -119,20 +120,19 @@ fun ShowTokenScreen(
                 }
             }
             
-            // 复制按钮
-            Button(
-                onClick = {
-                    clipboardManager.setText(AnnotatedString(token))
-                    Toast.makeText(
-                        androidx.compose.ui.platform.LocalContext.current,
-                        "Token已复制到剪贴板",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                },
-                modifier = Modifier.fillMaxWidth()
+            // 复制按钮
+            Button(
+                onClick = {
+                    clipboardManager.setText(AnnotatedString(token))
+                    val localContext = androidx.compose.ui.platform.LocalContext.current
+                    Toast.makeText(
+                        localContext,
+                        "Token已复制到剪贴板",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                },
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("复制Token")
-            }
             
             // 警告说明
             Text(

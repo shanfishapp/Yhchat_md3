@@ -135,8 +135,11 @@ fun SettingsScreen(
                             subtitle = "查看当前登录的Token",
                             onClick = {
                                 tokenRepository?.let { tokenRepo ->
-                                    tokenRepo.getToken()?.let { token ->
-                                        ShowTokenActivity.start(context, token)
+                                    kotlinx.coroutines.runBlocking {
+                                        val token = tokenRepo.getTokenSync()
+                                        token?.let {
+                                            ShowTokenActivity.start(context, it)
+                                        }
                                     }
                                 }
                             }

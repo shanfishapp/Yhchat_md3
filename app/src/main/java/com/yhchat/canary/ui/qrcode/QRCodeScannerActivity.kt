@@ -153,19 +153,19 @@ class QRCodeScannerActivity : BaseActivity() {
                 }
             }
             
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(250.dp)
-                    .clip(MaterialTheme.shapes.medium)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(2.dp)
-                        .offset(y = (animationPosition - 0.5f) * 250.dp)
-                        .background(Color(0xFF4CAF50))
-                )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(250.dp)
+                    .clip(MaterialTheme.shapes.medium)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .offset(y = ((animationPosition - 0.5f) * 250).dp)
+                        .background(Color(0xFF4CAF50))
+                )
             }
             
             // 四个角
