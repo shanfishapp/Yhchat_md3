@@ -11,16 +11,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.yhchat.canary.proto.chat_ws_go.ChatWsGoProto
+import yh_bot.Bot
+import com.yhchat.canary.data.model.Bot_data
 
 /**
  * 机器人看板内容组件
- * @param boardData 看板数据
+ * @param boardContent 看板内容数据
  * @param onImageClick 点击图片时的回调
  */
 @Composable
 fun BotBoardContent(
-    boardData: ChatWsGoProto.BotBoardMessage.BoardData.BoardContent,
+    boardContent: Bot.board.Board_data,
     onImageClick: (String) -> Unit
 ) {
     Card(
@@ -37,7 +38,7 @@ fun BotBoardContent(
                 .padding(16.dp)
         ) {
             // 看板标题 (从机器人名称获取)
-            boardData.botName?.let { botName ->
+            boardContent.botName?.let { botName ->
                 if (botName.isNotBlank()) {
                     Text(
                         text = botName,
@@ -50,7 +51,7 @@ fun BotBoardContent(
             }
             
             // 看板内容
-            boardData.content?.let { content ->
+            boardContent.content?.let { content ->
                 if (content.isNotBlank()) {
                     MarkdownText(
                         markdown = content,
@@ -70,8 +71,8 @@ fun BotBoardContent(
  */
 @Composable
 fun GroupBotBoardsSection(
-    groupBots: List<com.yhchat.canary.data.model.Bot>,
-    groupBotBoards: Map<String, ChatWsGoProto.BotBoardMessage.BoardData>,
+    groupBots: List<Bot_data>,
+    groupBotBoards: Map<String, Bot.board.Board_data>,
     onImageClick: (String) -> Unit
 ) {
     LazyColumn(
@@ -83,7 +84,7 @@ fun GroupBotBoardsSection(
         items(groupBots) { bot ->
             val botBoardData = groupBotBoards[bot.botId]
             if (botBoardData != null) {
-                val boardContent = botBoardData.board
+                val boardContent = botBoardData
                 if (boardContent != null && boardContent.content.isNotBlank()) {
                     Card(
                         modifier = Modifier
