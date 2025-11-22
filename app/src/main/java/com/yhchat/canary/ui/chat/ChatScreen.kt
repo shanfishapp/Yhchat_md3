@@ -8,6 +8,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -707,47 +708,6 @@ fun ChatScreen(
             }
         }
 
-        // 菜单按钮栏（仅群聊显示，且设置允许）
-        val showMenuButtons = remember { 
-            context.getSharedPreferences("chat_settings", android.content.Context.MODE_PRIVATE)
-                .getBoolean("show_menu_buttons", true) 
-        }
-        if (chatType == 2 && showMenuButtons && uiState.groupMembers.isNotEmpty()) {
-            MenuButtons(
-                onAddFriend = {
-                    // 添加好友按钮点击事件
-                    com.yhchat.canary.ui.contacts.AddFriendActivity.start(
-                        context = context,
-                        groupId = chatId,
-                        groupName = chatName
-                    )
-                },
-                onGroupNotice = {
-                    // 群公告按钮点击事件
-                    com.yhchat.canary.ui.group.GroupNoticeActivity.start(
-                        context = context,
-                        groupId = chatId
-                    )
-                },
-                onGroupFile = {
-                    // 群文件按钮点击事件
-                    com.yhchat.canary.ui.disk.GroupDiskActivity.start(
-                        context = context,
-                        groupId = chatId,
-                        groupName = chatName
-                    )
-                },
-                onGroupMember = {
-                    // 群成员按钮点击事件
-                    com.yhchat.canary.ui.group.GroupMembersActivity.start(
-                        context = context,
-                        groupId = chatId,
-                        groupName = chatName
-                    )
-                }
-            )
-        }
-
         // 底部输入栏
             ChatInputBar(
                 text = inputText,
@@ -1022,11 +982,6 @@ fun LazyItemScope.AnimatedMessageItem(
                     }
                 },
                 onLongClick = { 
-                    // 获取点击位置
-                    val density = LocalDensity.current
-                    onGloballyPositioned { coordinates ->
-                        contextMenuPosition = coordinates.positionInRoot()
-                    }
                     showContextMenu = true
                 }
             )
@@ -1157,7 +1112,7 @@ fun LazyItemScope.AnimatedMessageItem(
                                 
                                 Column {
                                     Icon(
-                                        imageVector = Icons.Default.AttachFile,
+                                        imageVector = Icons.Default.Add,
                                         contentDescription = "文件",
                                         tint = textColor
                                     )
@@ -1984,51 +1939,24 @@ fun GroupBotBoardsSection(
     }
 }
 
-/**
- * 菜单按钮栏
- */
-@Composable
-fun MenuButtons(
-    onAddFriend: () -> Unit,
-    onGroupNotice: () -> Unit,
-    onGroupFile: () -> Unit,
-    onGroupMember: () -> Unit
-) {
-    LazyRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
-        item {
-            MenuButton(
-                icon = Icons.Default.Add,
-                label = "添加",
-                onClick = onAddFriend
-            )
-        }
-        item {
-            MenuButton(
-                icon = Icons.Default.FormatQuote,
-                label = "公告",
-                onClick = onGroupNotice
-            )
-        }
-        item {
-            MenuButton(
-                icon = Icons.Default.AttachFile,
-                label = "文件",
-                onClick = onGroupFile
-            )
-        }
-        item {
-            MenuButton(
-                icon = Icons.Default.MoreVert,
-                label = "成员",
-                onClick = onGroupMember
-            )
-        }
-    }
+@Composable  
+fun MenuButtons(  
+    onAddFriend: () -> Unit,  
+    onGroupNotice: () -> Unit,  
+    onGroupFile: () -> Unit,  
+    onGroupMember: () -> Unit  
+) {  
+    Row(  
+        modifier = Modifier  
+            .fillMaxWidth()  
+            .padding(vertical = 8.dp),  
+        horizontalArrangement = Arrangement.SpaceEvenly  
+    ) {  
+        MenuButton(icon = Icons.Default.Add, label = "添加", onClick = onAddFriend)  
+        MenuButton(icon = Icons.Default.FormatQuote, label = "公告", onClick = onGroupNotice)  
+        MenuButton(icon = Icons.Default.Add, label = "文件", onClick = onGroupFile)  
+        MenuButton(icon = Icons.Default.MoreVert, label = "成员", onClick = onGroupMember)  
+    }  
 }
 
 /**
