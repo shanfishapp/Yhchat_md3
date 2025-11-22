@@ -1139,7 +1139,7 @@ fun LazyItemScope.AnimatedMessageItem(
                                         .height(200.dp)  // 固定高度，可根据需要调整
                                 ) {
                                     HtmlWebView(
-                                        htmlContent = message.content.text!!,,
+                                        htmlContent = message.content.text!!,
                                         modifier = Modifier.fillMaxSize()
                                     )
                                 }
