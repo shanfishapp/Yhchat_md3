@@ -54,6 +54,8 @@ fun SettingsScreen(
     }
     
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showTokenDialog by remember { mutableStateOf(false) }
+    var currentToken by remember { mutableStateOf("") }
     
     Column(
         modifier = modifier.fillMaxSize()
@@ -104,101 +106,102 @@ fun SettingsScreen(
                 )
             }
             
-            // 账户设置
-            item {
-                SettingsCard(
-                    title = "账户设置",
-                    items = listOf(
-                        SettingsItem(
-                            icon = Icons.Default.Devices,
-                            title = "在线设备",
-                            subtitle = "查看当前登录的设备",
-                            onClick = {
-                                tokenRepository?.let { tokenRepo ->
-                                    OnlineDevicesActivity.start(context, tokenRepo)
-                                }
-                            }
-                        ),
-                        SettingsItem(
-                            icon = Icons.Default.Lock,
-                            title = "修改密码",
-                            subtitle = "更改账户登录密码",
-                            onClick = {
-                                // 启动修改密码Activity，传递用户邮箱
-                                val intent = ChangePasswordActivity.createIntent(context, userEmail)
-                                context.startActivity(intent)
-                            }
-                        ),
-                        SettingsItem(
-                            icon = Icons.Default.Key,
-                            title = "显示Token",
-                            subtitle = "查看当前登录的Token",
-                            onClick = {
-                                tokenRepository?.let { tokenRepo ->
-                                    kotlinx.coroutines.runBlocking {
-                                        val token = tokenRepo.getTokenSync()
-                                        token?.let {
-                                            ShowTokenActivity.start(context, it)
-                                        }
-                                    }
-                                }
-                            }
-                        ),
-                        SettingsItem(
-                            icon = Icons.Default.ExitToApp,
-                            title = "退出登录",
-                            subtitle = "安全退出当前账户",
-                            onClick = {
-                                showLogoutDialog = true
-                            },
-                            isDestructive = true
-                        )
-                    )
-                )
-            }
-            
-            // 内容设置
-            item {
-                SettingsCard(
-                    title = "内容设置",
-                    items = listOf(
-                        SettingsItem(
-                            icon = Icons.Default.Web,
-                            title = "HTML设置",
-                            subtitle = "网页内容显示设置",
-                            onClick = {
-                                HtmlSettingsActivity.start(context)
-                            }
-                        )
-                    )
-                )
-            }
-            
-            // 显示设置
-            item {
-                DisplaySettingsCard(context = context)
-            }
-            
-            // 个性化设置
-            item {
-                PersonalizationSettingsCard(context = context)
-            }
-            
-            // 关于应用
-            item {
-                SettingsCard(
-                    title = "关于",
-                    items = listOf(
-                        SettingsItem(
-                            icon = Icons.Default.Info,
-                            title = "应用详情",
-                            subtitle = "查看应用版本和开发者信息",
-                            onClick = {
-                                AppInfoActivity.start(context)
-                            }
-                        )
-                    )
-                )
+            // 账户设置
+            item {
+                SettingsCard(
+                    title = "账户设置",
+                    items = listOf(
+                        SettingsItem(
+                            icon = Icons.Default.Devices,
+                            title = "在线设备",
+                            subtitle = "查看当前登录的设备",
+                            onClick = {
+                                tokenRepository?.let { tokenRepo ->
+                                    OnlineDevicesActivity.start(context, tokenRepo)
+                                }
+                            }
+                        ),
+                        SettingsItem(
+                            icon = Icons.Default.Lock,
+                            title = "修改密码",
+                            subtitle = "更改账户登录密码",
+                            onClick = {
+                                // 启动修改密码Activity，传递用户邮箱
+                                val intent = ChangePasswordActivity.createIntent(context, userEmail)
+                                context.startActivity(intent)
+                            }
+                        ),
+                        SettingsItem(
+                            icon = Icons.Default.Key,
+                            title = "显示Token",
+                            subtitle = "查看当前登录的Token",
+                            onClick = {
+                                tokenRepository?.let { tokenRepo ->
+                                    kotlinx.coroutines.runBlocking {
+                                        val token = tokenRepo.getTokenSync()
+                                        token?.let {
+                                            currentToken = it
+                                            showTokenDialog = true
+                                        }
+                                    }
+                                }
+                            }
+                        ),
+                        SettingsItem(
+                            icon = Icons.Default.ExitToApp,
+                            title = "退出登录",
+                            subtitle = "安全退出当前账户",
+                            onClick = {
+                                showLogoutDialog = true
+                            },
+                            isDestructive = true
+                        )
+                    )
+                )
+            }
+            
+            // 内容设置
+            item {
+                SettingsCard(
+                    title = "内容设置",
+                    items = listOf(
+                        SettingsItem(
+                            icon = Icons.Default.Web,
+                            title = "HTML设置",
+                            subtitle = "网页内容显示设置",
+                            onClick = {
+                                HtmlSettingsActivity.start(context)
+                            }
+                        )
+                    )
+                )
+            }
+            
+            // 显示设置
+            item {
+                DisplaySettingsCard(context = context)
+            }
+            
+            // 个性化设置
+            item {
+                PersonalizationSettingsCard(context = context)
+            }
+            
+            // 关于应用
+            item {
+                SettingsCard(
+                    title = "关于",
+                    items = listOf(
+                        SettingsItem(
+                            icon = Icons.Default.Info,
+                            title = "应用详情",
+                            subtitle = "查看应用版本和开发者信息",
+                            onClick = {
+                                AppInfoActivity.start(context)
+                            }
+                        )
+                    )
+                )
             }
         }
         
@@ -231,7 +234,92 @@ fun SettingsScreen(
                 }
             )
         }
+        
+        // 显示Token对话框
+        if (showTokenDialog) {
+            TokenDialog(
+                token = currentToken,
+                onDismiss = { showTokenDialog = false }
+            )
+        }
     }
+}
+
+/**
+ * 显示Token的对话框
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TokenDialog(
+    token: String,
+    onDismiss: () -> Unit
+) {
+    val clipboardManager: androidx.compose.ui.platform.ClipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var showToast by remember { mutableStateOf(false) }
+    
+    // 处理 Toast 显示
+    if (showToast) {
+        androidx.compose.runtime.LaunchedEffect(showToast) {
+            android.widget.Toast.makeText(
+                context,
+                "Token已复制到剪贴板",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+            showToast = false
+        }
+    }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("用户Token")
+        },
+        text = {
+            Column(
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Text(
+                        text = "安全提醒：请妥善保管您的Token，不要泄露给他人，否则可能导致账户被盗用。",
+                        modifier = Modifier.padding(16.dp),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                
+                OutlinedTextField(
+                    value = token,
+                    onValueChange = { },
+                    label = { Text("用户Token") },
+                    modifier = Modifier.fillMaxWidth(),
+                    readOnly = true,
+                    singleLine = false,
+                    maxLines = 10
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(token))
+                    showToast = true
+                }
+            ) {
+                Text("复制Token")
+            }
+        },
+        dismissButton = {
+            Button(
+                onClick = onDismiss
+            ) {
+                Text("关闭")
+            }
+        }
+    )
 }
 
 /**
