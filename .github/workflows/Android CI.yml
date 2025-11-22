@@ -6,16 +6,11 @@ on:
       - canary
       - main
   workflow_dispatch: 
-
-    tags:
-      - "v*"
-    # 忽略的标签类型，不触发构建流程(和tags不能同时写)
-    # tags-ignore:
-    #   - "d*"
+  tags:
+    - "v*"
 
 jobs:
   builds:
-    # 构建的系统(ubuntu、windows、macos)
     runs-on: ubuntu-latest
     
     permissions:
@@ -23,6 +18,26 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Cache Android SDK
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.android/build-cache
+            $ANDROID_HOME/build-cache
+          key: ${{ runner.os }}-android-${{ hashFiles('**/build.gradle*', '**/gradle.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-android-
 
       - uses: actions/setup-java@v3
         with:
@@ -37,10 +52,10 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build APK
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleRelease --build-cache
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-         name: app-release
-         path: app/build/outputs/apk/release/app-release-unsigned.apk
+          name: app-release
+          path: app/build/outputs/apk/release/app-release-unsigned.apk

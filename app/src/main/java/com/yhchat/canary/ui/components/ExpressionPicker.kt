@@ -218,12 +218,7 @@ fun ExpressionPicker(
                                 AsyncImage(
                                     model = ImageRequest.Builder(context)
                                         .data(resourceId)
-                                        .apply {
-                                            // 确保使用支持SVG的图片加载器
-                                            ImageUtils.createImageLoader(context).let { loader ->
-                                                this@apply.imageLoader(loader)
-                                            }
-                                        }
+                                        .crossfade(true)
                                         .build(),
                                     contentDescription = localExpression.name,
                                     modifier = Modifier
@@ -232,7 +227,8 @@ fun ExpressionPicker(
                                             onLocalExpressionClick("[.${localExpression.name.split(".")[0]}]")  // 传递格式化的表情名称
                                             onDismiss()
                                         },
-                                    contentScale = ContentScale.Fit
+                                    contentScale = ContentScale.Fit,
+                                    imageLoader = ImageUtils.createImageLoader(context)
                                 )
                             }
                         }
