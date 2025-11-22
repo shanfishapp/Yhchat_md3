@@ -1,0 +1,5 @@
+ignoredBuiltDependencies:
+  - node-pty
+
+onlyBuiltDependencies:
+  - '@iflow-ai/iflow-cli'

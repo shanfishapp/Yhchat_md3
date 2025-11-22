@@ -1,0 +1,5 @@
+{
+	"dependencies": {
+		"@iflow-ai/iflow-cli": "^0.3.26"
+	}
+}
