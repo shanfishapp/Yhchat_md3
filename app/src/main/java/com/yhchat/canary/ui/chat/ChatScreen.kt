@@ -47,56 +47,59 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
-import androidx.compose.material.pullrefresh.pullRefresh
-import androidx.compose.material.pullrefresh.rememberPullRefreshState
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.foundation.lazy.LazyItemScope
-import com.yhchat.canary.ui.bot.BotInfoActivity
-import com.yhchat.canary.ui.components.MarkdownText
-import com.yhchat.canary.ui.components.EmojiText
-import com.yhchat.canary.ui.components.HtmlWebView
-import com.yhchat.canary.ui.components.ChatInputBar
-import com.yhchat.canary.ui.components.ImageUtils
-import com.yhchat.canary.ui.components.ImageViewer
-import com.yhchat.canary.ui.components.LinkText
-import com.yhchat.canary.ui.components.LinkDetector
-import com.yhchat.canary.data.model.ChatMessage
-import com.yhchat.canary.data.model.MessageContent
-import com.yhchat.canary.service.AudioPlayerService
-import com.yhchat.canary.service.FileDownloadService
-import com.yhchat.canary.utils.PermissionUtils
-import android.app.Activity
-import android.content.Context
-import android.widget.Toast
-import java.text.SimpleDateFormat
-import java.util.*
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.CoroutineScope
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.input.pointer.pointerInput
-import com.yhchat.canary.ui.community.PostDetailActivity
-import androidx.compose.foundation.border
-import org.json.JSONArray
-import org.json.JSONObject
-// pointerInput 相关扩展函数无需单独 import，consume 已废弃
-import com.yhchat.canary.ui.theme.YhchatCanaryTheme
-import kotlinx.coroutines.delay
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.foundation.lazy.LazyItemScope
+import com.yhchat.canary.ui.bot.BotInfoActivity
+import com.yhchat.canary.ui.components.MarkdownText
+import com.yhchat.canary.ui.components.EmojiText
+import com.yhchat.canary.ui.components.HtmlWebView
+import com.yhchat.canary.ui.components.ChatInputBar
+import com.yhchat.canary.ui.components.ImageUtils
+import com.yhchat.canary.ui.components.ImageViewer
+import com.yhchat.canary.ui.components.LinkText
+import com.yhchat.canary.ui.components.LinkDetector
+import com.yhchat.canary.data.model.ChatMessage
+import com.yhchat.canary.data.model.MessageContent
+import com.yhchat.canary.service.AudioPlayerService
+import com.yhchat.canary.service.FileDownloadService
+import com.yhchat.canary.utils.PermissionUtils
+import yh_bot.Bot
+import com.yhchat.canary.proto.group.Bot_data
+import android.app.Activity
+import android.content.Context
+import android.widget.Toast
+import java.text.SimpleDateFormat
+import java.util.*
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.input.pointer.pointerInput
+import com.yhchat.canary.ui.community.PostDetailActivity
+import androidx.compose.foundation.border
+import org.json.JSONArray
+import org.json.JSONObject
+// pointerInput 相关扩展函数无需单独 import，consume 已废弃
+import com.yhchat.canary.ui.theme.YhchatCanaryTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -451,43 +454,46 @@ fun ChatScreen(
                     )
                 }
                 
-                // 看板内容（展开时显示）
-                AnimatedVisibility(
-                    visible = showBotBoard,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    uiState.botBoard?.let { board ->
-                        if (board.boardCount > 0) {
-                            val boardData = board.getBoardList().firstOrNull()
-                            boardData?.let { data ->
-                                BotBoardContent(
-                                    boardData = data,
-                                    onImageClick = { url ->
-                                        currentImageUrl = url
-                                        showImageViewer = true
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-                }
-            }
+                // 看板内容（展开时显示）
+                AnimatedVisibility(
+                    visible = showBotBoard,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    uiState.botBoard?.let { board ->
+                        if (board.boardCount > 0) {
+                            val boardDataList = board.boardList
+                            if (boardDataList.isNotEmpty()) {
+                                val boardData = boardDataList[0]
+                                BotBoardContent(
+                                    boardData = boardData,
+                                    onImageClick = { url ->
+                                        currentImageUrl = url
+                                        showImageViewer = true
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+                }
+            }
+        }
+        
+        // 群聊中的机器人看板列表（且设置允许）
+        if (chatType == 2 && uiState.groupBots.isNotEmpty() && botBoardEnabled) {
+            GroupBotBoardsSection(
+                groupBots = uiState.groupBots,
+                groupBotBoards = uiState.groupBotBoards,
+                onImageClick = { url ->
+                    currentImageUrl = url
+                    showImageViewer = true
+                }
+            )
         }
         
-        // 群聊中的机器人看板列表（且设置允许）
-        if (chatType == 2 && uiState.groupBots.isNotEmpty() && botBoardEnabled) {
-            GroupBotBoardsSection(
-                groupBots = uiState.groupBots,
-                groupBotBoards = uiState.groupBotBoards,
-                onImageClick = { url ->
-                    currentImageUrl = url
-                    showImageViewer = true
-                }
-            )
-        }
+        
         
         // 错误信息
         uiState.error?.let { error ->
@@ -626,7 +632,8 @@ fun ChatScreen(
                                 messageToEdit = message
                                 showEditDialog = true
                             },
-                            memberPermission = memberPermission
+                            memberPermission = memberPermission,
+                            currentUserPermission = currentUserPermission
                         )
                     }
 
@@ -890,12 +897,13 @@ fun LazyItemScope.AnimatedMessageItem(
     isMyMessage: Boolean,
     modifier: Modifier = Modifier,
     onImageClick: (String) -> Unit = {},
-    onAvatarClick: (String, String, Int, Int) -> Unit = { _, _, _ -> },
+    onAvatarClick: (String, String, Int, Int) -> Unit = { _, _, _, _ -> },
     onAddExpression: (String) -> Unit = {},
     onQuote: (String, String) -> Unit = { _, _ -> },
     onRecall: (String) -> Unit = {},
     onEdit: (ChatMessage) -> Unit = {},
-    memberPermission: Int? = null  // 群成员权限等级
+    memberPermission: Int? = null,  // 群成员权限等级
+    currentUserPermission: Int = 0  // 当前用户权限等级
 ) {
     val context = LocalContext.current
     val content = message.content
@@ -915,9 +923,12 @@ fun LazyItemScope.AnimatedMessageItem(
         Alignment.Start
     }
     
-    // 长按菜单状态
-    var showContextMenu by remember { mutableStateOf(false) }
-    var contextMenuPosition by remember { mutableStateOf(Offset.Zero) }
+    // 长按菜单状态
+    var showContextMenu by remember { mutableStateOf(false) }
+    var contextMenuPosition by remember { mutableStateOf(Offset.Zero) }
+
+    // 用于获取消息项位置的引用
+    val messageItemCoordinates = remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
     
     // 确定消息内容类型
     val contentType = message.content.contentType ?: 1
@@ -926,62 +937,70 @@ fun LazyItemScope.AnimatedMessageItem(
     val messageText = content.text ?: ""
     val messageUrl = content.imageUrl ?: content.stickerUrl ?: content.fileUrl ?: content.videoUrl ?: content.audioUrl ?: ""
     
-    Box(
-        modifier = modifier
-            .combinedClickable(
-                onClick = { 
-                    // 单击事件：根据内容类型执行不同的操作
-                    when (contentType) {
-                        2 -> {
-                            // Markdown消息：什么都不做，内容已在界面上渲染
-                        }
-                        8 -> {
-                            // HTML消息：什么都不做，内容已在界面上渲染
-                        }
-                        else -> {
-                            // 其他类型消息：如果有URL则点击打开，否则无操作
-                            if (messageUrl.isNotEmpty()) {
-                                when {
-                                    messageUrl.endsWith(".mp3") || messageUrl.endsWith(".wav") || messageUrl.endsWith(".m4a") -> {
-                                        // 音频文件：播放音频
-                                        AudioPlayerService.start(context, messageUrl, message.sender.name)
-                                    }
-                                    messageUrl.endsWith(".mp4") || messageUrl.endsWith(".mov") || messageUrl.endsWith(".avi") -> {
-                                        // 视频文件：下载并播放视频
-                                        FileDownloadService.startDownload(  
-                                            context = context,  
-                                            fileUrl = messageUrl,  
-                                            fileName = "video_${System.currentTimeMillis()}.mp4",  
-                                            fileSize = 0L,  // 如果不知道大小可以传 0  
-                                            autoOpen = true  
-                                        )  
-                                    }
-                                    messageUrl.endsWith(".pdf") || messageUrl.endsWith(".doc") || messageUrl.endsWith(".docx") || 
-                                    messageUrl.endsWith(".xls") || messageUrl.endsWith(".xlsx") || messageUrl.endsWith(".ppt") || 
-                                    messageUrl.endsWith(".pptx") -> {
-                                        // 文档文件：下载并打开文档
-                                        FileDownloadService.startDownload(  
-                                            context = context,  
-                                            fileUrl = messageUrl,  
-                                            fileName = "file_${System.currentTimeMillis()}_${messageUrl.substringAfterLast("/")}",  
-                                            fileSize = 0L,  
-                                            autoOpen = true  
-                                        )
-                                    }
-                                    else -> {
-                                        // 图片文件：打开图片预览
-                                        onImageClick(messageUrl)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                onLongClick = { 
-                    showContextMenu = true
-                }
+    Box(
+        modifier = modifier
+            .onGloballyPositioned { coordinates ->
+                messageItemCoordinates.value = coordinates
+            }
+            .combinedClickable(
+                onClick = { 
+                    // 单击事件：根据内容类型执行不同的操作
+                    when (contentType) {
+                        2 -> {
+                            // Markdown消息：什么都不做，内容已在界面上渲染
+                        }
+                        8 -> {
+                            // HTML消息：什么都不做，内容已在界面上渲染
+                        }
+                        else -> {
+                            // 其他类型消息：如果有URL则点击打开，否则无操作
+                            if (messageUrl.isNotEmpty()) {
+                                when {
+                                    messageUrl.endsWith(".mp3") || messageUrl.endsWith(".wav") || messageUrl.endsWith(".m4a") -> {
+                                        // 音频文件：播放音频
+                                        AudioPlayerService.start(context, messageUrl, message.sender.name)
+                                    }
+                                    messageUrl.endsWith(".mp4") || messageUrl.endsWith(".mov") || messageUrl.endsWith(".avi") -> {
+                                        // 视频文件：下载并播放视频
+                                        FileDownloadService.startDownload(  
+                                            context = context,  
+                                            fileUrl = messageUrl,  
+                                            fileName = "video_${System.currentTimeMillis()}.mp4",  
+                                            fileSize = 0L,  // 如果不知道大小可以传 0  
+                                            autoOpen = true  
+                                        )  
+                                    }
+                                    messageUrl.endsWith(".pdf") || messageUrl.endsWith(".doc") || messageUrl.endsWith(".docx") || 
+                                    messageUrl.endsWith(".xls") || messageUrl.endsWith(".xlsx") || messageUrl.endsWith(".ppt") || 
+                                    messageUrl.endsWith(".pptx") -> {
+                                        // 文档文件：下载并打开文档
+                                        FileDownloadService.startDownload(  
+                                            context = context,  
+                                            fileUrl = messageUrl,  
+                                            fileName = "file_${System.currentTimeMillis()}_${messageUrl.substringAfterLast("/")}",  
+                                            fileSize = 0L,  
+                                            autoOpen = true  
+                                        )
+                                    }
+                                    else -> {
+                                        // 图片文件：打开图片预览
+                                        onImageClick(messageUrl)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                onLongClick = { 
+                    messageItemCoordinates.value?.let { coordinates ->
+                        contextMenuPosition = coordinates.positionInRoot()
+                    } ?: run {
+                        // 如果无法获取精确位置，使用默认位置
+                        contextMenuPosition = Offset(0f, 0f)
+                    }
+                    showContextMenu = true
+                }
             )
-    ) {
         // 消息容器
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1180,30 +1199,25 @@ fun LazyItemScope.AnimatedMessageItem(
                                     modifier = Modifier
                                         .size(120.dp)
                                         .clip(RoundedCornerShape(8.dp))
-                                        .combinedClickable(
-                                            onClick = {
-                                                if (isPersonalExpression) {
-                                                    // 个人表情：打开图片预览
-                                                    onImageClick(imageUrl)
-                                                } else if (isStickerPack) {
-                                                    // 表情包：跳转到表情包详情
-                                                    com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
-                                                        context = context,
-                                                        stickerPackId = stickerPackId?.toString() ?: ""
-                                                    )
-                                                } else {
-                                                    // 默认：图片预览
-                                                    onImageClick(imageUrl)
-                                                }
-                                            },
-                                            onLongClick = { 
-                                                // 获取点击位置
-                                                val density = LocalDensity.current
-                                                onGloballyPositioned { coordinates ->
-                                                    contextMenuPosition = coordinates.positionInRoot()
-                                                }
-                                                showContextMenu = true
-                                            }
+                                        .combinedClickable(
+                                            onClick = {
+                                                if (isPersonalExpression) {
+                                                    // 个人表情：打开图片预览
+                                                    onImageClick(imageUrl)
+                                                } else if (isStickerPack) {
+                                                    // 表情包：跳转到表情包详情
+                                                    com.yhchat.canary.ui.sticker.StickerPackDetailActivity.start(
+                                                        context = context,
+                                                        stickerPackId = stickerPackId?.toString() ?: ""
+                                                    )
+                                                } else {
+                                                    // 默认：图片预览
+                                                    onImageClick(imageUrl)
+                                                }
+                                            },
+                                            onLongClick = { 
+                                                showContextMenu = true
+                                            }
                                         ),
                                     contentScale = ContentScale.Fit
                                 )
@@ -1549,22 +1563,27 @@ fun MessageContextMenu(
         else -> 3  // 引用、复制、添加表情（如果包含图片）
     }
     
-    val x = if (position.x + 160.dp.toPx() > screenWidth) {
-        screenWidth - 160.dp.toPx() - 8.dp.toPx()  // 靠右但不超出屏幕
-    } else {
-        position.x
+    val density = LocalDensity.current
+    val x = with(density) {
+        if (position.x + 160.dp.toPx() > screenWidth) {
+            screenWidth - 160.dp.toPx() - 8.dp.toPx()  // 靠右但不超出屏幕
+        } else {
+            position.x
+        }
+    }
+    
+    val y = with(density) {
+        if (position.y + menuHeight.toPx() > screenHeight) {
+            position.y - menuHeight.toPx()  // 向上显示菜单
+        } else {
+            position.y
+        }
     }
     
-    val y = if (position.y + menuHeight.toPx() > screenHeight) {
-        position.y - menuHeight.toPx()  // 向上显示菜单
-    } else {
-        position.y
-    }
-    
-    Box(
-        modifier = Modifier
-            .offset { IntOffset(x.toInt(), y.toInt()) }
-            .clickable { }  // 防止点击穿透
+    Box(
+        modifier = Modifier
+            .offset { IntOffset(x.toInt(), y.toInt()) }
+            .clickable { }  // 防止点击穿透
     ) {
         Card(
             modifier = Modifier.width(menuWidth),
@@ -1815,125 +1834,9 @@ fun VideoMessageView(
     }
 }
 
-/**
- * 机器人看板内容
- */
-@Composable
-fun BotBoardContent(
-    boardData: com.yhchat.canary.data.model.BotBoardData,
-    onImageClick: (String) -> Unit
-) {
-    val context = LocalContext.current
-    
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-        // 看板标题
-        if (boardData.title.isNotBlank()) {
-            Text(
-                text = boardData.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-        
-        // 看板内容（使用Markdown渲染）
-        if (boardData.content.isNotBlank()) {
-            MarkdownText(
-                markdown = boardData.content,
-                textColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-        
-        // 看板图片
-        boardData.imageUrl?.let { imageUrl ->
-            Spacer(modifier = Modifier.height(8.dp))
-            AsyncImage(
-                model = ImageUtils.createImageRequest(
-                    context = context,
-                    url = imageUrl
-                ),
-                contentDescription = "看板图片",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable { onImageClick(imageUrl) },
-                contentScale = ContentScale.Crop
-            )
-        }
-        
-        // 如果有链接，添加链接文本
-        boardData.linkUrl?.let { linkUrl ->
-            Spacer(modifier = Modifier.height(8.dp))
-            LinkText(
-                text = linkUrl,
-                linkColor = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
-}
 
-/**
- * 群聊中的机器人看板部分
- */
-@Composable
-fun GroupBotBoardsSection(
-    groupBots: List<com.yhchat.canary.data.model.GroupBot>,
-    groupBotBoards: Map<String, com.yhchat.canary.data.model.BotBoard>,
-    onImageClick: (String) -> Unit
-) {
-    groupBots.forEach { bot ->
-        val board = groupBotBoards[bot.botId]
-        if (board != null && board.boardCount > 0) {
-            val boardData = board.getBoardList().firstOrNull()
-            if (boardData != null && boardData.content.isNotBlank()) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "机器人看板",
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "${bot.name} 看板",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        // 看板内容
-                        BotBoardContent(
-                            boardData = boardData,
-                            onImageClick = onImageClick
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
+
+
 
 @Composable  
 fun MenuButtons(  
@@ -1978,9 +1881,99 @@ fun MenuButton(
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/**
+ * 机器人看板内容
+ */
+@Composable
+fun BotBoardContent(
+    boardData: Bot.board.Board_data,
+    onImageClick: (String) -> Unit
+) {
+    val context = LocalContext.current
+    
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        // 看板标题
+        if (boardData.bot_name.isNotBlank()) {
+            Text(
+                text = boardData.bot_name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        
+        // 看板内容（使用Markdown渲染）
+        if (boardData.content.isNotBlank()) {
+            MarkdownText(
+                markdown = boardData.content,
+                textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+/**
+ * 群聊中的机器人看板部分
+ */
+@Composable
+fun GroupBotBoardsSection(
+    groupBots: List<Bot_data>,
+    groupBotBoards: Map<String, Bot.board.Board_data>,
+    onImageClick: (String) -> Unit
+) {
+    groupBots.forEach { bot ->
+        val board = groupBotBoards[bot.botId]
+        if (board != null && board.content.isNotBlank()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "机器人看板",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "${bot.name} 看板",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // 看板内容
+                        BotBoardContent(
+                            boardData = board,
+                            onImageClick = onImageClick
+                        )
+                    }
+                }
+        }
+    }
 }
