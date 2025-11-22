@@ -1,5 +1,8 @@
 package com.yhchat.canary.ui.login
 
+import android.content.Context
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -142,10 +145,17 @@ fun LoginScreen(
                     modifier = Modifier.fillMaxWidth(),
                     containerColor = Color.Transparent,
                     indicator = { tabPositions ->
-                        TabRowDefaults.Indicator(
-                            modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                            color = MaterialTheme.colorScheme.primary,
-                            height = 3.dp
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .wrapContentSize(Alignment.BottomStart)
+                                .offset(x = tabPositions[selectedTab].left, y = 0.dp)
+                                .width(tabPositions[selectedTab].width)
+                                .height(3.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = RoundedCornerShape(2.dp)
+                                )
                         )
                     }
                 ) {

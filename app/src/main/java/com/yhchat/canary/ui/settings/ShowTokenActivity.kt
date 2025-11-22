@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.yhchat.canary.ui.theme.YhchatCanaryTheme
@@ -55,13 +56,26 @@ fun ShowTokenScreen(
     onBackClick: () -> Unit
 ) {
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+    var showToast by remember { mutableStateOf(false) }
+    
+    // 处理 Toast 显示
+    if (showToast) {
+        LaunchedEffect(showToast) {
+            Toast.makeText(
+                context,
+                "Token已复制到剪贴板",
+                Toast.LENGTH_SHORT
+            ).show()
+            showToast = false
+        }
+    }
     
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // 顶部应用栏
         TopAppBar(
             title = { Text("用户Token") },
             navigationIcon = {
@@ -78,7 +92,6 @@ fun ShowTokenScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 说明文字
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -91,7 +104,6 @@ fun ShowTokenScreen(
                 )
             }
             
-            // Token显示区域
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -110,7 +122,7 @@ fun ShowTokenScreen(
                     
                     OutlinedTextField(
                         value = token,
-                        onValueChange = { /* 不允许编辑 */ },
+                        onValueChange = { },
                         label = { Text("用户Token") },
                         modifier = Modifier.fillMaxWidth(),
                         readOnly = true,
@@ -120,23 +132,16 @@ fun ShowTokenScreen(
                 }
             }
             
-            // 复制按钮
             Button(
                 onClick = {
                     clipboardManager.setText(AnnotatedString(token))
-                    val localContext = androidx.compose.ui.platform.LocalContext.current
-                    Toast.makeText(
-                        localContext,
-                        "Token已复制到剪贴板",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    showToast = true
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("复制Token")
             }
             
-            // 警告说明
             Text(
                 text = "此Token用于API访问和第三方工具登录，与登录密码不同。请仅在必要时使用。",
                 style = MaterialTheme.typography.bodySmall,
