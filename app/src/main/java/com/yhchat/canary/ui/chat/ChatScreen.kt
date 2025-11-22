@@ -76,6 +76,7 @@ import com.yhchat.canary.ui.components.LinkText
 import com.yhchat.canary.ui.components.LinkDetector
 import com.yhchat.canary.ui.components.BotBoardContent
 import com.yhchat.canary.ui.components.GroupBotBoardsSection
+import com.yhchat.canary.proto.group.Bot_data
 
 import com.yhchat.canary.data.model.ChatMessage
 import com.yhchat.canary.data.model.MessageContent
@@ -459,15 +460,17 @@ fun ChatScreen(
                     exit = shrinkVertically() + fadeOut()
                 ) {
                     uiState.botBoard?.let { board ->
-                        val boardContent = board
-                        if (boardContent != null && boardContent.content.isNotBlank()) {
-                            BotBoardContent(
-                                boardContent = boardContent,
-                                onImageClick = { url ->
-                                    currentImageUrl = url
-                                    showImageViewer = true
-                                }
-                            )
+                        if (board.boardCount > 0) {
+                            val boardContent = board.getBoard(0)
+                            if (boardContent != null && boardContent.content.isNotBlank()) {
+                                BotBoardContent(
+                                    boardContent = boardContent,
+                                    onImageClick = { url ->
+                                        currentImageUrl = url
+                                        showImageViewer = true
+                                    }
+                                )
+                            }
                         }
                     }
                 }

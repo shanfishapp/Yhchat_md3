@@ -12,7 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import yh_bot.Bot
-import com.yhchat.canary.data.model.Bot_data
+import com.yhchat.canary.proto.group.Bot_data
 
 /**
  * 机器人看板内容组件
@@ -110,7 +110,7 @@ fun GroupBotBoardsSection(
                             
                             // 看板内容
                             BotBoardContent(
-                                boardData = boardContent,
+                                boardContent = boardContent,
                                 onImageClick = onImageClick
                             )
                         }
