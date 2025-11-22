@@ -20,9 +20,12 @@
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     
-    <!-- 通知权限 -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
+    <!-- 通知权限 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    
+    <!-- 相机权限用于二维码扫描 -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
     <application
         android:name=".CanaryApplication"
         android:allowBackup="true"
@@ -405,13 +408,19 @@
             android:label="机器人商店"
             android:theme="@style/Theme.YhchatCanary" />
             
-        <activity
-            android:name=".ui.discover.BotDetailActivity"
-            android:exported="false"
-            android:label="机器人详情"
-            android:theme="@style/Theme.YhchatCanary" />
-
-            
+        <activity
+            android:name=".ui.discover.BotDetailActivity"
+            android:exported="false"
+            android:label="机器人详情"
+            android:theme="@style/Theme.YhchatCanary" />
+
+        <!-- 二维码扫描 Activity -->
+        <activity
+            android:name=".ui.qrcode.QRCodeScannerActivity"
+            android:exported="false"
+            android:label="扫描二维码"
+            android:theme="@style/Theme.YhchatCanary" />
+            
         <!-- 语音播放服务 -->
         <service
             android:name=".service.AudioPlayerService"

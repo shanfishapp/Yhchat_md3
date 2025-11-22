@@ -415,8 +415,8 @@ fun ConversationScreen(
                 },
                 onScan = {
                     showAddMenuBottomSheet = false
-                    // TODO: 扫一扫功能
-                    android.widget.Toast.makeText(context, "扫一扫功能待实现", android.widget.Toast.LENGTH_SHORT).show()
+                    val intent = Intent(context, com.yhchat.canary.ui.qrcode.QRCodeScannerActivity::class.java)
+                    context.startActivity(intent)
                 },
                 onSendFile = {
                     showAddMenuBottomSheet = false
