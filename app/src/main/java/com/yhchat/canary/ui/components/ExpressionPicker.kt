@@ -240,11 +240,11 @@ fun ExpressionPicker(
                         }
                     } else {
                         LazyVerticalGrid(
-                            columns = GridCells.Fixed(4),
+                            columns = GridCells.Fixed(10), // 修改为一行显示10个表情
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp), // 减小间距
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             items(uiState.localExpressions) { localExpression ->
                                 // 从 assets/emojis/ 目录加载图片
@@ -266,7 +266,7 @@ fun ExpressionPicker(
                                         bitmap = bitmap.asImageBitmap(),
                                         contentDescription = localExpression.name,
                                         modifier = Modifier
-                                            .size(80.dp)
+                                            .size(40.dp) // 减小表情大小
                                             .clickable {
                                                 // 传递格式化的表情名称，只使用文件名（不含扩展名）
                                                 val fileNameWithoutExtension = localExpression.name.substringBeforeLast(".")
@@ -279,7 +279,7 @@ fun ExpressionPicker(
                                     // 加载失败时显示占位符
                                     Box(
                                         modifier = Modifier
-                                            .size(80.dp)
+                                            .size(40.dp) // 减小占位符大小
                                             .background(Color.LightGray),
                                         contentAlignment = Alignment.Center
                                     ) {
