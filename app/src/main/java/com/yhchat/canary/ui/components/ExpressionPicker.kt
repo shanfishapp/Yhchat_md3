@@ -271,7 +271,7 @@ fun ExpressionPicker(
                                                 // 传递格式化的表情名称，只使用文件名（不含扩展名）
                                                 val fileNameWithoutExtension = localExpression.name.substringBeforeLast(".")
                                                 onLocalExpressionClick("[.$fileNameWithoutExtension]")
-                                                onDismiss()
+                                                // 点击表情时不自动关闭表情选择器
                                             },
                                         contentScale = ContentScale.Fit
                                     )

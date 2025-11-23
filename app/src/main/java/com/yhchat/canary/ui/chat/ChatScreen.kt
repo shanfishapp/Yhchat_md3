@@ -830,6 +830,12 @@ fun ChatScreen(
                 onLocalExpressionClick = { expressionText ->
                     // 将表情文本添加到输入框末尾
                     inputText = inputText + expressionText
+                    // 自动聚焦输入框并显示键盘
+                    coroutineScope.launch {
+                        inputFocusRequester.requestFocus()
+                        // 触发键盘显示
+                        shouldShowKeyboard = true
+                    }
                 },
                 onInstructionClick = { instruction ->
                     android.util.Log.d("ChatScreen", "🎯 用户点击指令: /${instruction.name} (id=${instruction.id}, type=${instruction.type})")

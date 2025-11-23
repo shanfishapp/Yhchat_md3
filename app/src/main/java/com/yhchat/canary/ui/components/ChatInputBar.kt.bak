@@ -315,7 +315,7 @@ fun ChatInputBar(
                 },
                 onLocalExpressionClick = { expressionText ->
                     onLocalExpressionClick?.invoke(expressionText)
-                    keyboardController?.show()
+                    showExpressionPicker = false
                 },
                 onDismiss = { showExpressionPicker = false }
             )
