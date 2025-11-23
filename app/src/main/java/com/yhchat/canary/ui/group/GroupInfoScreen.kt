@@ -270,7 +270,7 @@ fun GroupInfoScreenRoot(
     // 编辑群昵称对话框
     if (showEditNicknameDialog) {
         EditGroupNicknameDialog(
-            currentNickname = uiState.groupInfo?.let { it.name } ?: "", // 默认使用群名作为当前昵称
+            currentNickname = "", // 如果没有设置群昵称则显示为空
             onConfirm = { newNickname ->
                 viewModel.editMyGroupNickname(groupId, newNickname)
                 showEditNicknameDialog = false
@@ -746,7 +746,6 @@ fun ExitGroupDialog(
             }
         }
     )
-}}
 
 /**
  * 编辑群昵称对话框
@@ -818,3 +817,4 @@ fun EditGroupNicknameDialog(
 }
 
 
+}

@@ -1,6 +1,7 @@
 package com.yhchat.canary.data.repository
 
 import android.util.Log
+import com.google.gson.Gson
 import com.google.protobuf.InvalidProtocolBufferException
 import com.yhchat.canary.data.model.GroupDetail
 import com.yhchat.canary.data.model.GroupMemberInfo
@@ -13,6 +14,7 @@ import com.yhchat.canary.proto.group.edit_group_send
 import com.yhchat.canary.proto.group.bot_list_send
 import com.yhchat.canary.proto.group.bot_list
 import com.yhchat.canary.proto.group.Bot_data
+import com.yhchat.canary.data.model.EditMyGroupNicknameRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
