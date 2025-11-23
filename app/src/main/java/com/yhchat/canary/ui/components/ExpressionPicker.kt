@@ -409,14 +409,18 @@ class ExpressionPickerViewModel : ViewModel() {
         val localExpressions = mutableListOf<LocalExpression>()
         try {
             // 从assets目录获取所有表情文件名
-            val emojiFileNames = context.assets.list("emojis") ?: emptyArray()
-            
-            // 添加所有表情文件
-            emojiFileNames.forEach { fileName ->
-                localExpressions.add(LocalExpression(fileName, fileName))
+            val emojiFileNames = context.assets.list("emojis") 
+            if (emojiFileNames != null && emojiFileNames.isNotEmpty()) {
+                // 添加所有表情文件
+                emojiFileNames.forEach { fileName ->
+                    localExpressions.add(LocalExpression(fileName, fileName))
+                }
+                android.util.Log.d("ExpressionPicker", "成功加载 ${emojiFileNames.size} 个表情文件")
+            } else {
+                android.util.Log.w("ExpressionPicker", "assets/emojis 目录为空或不存在")
             }
         } catch (e: Exception) {
-            android.util.Log.e("ExpressionPicker", "加载本地表情失败: ${e.message}")
+            android.util.Log.e("ExpressionPicker", "加载本地表情失败: ${e.message}", e)
         }
         
         _uiState.value = _uiState.value.copy(
