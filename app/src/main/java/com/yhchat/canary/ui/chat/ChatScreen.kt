@@ -461,10 +461,10 @@ fun ChatScreen(
                 ) {
                     uiState.botBoard?.let { board ->
                         if (board.boardCount > 0) {
-                            val boardContent = board.getBoard(0)
-                            if (boardContent != null && boardContent.content.isNotBlank()) {
+                            val boardData = board.getBoardList().firstOrNull()
+                            if (boardData != null && boardData.content.isNotBlank()) {
                                 BotBoardContent(
-                                    boardContent = boardContent,
+                                    boardContent = boardData,
                                     onImageClick = { url ->
                                         currentImageUrl = url
                                         showImageViewer = true
