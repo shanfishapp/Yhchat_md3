@@ -405,21 +405,15 @@ class ExpressionPickerViewModel : ViewModel() {
     }
     
     fun loadLocalExpressions(context: Context) {
-        // 加载 res/emojis 目录下的表情
+        // 加载 assets/emojis 目录下的表情
         val localExpressions = mutableListOf<LocalExpression>()
         try {
-            // 确定表情资源的文件名列表（直接列出已知的资源文件名）
-            val emojiFileNames = listOf("1f345", "1f346", "1f347", "1f349", "1f34a", "1f34b", "1f34c", "1f34d", "1f34e", "1f34f", "1f350", "1f351", "1f352", "1f353", "1f354", "1f355", "1f35a", "1f35c", "1f36d", "1f378", "1f37b", "1f37c", "1f37f", "1f381", "1f382", "1f389", "1f40c", "1f420", "1f422", "1f423", "1f424", "1f425", "1f431", "1f437", "1f438", "1f439", "1f43a", "1f43b", "1f43b-200d-2744-fe0f", "1f43c", "1f44a", "1f44c", "1f44d", "1f44f", "1f602", "1f605", "1f60a", "1f60b", "1f60c", "1f60d", "1f60e", "1f60f", "1f611", "1f618", "1f61a", "1f61b", "1f61c", "1f61d", "1f61e", "1f61f", "1f620", "1f625", "1f62a", "1f62b", "1f62c", "1f62d", "1f62e", "1f62e-200d-1f4a8", "1f62f", "1f63a", "1f63b", "1f63c", "1f63d", "1f63e", "1f63f", "1f644", "1f64b-200d-2640-fe0f", "1f64b-200d-2642-fe0f", "1f64f", "1f913", "1f914", "1f91d", "1f923", "1f925", "1f926-200d-2640-fe0f", "1f926-200d-2642-fe0f", "1f927", "1f928", "1f929", "1f92a", "1f92b", "1f92c", "1f92d", "1f92e", "1f937-200d-2640-fe0f", "1f937-200d-2642-fe0f", "1f970", "1f973", "1f97a", "1f996", "1fae0", "1fae2", "1fae3", "1fae4", "1faf0", "270c", "27a1", "2b05", "2b06", "2b07", "31-20e3", "32-20e3", "33-20e3", "34-20e3", "35-20e3", "36-20e3", "37-20e3", "38-20e3", "39-20e3", "eeee", "tuosai")
-            val pngFileNames = listOf("eeee", "tuosai")
+            // 从assets目录获取所有表情文件名
+            val emojiFileNames = context.assets.list("emojis") ?: emptyArray()
             
-            // 添加SVG格式的表情
-            emojiFileNames.filter { !pngFileNames.contains(it) }.forEach { fileName ->
-                localExpressions.add(LocalExpression("${fileName}.svg", fileName))
-            }
-            
-            // 添加PNG格式的表情
-            pngFileNames.forEach { fileName ->
-                localExpressions.add(LocalExpression("${fileName}.png", fileName))
+            // 添加所有表情文件
+            emojiFileNames.forEach { fileName ->
+                localExpressions.add(LocalExpression(fileName, fileName))
             }
         } catch (e: Exception) {
             android.util.Log.e("ExpressionPicker", "加载本地表情失败: ${e.message}")

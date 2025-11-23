@@ -85,18 +85,21 @@ fun EmojiText(
                     )
                 }
                 is RenderPart.Emoji -> {
-                    val resourceId = context.resources.getIdentifier(
-                        part.name, // 表情文件名（不含扩展名）
-                        "drawable",
-                        context.packageName
-                    )
+                    // 尝试从 assets/emojis 目录加载表情
+                    // 首先尝试直接使用表情名作为文件名
+                    val assetPath = "emojis/${part.name}.png"
+                    val assetExists = try {
+                        context.assets.list("emojis")?.contains("${part.name}.png") == true
+                    } catch (e: Exception) {
+                        false
+                    }
                     
-                    if (resourceId != 0) {
-                        // 如果找到了对应的资源，则显示图片
+                    if (assetExists) {
+                        // 使用 Coil 加载 assets 目录中的图片
                         Image(
                             painter = rememberAsyncImagePainter(
                                 model = ImageRequest.Builder(context)
-                                    .data(resourceId)
+                                    .data("file:///android_asset/emojis/${part.name}.png")
                                     .build()
                             ),
                             contentDescription = "[${part.name}]",
@@ -104,14 +107,40 @@ fun EmojiText(
                                 .size(24.dp) // 设置表情大小，可根据需要调整
                         )
                     } else {
-                        // 如果找不到对应资源，则显示原始格式文本
-                        Text(
-                            text = "[.${part.name}]",
-                            style = style,
-                            color = color,
-                            maxLines = maxLines,
-                            overflow = overflow
-                        )
+                        // 尝试不带扩展名的其他格式（如中文名表情）
+                        val allEmojiFiles = try {
+                            context.assets.list("emojis") ?: emptyArray()
+                        } catch (e: Exception) {
+                            emptyArray()
+                        }
+                        
+                        // 检查是否匹配任何表情文件（包括中文名）
+                        val matchingFile = allEmojiFiles.find { 
+                            val fileNameWithoutExt = it.substringBeforeLast(".")
+                            fileNameWithoutExt == part.name
+                        }
+                        
+                        if (matchingFile != null) {
+                            Image(
+                                painter = rememberAsyncImagePainter(
+                                    model = ImageRequest.Builder(context)
+                                        .data("file:///android_asset/emojis/$matchingFile")
+                                        .build()
+                                ),
+                                contentDescription = "[${part.name}]",
+                                modifier = Modifier
+                                    .size(24.dp) // 设置表情大小，可根据需要调整
+                            )
+                        } else {
+                            // 如果找不到对应资源，则显示原始格式文本
+                            Text(
+                                text = "[.${part.name}]",
+                                style = style,
+                                color = color,
+                                maxLines = maxLines,
+                                overflow = overflow
+                            )
+                        }
                     }
                 }
             }
