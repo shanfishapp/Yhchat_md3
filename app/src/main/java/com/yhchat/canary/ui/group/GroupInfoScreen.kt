@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +59,7 @@ fun GroupInfoScreenRoot(
     var showReportDialog by remember { mutableStateOf(false) }
     var showInviteDialog by remember { mutableStateOf(false) }
     var showExitGroupDialog by remember { mutableStateOf(false) }
+    var showEditNicknameDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(groupId) {
         viewModel.loadGroupInfo(groupId)
@@ -93,11 +95,35 @@ fun GroupInfoScreenRoot(
                             }
                         },
                         actions = {
-                            IconButton(onClick = onSettingsClick) {
-                                Icon(
-                                    imageVector = Icons.Default.Settings,
-                                    contentDescription = "群聊设置"
-                                )
+                            // 添加三个点菜单
+                            var showMenu by remember { mutableStateOf(false) }
+                            Box {
+                                IconButton(onClick = { showMenu = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.MoreVert,
+                                        contentDescription = "更多选项"
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = showMenu,
+                                    onDismissRequest = { showMenu = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("编辑我的群昵称") },
+                                        onClick = {
+                                            showMenu = false
+                                            showEditNicknameDialog = true
+                                        }
+                                    )
+                                    Divider()
+                                    DropdownMenuItem(
+                                        text = { Text("群聊设置") },
+                                        onClick = {
+                                            showMenu = false
+                                            onSettingsClick()
+                                        }
+                                    )
+                                }
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
@@ -156,6 +182,7 @@ fun GroupInfoScreenRoot(
                             onSearchChatClick = onSearchChatClick,
                             onInviteClick = { showInviteDialog = true },
                             onExitClick = { showExitGroupDialog = true },
+                            onEditNicknameClick = { showEditNicknameDialog = true },
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -239,6 +266,18 @@ fun GroupInfoScreenRoot(
             onDismiss = { showExitGroupDialog = false }
         )
     }
+    
+    // 编辑群昵称对话框
+    if (showEditNicknameDialog) {
+        EditGroupNicknameDialog(
+            currentNickname = uiState.groupInfo?.let { it.name } ?: "", // 默认使用群名作为当前昵称
+            onConfirm = { newNickname ->
+                viewModel.editMyGroupNickname(groupId, newNickname)
+                showEditNicknameDialog = false
+            },
+            onDismiss = { showEditNicknameDialog = false }
+        )
+    }
 }
 
 @Composable
@@ -261,6 +300,7 @@ private fun GroupInfoContent(
     onSearchChatClick: () -> Unit = {},
     onInviteClick: () -> Unit = {},
     onExitClick: () -> Unit = {},
+    onEditNicknameClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -497,6 +537,13 @@ private fun GroupInfoContent(
                         }
                     )
                     
+                    // 编辑我的群昵称
+                    FunctionMenuItem(
+                        icon = Icons.Default.Edit,
+                        text = "编辑我的群昵称",
+                        onClick = onEditNicknameClick
+                    )
+                    
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     
                     // 退出群聊 (危险操作)
@@ -695,6 +742,75 @@ fun ExitGroupDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}}
+
+/**
+ * 编辑群昵称对话框
+ */
+@Composable
+fun EditGroupNicknameDialog(
+    currentNickname: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+    isLoading: Boolean = false
+) {
+    var nickname by remember { mutableStateOf(currentNickname) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "编辑群昵称",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "设置您在群聊中的昵称",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = nickname,
+                    onValueChange = { nickname = it },
+                    label = { Text("群昵称") },
+                    placeholder = { Text("请输入群昵称") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isLoading,
+                    maxLines = 1,
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(nickname) },
+                enabled = !isLoading && nickname.isNotBlank()
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("设置中...")
+                } else {
+                    Text("确定")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isLoading
+            ) {
                 Text("取消")
             }
         }

@@ -22,6 +22,8 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import com.google.gson.Gson
+import okhttp3.RequestBody
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -847,6 +849,62 @@ class GroupRepository @Inject constructor(
             Result.failure(e)
         }
     }
+    
+    /**
+     * 编辑我的群昵称
+     * POST /v1/group/edit-my-group-nickname
+     */
+    suspend fun editMyGroupNickname(
+        groupId: String,
+        nickname: String
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        Log.d(tag, "✏️ Editing my group nickname for group: $groupId, nickname: $nickname")
+        val token = tokenRepository?.getTokenSync()
+        if (token.isNullOrEmpty()) {
+            Log.e(tag, "❌ No token available")
+            return@withContext Result.failure(Exception("未登录"))
+        }
+
+        return@withContext try {
+            val request = EditMyGroupNicknameRequest(
+                groupId = groupId,
+                botId = nickname
+            )
+            
+            val requestBody = request.toJsonRequestBody()
+            
+            val requestObj = Request.Builder()
+                .url("$baseUrl/v1/group/edit-my-group-nickname")
+                .addHeader("token", token)
+                .post(requestBody)
+                .build()
+
+            Log.d(tag, "📤 Sending edit my group nickname request...")
+            val response = client.newCall(requestObj).execute()
+
+            if (response.isSuccessful) {
+                val responseText = response.body?.string()
+                Log.d(tag, "✅ My group nickname edited successfully: $responseText")
+                Result.success(true)
+            } else {
+                Log.e(tag, "❌ HTTP error: ${response.code}")
+                Result.failure(Exception("设置群昵称失败: ${response.code}"))
+            }
+        } catch (e: IOException) {
+            Log.e(tag, "Network error", e)
+            Result.failure(e)
+        } catch (e: Exception) {
+            Log.e(tag, "Unknown error", e)
+            Result.failure(e)
+        }
+    }
+}
+
+// 扩展函数用于将对象转换为JSON请求体
+fun Any.toJsonRequestBody(): okhttp3.RequestBody {
+    val gson = com.google.gson.Gson()
+    val json = gson.toJson(this)
+    return json.toRequestBody("application/json".toMediaTypeOrNull())
 }
 
 

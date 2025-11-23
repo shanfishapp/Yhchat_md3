@@ -349,5 +349,29 @@ class GroupInfoViewModel @Inject constructor(
             )
         }
     }
+    
+    /**
+     * 编辑我的群昵称
+     */
+    fun editMyGroupNickname(groupId: String, nickname: String) {
+        viewModelScope.launch {
+            Log.d(tag, "Editing my group nickname: $nickname")
+            
+            groupRepository.editMyGroupNickname(groupId, nickname).fold(
+                onSuccess = {
+                    Log.d(tag, "✅ My group nickname edited successfully")
+                    _uiState.value = _uiState.value.copy(
+                        successMessage = "群昵称设置成功"
+                    )
+                },
+                onFailure = { error ->
+                    Log.e(tag, "❌ Failed to edit my group nickname", error)
+                    _uiState.value = _uiState.value.copy(
+                        error = error.message ?: "设置群昵称失败"
+                    )
+                }
+            )
+        }
+    }
 }
 

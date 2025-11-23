@@ -762,6 +762,16 @@ interface ApiService {
     ): Response<okhttp3.ResponseBody>
     
     /**
+     * 设置我的群昵称
+     * POST /v1/group/edit-my-group-nickname
+     */
+    @POST("v1/group/edit-my-group-nickname")
+    suspend fun editMyGroupNickname(
+        @Header("token") token: String,
+        @Body request: EditMyGroupNicknameRequest
+    ): Response<com.yhchat.canary.data.model.ApiStatus>
+    
+    /**
      * 获取发现群聊分区列表
      */
     @POST("v1/user/recommend-category-list")
