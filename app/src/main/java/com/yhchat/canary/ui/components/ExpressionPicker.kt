@@ -206,30 +206,45 @@ fun ExpressionPicker(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(uiState.localExpressions) { localExpression ->
-                                val resourceId = context.resources.getIdentifier(
-                                    localExpression.name.split(".")[0], // 获取文件名（不含扩展名）
-                                    "drawable",
-                                    context.packageName
-                                )
+                                // 从 assets/emojis/ 目录加载图片
+                                val assetPath = "emojis/${localExpression.name}"
                                 
-                                // 根据文件扩展名判断是否为SVG格式
-                                val isSvg = localExpression.name.lowercase().endsWith(".svg")
-                                
-                                AsyncImage(
-                                    model = ImageRequest.Builder(context)
-                                        .data(resourceId)
-                                        .crossfade(true)
-                                        .build(),
-                                    contentDescription = localExpression.name,
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .clickable {
-                                            onLocalExpressionClick("[.${localExpression.name.split(".")[0]}]")  // 传递格式化的表情名称
-                                            onDismiss()
-                                        },
-                                    contentScale = ContentScale.Fit,
-                                    imageLoader = ImageUtils.createImageLoader(context)
-                                )
+                                // 使用 remember 来管理 Bitmap，避免重复加载
+                                val bitmap = remember(localExpression.name) {
+                                    try {
+                                        val inputStream = context.assets.open(assetPath)
+                                        BitmapFactory.decodeStream(inputStream)
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                        null
+                                    }
+                                }
+
+                                if (bitmap != null) {
+                                    Image(
+                                        bitmap = bitmap.asImageBitmap(),
+                                        contentDescription = localExpression.name,
+                                        modifier = Modifier
+                                            .size(80.dp)
+                                            .clickable {
+                                                // 传递格式化的表情名称，只使用文件名（不含扩展名）
+                                                val fileNameWithoutExtension = localExpression.name.substringBeforeLast(".")
+                                                onLocalExpressionClick("[.$fileNameWithoutExtension]")
+                                                onDismiss()
+                                            },
+                                        contentScale = ContentScale.Fit
+                                    )
+                                } else {
+                                    // 加载失败时显示占位符
+                                    Box(
+                                        modifier = Modifier
+                                            .size(80.dp)
+                                            .background(Color.LightGray),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("加载失败")
+                                    }
+                                }
                             }
                         }
                     }
