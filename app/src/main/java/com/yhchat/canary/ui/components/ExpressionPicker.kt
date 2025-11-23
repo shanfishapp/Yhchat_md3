@@ -222,7 +222,7 @@ fun ExpressionPicker(
                                         .build(),
                                     contentDescription = localExpression.name,
                                     modifier = Modifier
-                                        .size(80.dp)
+                                        .size(20.dp)
                                         .clickable {
                                             onLocalExpressionClick("[.${localExpression.name.split(".")[0]}]")  // 传递格式化的表情名称
                                             onDismiss()
