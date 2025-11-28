@@ -504,6 +504,13 @@ private fun GroupInfoContent(
                         onClick = onInviteClick
                     )
                     
+                    // 修改群昵称
+                    FunctionMenuItem(
+                        icon = Icons.Default.Edit,
+                        text = "修改群昵称",
+                        onClick = onEditNicknameClick
+                    )
+                    
                     // 群聊设置
                     FunctionMenuItem(
                         icon = Icons.Default.Settings,
