@@ -140,6 +140,22 @@ fun ChatScreen(
         0
     }
     var inputText by remember { mutableStateOf("") }
+    
+    // 艾特的用户ID列表，用于发送消息时
+    var mentionedUsers by remember { mutableStateOf<Map<String, String>>(emptyMap()) } // Map<userId, userName>
+    
+    // 艾特用户回调
+    val mentionUser = { userId: String, userName: String ->
+        // 将@用户名添加到输入框
+        val mentionText = "@$userName "
+        inputText = inputText + mentionText
+        // 记录提及的用户
+        mentionedUsers = mentionedUsers + (userId to userName)
+        // 自动聚焦输入框并显示键盘
+        coroutineScope.launch {
+            inputFocusRequester.requestFocus()
+        }
+    }
     var selectedMessageType by remember { mutableStateOf(1) } // 1-文本, 3-Markdown, 8-HTML
     var selectedInstruction by remember { mutableStateOf<com.yhchat.canary.data.model.Instruction?>(null) } // 选中的指令
     val listState = rememberLazyListState()
@@ -758,15 +774,21 @@ fun ChatScreen(
                             android.util.Log.d("ChatScreen", "📤 发送普通消息: $messageText")
                         }
                         
+                        // 提取提及的用户ID列表
+                        val mentionedIds = mentionedUsers.keys.toList()
+                        
                         // 根据选择的消息类型发送消息，带上引用信息和指令ID
                         viewModel.sendMessage(
                             text = messageText,
                             contentType = selectedMessageType,
                             quoteMsgId = quotedMessageId,
                             quoteMsgText = quotedMessageText,
-                            commandId = selectedInstruction?.id  // 传递指令ID
+                            commandId = selectedInstruction?.id,  // 传递指令ID
+                            mentionedIds = mentionedIds
                         )
                         inputText = ""
+                        // 重置提及用户列表
+                        mentionedUsers = emptyMap()
                         // 发送后重置为文本类型
                         selectedMessageType = 1
                         // 清除引用状态
@@ -858,15 +880,21 @@ fun ChatScreen(
                             val textToSend = "/${instruction.name}"
                             android.util.Log.d("ChatScreen", "📤 直发指令发送文本: '$textToSend'")
                             
+                            // 提取提及的用户ID列表
+                            val mentionedIds = mentionedUsers.keys.toList()
+                            
                             // 立即发送消息
                             viewModel.sendMessage(
                                 text = textToSend,
                                 contentType = selectedMessageType,
                                 quoteMsgId = quotedMessageId,
                                 quoteMsgText = quotedMessageText,
-                                commandId = instruction.id
+                                commandId = instruction.id,
+                                mentionedIds = mentionedIds
                             )
                             inputText = ""
+                            // 重置提及用户列表
+                            mentionedUsers = emptyMap()
                             selectedInstruction = null
                             quotedMessageId = null
                             quotedMessageText = null
@@ -1009,9 +1037,20 @@ private fun MessageItem(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .clickable {
-                        onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType)
-                    },
+                    .combinedClickable(
+                        onClick = {
+                            onAvatarClick(message.sender.chatId, message.sender.name, message.sender.chatType)
+                        },
+                        onLongClick = {
+                            // 长按头像艾特用户
+                            val context = LocalContext.current
+                            
+                            // 调用艾特用户函数
+                            mentionUser(message.sender.chatId, message.sender.name)
+                            
+                            Toast.makeText(context, "已添加@${message.sender.name}到输入框", Toast.LENGTH_SHORT).show()
+                        }
+                    ),
                 contentScale = ContentScale.Crop
             )
             

@@ -869,8 +869,8 @@ class ChatViewModel @Inject constructor(
     /**
      * 发送文本消息
      */
-    fun sendTextMessage(text: String, quoteMsgId: String? = null) {
-        sendMessage(text, 1, quoteMsgId)
+    fun sendTextMessage(text: String, quoteMsgId: String? = null, mentionedIds: List<String> = emptyList()) {
+        sendMessage(text, 1, quoteMsgId, mentionedIds = mentionedIds)
     }
     
     /**
@@ -880,13 +880,15 @@ class ChatViewModel @Inject constructor(
      * @param quoteMsgId 引用消息ID
      * @param quoteMsgText 引用消息文本
      * @param commandId 指令ID
+     * @param mentionedIds 被提及的用户ID列表
      */
     fun sendMessage(
         text: String, 
         contentType: Int = 1, 
         quoteMsgId: String? = null,
         quoteMsgText: String? = null,
-        commandId: Long? = null
+        commandId: Long? = null,
+        mentionedIds: List<String> = emptyList()
     ) {
         // 如果是指令消息，允许空文本；否则检查文本是否为空
         if (currentChatId.isEmpty()) {
@@ -905,7 +907,7 @@ class ChatViewModel @Inject constructor(
                     8 -> "HTML"
                     else -> "文本"
                 }
-                Log.d(tag, "Sending $typeText message: $text${if (!quoteMsgId.isNullOrEmpty()) " (引用消息)" else ""}")
+                Log.d(tag, "Sending $typeText message: $text${if (!quoteMsgId.isNullOrEmpty()) " (引用消息)" else ""}, mentioned: $mentionedIds")
                 
                 val result = messageRepository.sendMessage(
                     chatId = currentChatId,
@@ -914,7 +916,8 @@ class ChatViewModel @Inject constructor(
                     contentType = contentType,
                     quoteMsgId = quoteMsgId,
                     quoteMsgText = quoteMsgText,
-                    commandId = commandId
+                    commandId = commandId,
+                    mentionedIds = mentionedIds
                 )
 
                 result.fold(
@@ -1434,6 +1437,15 @@ class ChatViewModel @Inject constructor(
                 Log.e(tag, "Failed to report button click", e)
             }
         }
+    }
+    
+    /**
+     * 提及用户 - 将@用户名添加到输入框
+     * @param userId 用户ID
+     * @param userName 用户名
+     */
+    fun mentionUser(userId: String, userName: String) {
+        Log.d(tag, "提及用户: $userName ($userId)")
     }
     
     /**

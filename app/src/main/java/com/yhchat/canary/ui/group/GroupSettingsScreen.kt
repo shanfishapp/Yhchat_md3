@@ -10,6 +10,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.NavigateNext
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -435,10 +436,83 @@ private fun GroupSettingsContent(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     SettingTextItem("成员数量", "${groupInfo.memberCount} 人")
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    SettingTextItem("创建者", groupInfo.createBy)
-                    if (groupInfo.communityName.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                // 跳转到创建者用户资料页面
+                                com.yhchat.canary.ui.profile.UserProfileActivity.start(
+                                    context,
+                                    groupInfo.createBy,
+                                    "创建者"
+                                )
+                            }
+                            .padding(vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "创建者",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = groupInfo.createBy,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Icon(
+                                imageVector = Icons.Default.NavigateNext,
+                                contentDescription = "查看",
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    if (groupInfo.communityName.isNotEmpty() && groupInfo.communityId > 0) {
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                        SettingTextItem("所属社区", groupInfo.communityName)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    // 跳转到所属社区页面
+                                    val intent = android.content.Intent(context, com.yhchat.canary.ui.community.BoardDetailActivity::class.java).apply {
+                                        putExtra("board_id", groupInfo.communityId.toInt())
+                                        putExtra("board_name", groupInfo.communityName)
+                                        // 获取token
+                                        val db = com.yhchat.canary.data.local.AppDatabase.getDatabase(context)
+                                        val tokenRepository = com.yhchat.canary.data.repository.TokenRepository(db.userTokenDao(), context)
+                                        val token = tokenRepository.getTokenSync()
+                                        putExtra("token", token)
+                                    }
+                                    context.startActivity(intent)
+                                }
+                                .padding(vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "所属社区",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = groupInfo.communityName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.NavigateNext,
+                                    contentDescription = "查看",
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
             }

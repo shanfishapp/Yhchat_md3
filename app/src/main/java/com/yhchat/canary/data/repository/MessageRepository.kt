@@ -150,7 +150,8 @@ class MessageRepository @Inject constructor(
         contentType: Int = 1, // 1-文本
         quoteMsgId: String? = null,
         quoteMsgText: String? = null,
-        commandId: Long? = null  // 指令ID
+        commandId: Long? = null,  // 指令ID
+        mentionedIds: List<String> = emptyList()  // 被提及的用户ID列表
     ): Result<Boolean> {
         return try {
             val tokenFlow = tokenRepository.getToken()
@@ -161,7 +162,7 @@ class MessageRepository @Inject constructor(
             }
 
             val msgId = UUID.randomUUID().toString().replace("-", "")
-            
+
             // 构建protobuf请求
             val contentBuilder = send_message_send.Content.newBuilder()
                 .setText(text)
@@ -171,6 +172,12 @@ class MessageRepository @Inject constructor(
                 contentBuilder.setQuoteMsgText(quoteMsgText)
             }
             
+            // 添加被提及的用户ID
+            if (mentionedIds.isNotEmpty()) {
+                contentBuilder.addAllMentionedId(mentionedIds)
+                Log.d(tag, "📋 添加提及用户ID: $mentionedIds")
+            }
+
             val requestBuilder = send_message_send.newBuilder()
                 .setMsgId(msgId)
                 .setChatId(chatId)
@@ -191,7 +198,7 @@ class MessageRepository @Inject constructor(
             val request = requestBuilder.build()
             val requestBody = request.toByteArray().toRequestBody("application/x-protobuf".toMediaType())
 
-            Log.d(tag, "Sending message to chat: $chatId, type: $chatType, text: $text")
+            Log.d(tag, "Sending message to chat: $chatId, type: $chatType, text: $text, mentioned: $mentionedIds")
             
             val response = apiService.sendMessage(token, requestBody)
             
