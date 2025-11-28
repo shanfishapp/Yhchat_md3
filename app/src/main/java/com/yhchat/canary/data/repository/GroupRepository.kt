@@ -24,8 +24,6 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
-import com.google.gson.Gson
-import okhttp3.RequestBody
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -904,7 +902,7 @@ class GroupRepository @Inject constructor(
 
 // 扩展函数用于将对象转换为JSON请求体
 fun Any.toJsonRequestBody(): okhttp3.RequestBody {
-    val gson = com.google.gson.Gson()
+    val gson = Gson()
     val json = gson.toJson(this)
     return json.toRequestBody("application/json".toMediaTypeOrNull())
 }
