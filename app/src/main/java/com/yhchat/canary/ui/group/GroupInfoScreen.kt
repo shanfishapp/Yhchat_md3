@@ -771,7 +771,7 @@ fun EditGroupNicknameDialog(
         confirmButton = {
             TextButton(
                 onClick = { onConfirm(nickname) },
-                enabled = !isLoading && nickname.isNotBlank()
+                enabled = !isLoading
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(

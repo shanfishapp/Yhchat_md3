@@ -380,9 +380,15 @@ class GroupInfoViewModel @Inject constructor(
      * 获取当前用户在群中的昵称
      */
     fun getCurrentUserNicknameInGroup(): String {
-        val currentUserId = tokenRepository.getUserIdSync() ?: ""
+        // 优先使用从group-info接口获取的群昵称
+        _uiState.value.groupInfo?.nickname?.let { nickname ->
+            if (nickname.isNotEmpty()) {
+                return nickname
+            }
+        }
         
-        // Find current user in the members list to get their nickname
+        // 如果群昵称为空，则从成员列表中获取昵称
+        val currentUserId = tokenRepository.getUserIdSync() ?: ""
         return _uiState.value.members.find { member ->
             member.userId == currentUserId
         }?.name ?: ""

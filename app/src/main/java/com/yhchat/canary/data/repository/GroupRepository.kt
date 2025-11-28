@@ -138,7 +138,8 @@ class GroupRepository @Inject constructor(
                 ownerId = data.owner,
                 limitedMsgType = data.limitedMsgType,
                 avatarId = data.avatarId,
-                recommendation = data.recommandation
+                recommendation = data.recommandation,
+                nickname = data.nickname
             )
 
             Log.d(

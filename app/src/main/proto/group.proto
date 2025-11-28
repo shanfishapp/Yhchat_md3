@@ -79,6 +79,8 @@ message info {
         int32 recommandation = 24; // 是否加入群推荐
         repeated string tag_old = 26; // 标签(旧版)
         repeated Tag tag = 27;
+        string nickname = 28;
+        string group_code = 29; // 群口令
 
         // 已使用标签信息
         message Tag {
