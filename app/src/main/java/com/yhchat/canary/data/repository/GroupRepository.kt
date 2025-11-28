@@ -874,10 +874,10 @@ class GroupRepository @Inject constructor(
             val response = apiService.editMyGroupNickname(token, request)
             
             if (response.isSuccessful && response.body()?.code == 1) {
-                Log.d(tag, "✅ My group nickname edited successfully: ${response.body()?.msg}")
+                Log.d(tag, "✅ My group nickname edited successfully: ${response.body()?.message}")
                 Result.success(true)
             } else {
-                val errorMsg = response.body()?.msg ?: "设置群昵称失败: ${response.code()}"
+                val errorMsg = response.body()?.message ?: "设置群昵称失败: ${response.code()}"
                 Log.e(tag, "❌ HTTP error: ${response.code()}, message: $errorMsg")
                 Result.failure(Exception(errorMsg))
             }
