@@ -871,24 +871,15 @@ class GroupRepository @Inject constructor(
                 botId = nickname
             )
             
-            val requestBody = request.toJsonRequestBody()
+            val response = apiService.editMyGroupNickname(token, request)
             
-            val requestObj = Request.Builder()
-                .url("$baseUrl/v1/group/edit-my-group-nickname")
-                .addHeader("token", token)
-                .post(requestBody)
-                .build()
-
-            Log.d(tag, "📤 Sending edit my group nickname request...")
-            val response = client.newCall(requestObj).execute()
-
-            if (response.isSuccessful) {
-                val responseText = response.body?.string()
-                Log.d(tag, "✅ My group nickname edited successfully: $responseText")
+            if (response.isSuccessful && response.body()?.code == 1) {
+                Log.d(tag, "✅ My group nickname edited successfully: ${response.body()?.msg}")
                 Result.success(true)
             } else {
-                Log.e(tag, "❌ HTTP error: ${response.code}")
-                Result.failure(Exception("设置群昵称失败: ${response.code}"))
+                val errorMsg = response.body()?.msg ?: "设置群昵称失败: ${response.code()}"
+                Log.e(tag, "❌ HTTP error: ${response.code()}, message: $errorMsg")
+                Result.failure(Exception(errorMsg))
             }
         } catch (e: IOException) {
             Log.e(tag, "Network error", e)

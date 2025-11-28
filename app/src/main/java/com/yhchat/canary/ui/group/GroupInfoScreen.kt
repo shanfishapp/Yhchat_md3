@@ -95,35 +95,12 @@ fun GroupInfoScreenRoot(
                             }
                         },
                         actions = {
-                            // 添加三个点菜单
-                            var showMenu by remember { mutableStateOf(false) }
-                            Box {
-                                IconButton(onClick = { showMenu = true }) {
-                                    Icon(
-                                        imageVector = Icons.Default.MoreVert,
-                                        contentDescription = "更多选项"
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = showMenu,
-                                    onDismissRequest = { showMenu = false }
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text("编辑我的群昵称") },
-                                        onClick = {
-                                            showMenu = false
-                                            showEditNicknameDialog = true
-                                        }
-                                    )
-                                    Divider()
-                                    DropdownMenuItem(
-                                        text = { Text("群聊设置") },
-                                        onClick = {
-                                            showMenu = false
-                                            onSettingsClick()
-                                        }
-                                    )
-                                }
+                            // 直接进入群聊设置
+                            IconButton(onClick = onSettingsClick) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "群聊设置"
+                                )
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
@@ -537,13 +514,6 @@ private fun GroupInfoContent(
                             intent.putExtra(com.yhchat.canary.ui.group.GroupSettingsActivity.EXTRA_GROUP_NAME, currentGroupName)
                             currentContext.startActivity(intent)
                         }
-                    )
-                    
-                    // 编辑我的群昵称
-                    FunctionMenuItem(
-                        icon = Icons.Default.Edit,
-                        text = "编辑我的群昵称",
-                        onClick = onEditNicknameClick
                     )
                     
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
