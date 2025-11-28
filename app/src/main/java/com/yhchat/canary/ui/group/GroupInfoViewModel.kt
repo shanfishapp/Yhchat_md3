@@ -363,6 +363,8 @@ class GroupInfoViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         successMessage = "群昵称设置成功"
                     )
+                    // Reload group members to update the nickname in the UI
+                    loadGroupMembers(groupId)
                 },
                 onFailure = { error ->
                     Log.e(tag, "❌ Failed to edit my group nickname", error)
@@ -372,6 +374,18 @@ class GroupInfoViewModel @Inject constructor(
                 }
             )
         }
+    }
+    
+    /**
+     * 获取当前用户在群中的昵称
+     */
+    fun getCurrentUserNicknameInGroup(): String {
+        val currentUserId = tokenRepository.getUserIdSync() ?: ""
+        
+        // Find current user in the members list to get their nickname
+        return _uiState.value.members.find { member ->
+            member.userId == currentUserId
+        }?.name ?: ""
     }
 }
 

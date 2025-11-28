@@ -269,8 +269,10 @@ fun GroupInfoScreenRoot(
     
     // 编辑群昵称对话框
     if (showEditNicknameDialog) {
+        val currentUserNickname = viewModel.getCurrentUserNicknameInGroup()
+        
         EditGroupNicknameDialog(
-            currentNickname = "", // 如果没有设置群昵称则显示为空
+            currentNickname = currentUserNickname,
             onConfirm = { newNickname: String ->
                 viewModel.editMyGroupNickname(groupId, newNickname)
                 showEditNicknameDialog = false
@@ -746,6 +748,7 @@ fun ExitGroupDialog(
             }
         }
     )
+}
 
 /**
  * 编辑群昵称对话框
@@ -814,7 +817,4 @@ fun EditGroupNicknameDialog(
             }
         }
     )
-}
-
-
 }
