@@ -1045,11 +1045,11 @@ private fun MessageItem(
                         },
                         onLongClick = {
                             // 长按头像艾特用户
-                            val context = LocalContext.current
-                            
                             // 调用艾特用户函数
                             mentionUser(message.sender.chatId, message.sender.name)
                             
+                            // 使用LocalContext获取context来显示Toast
+                            val context = LocalContext.current
                             Toast.makeText(context, "已添加@${message.sender.name}到输入框", Toast.LENGTH_SHORT).show()
                         }
                     ),

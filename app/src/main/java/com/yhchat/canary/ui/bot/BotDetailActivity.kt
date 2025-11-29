@@ -121,7 +121,14 @@ class BotDetailActivity : BaseActivity() {
                     botName = botName,
                     chatType = chatType,
                     viewModel = viewModel,
-                    onBackClick = { finish() }
+                    onBackClick = { finish() },
+                    onNavigateToUserProfile = { userId, userName ->
+                        com.yhchat.canary.ui.profile.UserProfileActivity.start(
+                            this@BotDetailActivity,
+                            userId,
+                            userName
+                        )
+                    }
                 )
             }
         }
@@ -139,7 +146,8 @@ private fun BotDetailScreen(
     botName: String,
     chatType: Int,
     viewModel: BotDetailViewModel,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onNavigateToUserProfile: (String, String) -> Unit = { _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showImageViewer by remember { mutableStateOf(false) }
@@ -460,12 +468,7 @@ private fun BotDetailContent(
                         .fillMaxWidth()
                         .clickable {
                             // 跳转到创建者用户资料页面
-                            val context = LocalContext.current
-                            com.yhchat.canary.ui.profile.UserProfileActivity.start(
-                                context,
-                                botInfo.data.createBy,
-                                "创建者"
-                            )
+                            onNavigateToUserProfile(botInfo.data.createBy, "创建者")
                         }
                         .padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
