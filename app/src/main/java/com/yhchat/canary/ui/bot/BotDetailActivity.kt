@@ -460,8 +460,9 @@ private fun BotDetailContent(
                         .fillMaxWidth()
                         .clickable {
                             // 跳转到创建者用户资料页面
+                            val context = LocalContext.current
                             com.yhchat.canary.ui.profile.UserProfileActivity.start(
-                                LocalContext.current,
+                                context,
                                 botInfo.data.createBy,
                                 "创建者"
                             )

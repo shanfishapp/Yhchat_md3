@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.yhchat.canary.ui.components.ImageUtils
+import kotlinx.coroutines.runBlocking
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -484,7 +485,7 @@ private fun GroupSettingsContent(
                                         // 获取token
                                         val db = com.yhchat.canary.data.local.AppDatabase.getDatabase(context)
                                         val tokenRepository = com.yhchat.canary.data.repository.TokenRepository(db.userTokenDao(), context)
-                                        val token = tokenRepository.getTokenSync()
+                                        val token = runBlocking { tokenRepository.getTokenSync() }
                                         putExtra("token", token)
                                     }
                                     context.startActivity(intent)

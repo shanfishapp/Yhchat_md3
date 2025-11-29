@@ -144,6 +144,12 @@ fun ChatScreen(
     // 艾特的用户ID列表，用于发送消息时
     var mentionedUsers by remember { mutableStateOf<Map<String, String>>(emptyMap()) } // Map<userId, userName>
     
+    // 协程作用域
+    val coroutineScope = rememberCoroutineScope()
+    
+    // 输入框焦点请求器
+    val inputFocusRequester = remember { FocusRequester() }
+    
     // 艾特用户回调
     val mentionUser = { userId: String, userName: String ->
         // 将@用户名添加到输入框
@@ -166,7 +172,6 @@ fun ChatScreen(
     
     // 滚动到底部按钮状态
     var showScrollToBottomButton by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
     
     // 引用消息状态
     var quotedMessageId by remember { mutableStateOf<String?>(null) }
@@ -175,9 +180,6 @@ fun ChatScreen(
     // 编辑消息状态
     var showEditDialog by remember { mutableStateOf(false) }
     var messageToEdit by remember { mutableStateOf<ChatMessage?>(null) }
-    
-    // 输入框焦点请求器
-    val inputFocusRequester = remember { FocusRequester() }
     
     // 键盘显示状态
     var shouldShowKeyboard by remember { mutableStateOf(false) }
